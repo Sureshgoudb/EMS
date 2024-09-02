@@ -1,0 +1,65 @@
+.addDeviceForm .MuiPaper-root {
+  margin: 10px !important;
+  width: 50% !important;
+}
+
+.devicename--cell {
+  color: #007c89;
+  cursor: pointer;
+}
+
+.add_from_Icon {
+  background-color: #007c89;
+  color: #fff;
+}
+
+.add_from_section,
+.share-device-btn {
+  background-color: #007c89 !important;
+  color: #fff !important;
+  ;
+}
+
+.action-cancel-btn {
+  background-color: #e2640b !important;
+  color: #fff !important;
+  ;
+}
+
+.device_list_section {
+
+  padding: 0px;
+  margin: 0px;
+}
+
+.header_section {
+  height: 40vh;
+  background: #68a9cf;
+  padding: 0px;
+}
+
+.block {
+  background: skyblue;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.static {
+  background: blue;
+}
+
+.droppable-element {
+  height: 50px;
+  width: 250px;
+  background: skyblue;
+  margin: 10px;
+  border: 2px dashed;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.first-row {
+  background-color: lightblue; /* Or any desired color */
+}

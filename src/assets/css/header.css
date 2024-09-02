@@ -1,0 +1,13 @@
+.MuiTabs-flexContainer {
+  a {
+    font-size: 0.7rem;
+    margin: 0px 3px;
+    min-height: 72px;
+  }
+}
+
+.MuiTabs-root {
+  .MuiTabs-indicator {
+    background-color: #fff;
+  }
+}

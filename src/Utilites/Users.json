@@ -1,0 +1,23 @@
+[
+    {
+        "id" : 1,
+        "email": "test@example.com",
+        "password": "Test@123",
+        "user_type": "admin",
+        "fullname": "Tester"
+    },
+
+    {   "id": 2,
+        "email": "develop@example.com",
+        "password": "develop@123",
+        "user_type": "developer",
+        "fullname": "Developer"
+    },
+    
+    {   "id": 3,
+        "email": "suresh@gmail.com",
+        "password": "suresh@123",
+        "user_type": "admin",
+        "fullname": "Admin"
+    }
+]
