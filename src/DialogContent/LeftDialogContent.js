@@ -29,6 +29,8 @@ import CenterDialog from "../common/CenterDialog";
 import Typography from "@mui/material/Typography";
 import { Close } from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
+import useForm from "../Hooks/useForm";
+import { validator } from "../Helpers/validator";
 
 const BootstrapDialog = styled(Dialog)(({ theme }) => ({
   "& .MuiDialogContent-root": {
@@ -179,8 +181,31 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
     }
   };
 
+  const initState = {
+    customer: selectedDashboard.customer,
+    name: selectedDashboard.name,
+    description: selectedDashboard.description,
+  }
+
+  const submit = () => {
+    console.log(" Submited");
+  };
+
+  const {
+    handleChange,
+    handleSubmit,
+    errors,
+    resetErrors,
+    state,
+  } = useForm({
+    initState,
+    callback: submit,
+    validator,
+  })
+
   const handleEditClose = () => {
     seteditDashboard(false);
+    resetErrors();
   };
 
   const handleDelete = (e) => {
@@ -205,7 +230,8 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
   };
 
   const handleEditFormSubmit = async (e) => {
-    if (e != null || e != undefined) {
+    const isValidated = Object.values(errors).every((value) => value === "")
+    if ((e != null || e != undefined) && isValidated) {
       let updateDashboardData = {
         name: e.target.form.name.value,
         customerid: e.target.form.customer.value,
@@ -240,6 +266,7 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
     }
   };
   const handleaddFormSubmit = async (e) => {
+    handleSubmit();
     if (e != null || e != undefined) {
        if(e.target.form.name.value !== "" && e.target.form.description.value !== "" && e.target.form.customer.value !== ""){
       let createDashboard = {
@@ -252,6 +279,7 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
         await axios
           .post(apiKey + "dashboard/create/", createDashboard)
           .then((response) => {
+            console.log(response.data);
             setDashboards((prevState) => [
               ...prevState,
               {
@@ -462,6 +490,9 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
               name="name"
               label="Name"
               defaultValue={selectedDashboard.name}
+              onChange={handleChange}
+              error={errors.name ? true : false}
+              helperText={errors.name}
               type="text"
               fullWidth
               variant="standard"
@@ -475,6 +506,9 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
               name="description"
               label="Description"
               defaultValue={selectedDashboard.description}
+              onChange={handleChange}
+              error={errors.description ? true : false}
+              helperText={errors.description}
               type="text"
               fullWidth
               variant="standard"
@@ -527,7 +561,7 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
       </Dialog>
       {/*** add user */}
 
-      <CenterDialog open={open} onClose={closeDialog} title="Add Dashboard">
+      <CenterDialog open={open} onClose={() => {closeDialog(); resetErrors();}} title="Add Dashboard">
         <form
           noValidate
           autoComplete="off"
@@ -540,9 +574,11 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
             name="customer"
             select
             label="Customer"
+            value={state.customer}
             fullWidth
-            onChange={(e) => handleValidation(e)}
-            error={!valid}
+            onChange={handleChange}
+            error={errors.customer ? true : false}
+            helperText={errors.customer}
           >
             {customers.map((option) => (
               <MenuItem key={option.name} value={option.customerid}>
@@ -558,12 +594,14 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
             id="name"
             name="name"
             label="Name"
+            value={state.name}
             defaultValue=""
             type="text"
             fullWidth
             variant="standard"
-            onChange={(e) => handleValidation(e)}
-            error={!valid}
+            onChange={handleChange}
+            error={errors.name ? true : false}
+            helperText={errors.name}
           />
 
           <TextField
@@ -573,15 +611,17 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
             id="description"
             name="description"
             label="Description"
+            value={state.description}
             defaultValue=""
             type="text"
             fullWidth
             variant="standard"
-            onChange={(e) => handleValidation(e)}
-            error={!valid}
+            onChange={handleChange}
+            error={errors.description ? true : false}
+            helperText={errors.description}
           />
           <DialogActions sx={{ justifyContent: "center" }}>
-            <Button className="action-cancel-btn" onClick={closeDialog}>
+            <Button className="action-cancel-btn" onClick={() => {closeDialog(); resetErrors();}}>
               Cancel
             </Button>
             <Button

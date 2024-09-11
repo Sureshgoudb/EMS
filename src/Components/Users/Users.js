@@ -348,9 +348,11 @@ const Users = () => {
 
   const handleEditClose = () => {
     seteditUser(false);
+    resetErrors();
   };
   const handleaddUserClose = () => {
     setaddUser(false);
+    resetErrors();
   };
 
   const handleOnChange = (event) => {
@@ -360,7 +362,9 @@ const Users = () => {
 
   const handleaddFormSubmit = async (e) => {
     e.preventDefault();
-    if (e !== null || e !== undefined) {
+    handleSubmit();
+    const isValidated = Object.values(errors).every((value) => value === "");
+    if ((e !== null || e !== undefined) && isValidated) {
       if(e.target.form.username.value !== "" && e.target.form.email.value !== "" && e.target.form.phone.value !== ""&& e.target.form.usertype.value !== ""){
       let createUser = {
         name: e.target.form.username.value,
@@ -397,8 +401,10 @@ const Users = () => {
   }
   };
   const handleEditFormSubmit = async (e) => {
+    // console.log(errors);
     e.preventDefault();
-    if (e !== null || e !== undefined) {
+    const isvalidated = Object.values(errors).every((value) => value === "");
+    if ((e !== null || e !== undefined) && isvalidated) {
       if(e.target.form.username.value !== "" && e.target.form.email.value !== "" && e.target.form.phone.value !== ""&& e.target.form.usertype.value !== ""){
       let updateUserData = {
         name: e.target.form.username.value,
@@ -476,6 +482,7 @@ const Users = () => {
     username: "",
     email: "",
     phone: "",
+    usertype: ""
   };
   const handleCustomerCellClick = (params, event) => {
     event.preventDefault();
@@ -524,20 +531,22 @@ const Users = () => {
   };
   const {
     handleChange,
-    handleAddSubmit,
+    handleSubmit,
     handleBlur,
     handleUpdateSubmit,
     state,
     errors,
+    setErrors,
+    resetErrors,
     countryCode,
   } = useForm({
     initState,
     callback: submit,
     validator,
   });
-  let isValidForm =
-    Object.values(errors).filter((error) => typeof error !== "undefined")
-      .length === 0;
+  // let isValidForm =
+  //   Object.values(errors).filter((error) => typeof error !== "undefined")
+  //     .length === 0;
   const { open, openDialog, closeDialog } = useDialogActions();
 
   return (
@@ -727,7 +736,7 @@ const Users = () => {
         </DialogActions>
       </Dialog>
       {/*** add user */}
-      <CenterDialog open={open} onClose={closeDialog} title="Add User">
+      <CenterDialog open={open} onClose={() => {closeDialog(); resetErrors();}} title="Add User">
         <form
           noValidate
           autoComplete="off"
@@ -740,6 +749,7 @@ const Users = () => {
             name="username"
             label="Name"
             defaultValue=""
+            value={state.name}
             type="text"
             fullWidth
             variant="standard"
@@ -755,6 +765,7 @@ const Users = () => {
             name="email"
             label="Email"
             defaultValue=""
+            value={state.email}
             type="email"
             fullWidth
             variant="standard"
@@ -771,7 +782,10 @@ const Users = () => {
                   name="usertype"
                   select
                   label="User Type"
-                  helperText="Please select user Type"
+                  value={state.usertype}
+                  onChange={handleChange}
+                  error={errors.usertype ? true : false}
+                  helperText="Please Select User Type"
                 >
                   {userTypeList.map((option) => (
                     <MenuItem key={option.value} value={option.value}>
@@ -784,6 +798,7 @@ const Users = () => {
               <PhoneNumber
                 errors={errors}
                 state={state}
+                value={state.phone}
                 handleChange={handleChange}
                 handleBlur={handleBlur}
                 countryCode={countryCode}
@@ -791,7 +806,7 @@ const Users = () => {
             </Grid>
           </Grid>
           <DialogActions sx={{ justifyContent: "center" }}>
-            <Button className="action-cancel-btn" onClick={closeDialog}>
+            <Button className="action-cancel-btn" onClick={() => {closeDialog(); resetErrors();}}>
               Cancel
             </Button>
             <Button
@@ -800,7 +815,7 @@ const Users = () => {
               type="submit"
               variant="outlined"
               color="secondary"
-              disabled={!isValidForm}
+              // disabled={!isValidForm}
               onClick={handleaddFormSubmit}
             >
               Add

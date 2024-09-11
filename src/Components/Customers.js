@@ -25,6 +25,8 @@ import CardLayout from "../common/CardLayout";
 import useDialogActions from "../common/useDialogActions";
 import CenterDialog from "../common/CenterDialog";
 import CardTitleBar from "../common/CardTitleBar";
+import useForm from "../Hooks/useForm";
+import { validator } from "../Helpers/validator";
 
 const BootstrapDialog = styled(Dialog)(({ theme }) => ({
   "& .MuiDialogContent-root": {
@@ -163,6 +165,26 @@ function Customers() {
     },
   ];
 
+  const initState = {
+    name: selectedCustomer.name,
+    description: selectedCustomer.description,
+  }
+
+  const submit = () => {
+    console.log(" Submited");
+  };
+
+  const {
+    handleChange,
+    handleSubmit,
+    errors,
+    resetErrors,
+  } = useForm({
+    initState,
+    callback: submit,
+    validator,
+  });
+
   const handleCellClick = (params, event) => {
     let customerSelected = JSON.stringify(params.row);
     setSelectedCustomer(JSON.parse(customerSelected));
@@ -182,6 +204,7 @@ function Customers() {
   };
   const handleEditClose = () => {
     seteditCustomer(false);
+    resetErrors();
   };
   const handleaddCustomerClose = () => {
     setaddCustomer(false);
@@ -190,6 +213,7 @@ function Customers() {
     console.log("handleUserUpdate" + e);
   };
   const handleaddFormSubmit = async (e) => {
+    handleSubmit();
     if (e != null || e != undefined) {
       if(e.target.form.name.value !== "" && e.target.form.description.value !== ""){
       let createCustomer = {
@@ -216,7 +240,9 @@ function Customers() {
             setaddCustomer(false);
             closeDialog();
           })
-          .catch((error) => { });
+          .catch((error) => { 
+            console.log(error);
+          });
       };
       addCustomerData();
     }
@@ -355,6 +381,9 @@ function Customers() {
               label="Name"
               defaultValue={selectedCustomer.name}
               type="text"
+              onChange={handleChange}
+              error={errors.name ? true : false}
+              helperText={errors.name}
               fullWidth
               variant="standard"
             />
@@ -368,6 +397,9 @@ function Customers() {
               label="Description"
               defaultValue={selectedCustomer.description}
               type="text"
+              onChange={handleChange}
+              error={errors.description ? true : false}
+              helperText={errors.description}
               fullWidth
               variant="standard"
             />
@@ -419,7 +451,7 @@ function Customers() {
       </Dialog>
       {/*** add user */}
 
-      <CenterDialog open={open} onClose={closeDialog} title="Add Customer">
+      <CenterDialog open={open} onClose={() => {closeDialog(); resetErrors();}} title="Add Customer">
         <form
           noValidate
           autoComplete="off"
@@ -433,6 +465,9 @@ function Customers() {
             name="name"
             label="Name"
             defaultValue=""
+            onChange={handleChange}
+            error={errors.name? true : false}
+            helperText={errors.name}
             type="text"
             fullWidth
             variant="standard"
@@ -446,12 +481,15 @@ function Customers() {
             name="description"
             label="Description"
             defaultValue=""
+            onChange={handleChange}
+            error={errors.description? true : false}
+            helperText={errors.description} 
             type="text"
             fullWidth
             variant="standard"
           />
           <DialogActions sx={{ justifyContent: "center" }}>
-            <Button className="action-cancel-btn" onClick={closeDialog}>
+            <Button className="action-cancel-btn" onClick={() => {closeDialog(); resetErrors();}}>
               Cancel
             </Button>
             <Button

@@ -14,6 +14,9 @@ import CardTitleBar from "../common/CardTitleBar";
 import { alignProperty } from "@mui/material/styles/cssUtils";
 import Snackbar from '@mui/material/Snackbar';
 import CloseIcon from '@mui/icons-material/Close';
+import useForm from "../Hooks/useForm";
+import { validator } from "../Helpers/validator";
+
 const Profile = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -26,6 +29,26 @@ const Profile = () => {
   const [open, setOpen] = React.useState(false);
 
 
+  const initState= {
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+  }
+  const submit = () => {
+    console.log(" Submited");
+  };
+
+  const {
+    handleChange,
+    handleSubmit,
+    errors,
+    resetErrors,
+  } = useForm({
+    initState,
+    callback: submit,
+    validator,
+  });
 
   const handleClose = (event, reason) => {
     if (reason === 'clickaway') {
@@ -62,8 +85,10 @@ const Profile = () => {
   }, []);
 
 
-  const handleSubmit = async (e) => {
+  const handleUpdateSubmit = async (e) => {
     e.preventDefault();
+    const isValidated = Object.values(errors).every((value) => value === "");
+    if(isValidated) {
       if(name!== "" && email !== "" && phone !== ""&& password !== ""){
       let updateUserData = {
         name: name,
@@ -94,6 +119,7 @@ const Profile = () => {
       };
       updateUser();
     }
+  }
   };
 
   return (
@@ -107,7 +133,10 @@ const Profile = () => {
             value={name}
             onChange={(event) => {
               setName(event.target.value );
+              handleChange(event);
           }}
+            error={errors.name ? true : false}
+            helperText={errors.name}
             type="text"
             fullWidth
           />
@@ -121,7 +150,10 @@ const Profile = () => {
             value={email}
             onChange={(event) => {
               setEmail(event.target.value );
+              handleChange(event);
           }}
+            error={errors.email ? true : false}
+            helperText={errors.email}
             type="email"
             fullWidth
  
@@ -135,8 +167,11 @@ const Profile = () => {
             label="Phone Number"
             onChange={(event) => {
               setPhone(event.target.value );
+              handleChange(event);
           }}
             value={phone}
+            error={errors.phone ? true : false}
+            helperText={errors.phone}
             type="text"
             fullWidth
 
@@ -145,8 +180,12 @@ const Profile = () => {
 <Box sx={{ display: 'flex', position: 'relative' }}>
       <TextField     margin="dense" id="password" label="Password" type={showPassword ? 'text' : 'password'} fullWidth    onChange={(event) => {
             setPassword(event.target.value );
+            handleChange(event);
         }}
-          value={password}/>
+          value={password}
+          error={errors.password ? true : false}
+          helperText={errors.password}
+          />
       <IconButton   onClick={() => { setShowPassword(!showPassword) }} sx={{ position: 'absolute', right: 0, top: 15 }}>
         {showPassword ? <VisibilityOff /> : <Visibility />}
       </IconButton>
@@ -157,7 +196,7 @@ const Profile = () => {
                sx={{  top: 15 }}
               className="share-device-btn"
               autoFocus
-              onClick={handleSubmit}
+              onClick={handleUpdateSubmit}
             >
               Update
             </Button>

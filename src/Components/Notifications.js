@@ -289,6 +289,7 @@ function Notifications() {
   };
   const handleEditClose = () => {
     seteditNotification(false);
+    resetErrors();
   };
   const handleaddNotificationClose = () => {
     setaddNotification(false);
@@ -339,6 +340,28 @@ function Notifications() {
     }
 
   }
+  const initState = {
+    notificationname: selectedNotification.notificationname,
+    type: selectedNotification.type,
+    device: selectedNotification.device,
+    message: selectedNotification.message,
+  };
+  const submit = () => {
+    console.log(" Submited");
+  };
+  const {
+    handleChange,
+    resetErrors,
+    handleBlur,
+    handleSubmit,
+    state,
+    errors,
+    countryCode,
+  } = useForm({
+    initState,
+    callback: submit,
+    validator,
+  });
 
   const handleaddFormSubmit = async (e) => {
     if (e != null || e != undefined) {
@@ -380,7 +403,9 @@ function Notifications() {
   }
   };
   const handleEditFormSubmit = async (e) => {
-    if (e != null || e != undefined) {
+    handleSubmit();
+    const isValidated = Object.values(errors).every((value) => value === "");
+    if ((e != null || e != undefined) && isValidated) {
       if(e.target.form.notificationname.value !== "" && e.target.form.type.value !== "" && e.target.form.expressionfield.value !== "" && e.target.form.device.value !== "" && e.target.form.message.value !== ""){
       let updateNotificationData = {
         notificationname: e.target.form.notificationname.value,
@@ -492,27 +517,7 @@ function Notifications() {
   ];
   const label = { inputProps: { "aria-label": "Active User" } };
 
-  const initState = {
-    username: "",
-    email: "",
-    phone: "",
-  };
-  const submit = () => {
-    console.log(" Submited");
-  };
-  const {
-    handleChange,
-    handleAddSubmit,
-    handleBlur,
-    handleUpdateSubmit,
-    state,
-    errors,
-    countryCode,
-  } = useForm({
-    initState,
-    callback: submit,
-    validator,
-  });
+  
   let isValidForm =
     Object.values(errors).filter((error) => typeof error !== "undefined")
       .length === 0;
@@ -595,6 +600,7 @@ function Notifications() {
                     id="notificationname"
                     name="notificationname"
                     label="NotificationName"
+                    value={state.notificationname}
                     type="text"
                     fullWidth
                     variant="standard"
@@ -611,6 +617,7 @@ function Notifications() {
                     id="message"
                     name="message"
                     label="message"
+                    value={state.message}
                     defaultValue={selectedNotification.message}
                     type="text"
                     fullWidth
@@ -669,6 +676,7 @@ function Notifications() {
                       fullWidth
                       label="Notification Type"
                       margin="dense"
+                      value={state.type}
                       defaultValue={selectedNotification.notificationtype}
                     >
                       {notificationTypeList.map((option) => (
@@ -688,9 +696,12 @@ function Notifications() {
                     select
                     label="Device"
                     margin="dense"
+                    value={state.device}
                     fullWidth
                     onChange={handleDeviceClick}
                     defaultValue={selectedNotification.deviceid}
+                    // error={errors.device ? true : false}
+                    // helperText="Select a Device"
                   >
                     {devices.map((option) => (
                       <MenuItem
@@ -746,7 +757,7 @@ function Notifications() {
             <Button
               className="share-device-btn"
               autoFocus
-              disabled={!isValidForm}
+              // disabled={!isValidForm}
               onClick={handleEditFormSubmit}
             >
               Update

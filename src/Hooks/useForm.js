@@ -19,36 +19,56 @@ const useForm = ({ initState, callback, validator }) => {
   // ******************************
   const handleChange = e => {
     const { name, value } = e.target;
-    setState(() => ({
+    const newState = {
       ...state,
       [name]: value
-    }));
+    };
+    setState(newState);
+
     if (name === "phone") {
       const country = getCountryCode(value);
       setCountryCode(() => country);
     }
+
+    const faildFiels = validator(newState, name);
+    // console.log(faildFiels);
+    setErrors(() => ({
+      ...errors,
+      [name]: Object.values(faildFiels)[0]
+    }));
   };
 
   // ******************************
   const handleBlur = e => {
     const { name: fieldName } = e.target;
-    const faildFiels = validator(state, fieldName);
-    setErrors(() => ({
-      ...errors,
-      [fieldName]: Object.values(faildFiels)[0]
-    }));
+    // console.log(fieldName);
+  //   const faildFiels = validator(state, fieldName);
+  //   setErrors(() => ({
+  //     ...errors,
+  //     [fieldName]: Object.values(faildFiels)[0]
+  //   }));
   };
 
   // ******************************
-  const handleSubmit = e => {
-    e.preventDefault();
-    const { name: fieldName } = e.target;
-    const faildFiels = validator(state, fieldName);
-    setErrors(() => ({
-      ...errors,
-      [fieldName]: Object.values(faildFiels)[0]
-    }));
-    setIsSubmited(true);
+  const handleSubmit = () => {
+    // e.preventDefault();
+    // const { name: fieldName } = e.target;
+    console.log(initState);
+    const newErrors = {};
+    Object.keys(state).forEach(key => {
+      const faildFiels = validator(state, key);
+      newErrors[key] = Object.values(faildFiels)[0];
+    });
+    setErrors(newErrors);
+  }
+
+  const resetErrors = () => {
+    const clearedErrors = Object.keys(errors).reduce((acc, key) => {
+      acc[key] = "";
+      return acc;
+    }, {});
+  
+    setErrors(clearedErrors);
   };
 
   return {
@@ -57,6 +77,8 @@ const useForm = ({ initState, callback, validator }) => {
     handleBlur,
     state,
     errors,
+    setErrors,
+    resetErrors,
     countryCode
   };
 };
