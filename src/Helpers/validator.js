@@ -8,9 +8,9 @@ export const validator = (values, fieldName) => {
     case "email":
       validateEmail(values.email, errors);
       break;
-      case "username":
-        validateName(values.username, errors);
-        break;
+    case "username":
+      validateOnlyRequired(values.username, errors, "Username is Required");
+      break;
     case "password":
       validatePassword(values.password, errors);
       break;
@@ -18,25 +18,37 @@ export const validator = (values, fieldName) => {
       validatePhoneNumber(values.phone, errors);
       break;
     case "usertype":
-      validateUserType(values.usertype, errors);
+      validateOnlyRequired(values.usertype, errors, "Please Select a Usertype");
       break;
     case "name":
-      validateName(values.name, errors);
+      validateOnlyRequired(values.name, errors, "Name is Required");
       break;
     case "description":
-      validateDescription(values.description, errors);
+      validateOnlyRequired(values.description, errors, "Description is Required");
       break;
     case "notificationname":
-      validateNotificationName(values.notificationname, errors);
+      validateOnlyRequired(values.notificationname, errors, "Notification Name is Required");
       break;
     case "message":
-      validateMessage(values.message, errors);
+      validateOnlyRequired(values.message, errors, "Message is Required");
       break;
     case "customer":
-      validateCustomer(values.customer, errors);
+      validateOnlyRequired(values.customer, errors, "Customer Name is Required");
       break;
     case "device":
-      validateDevice(values.device, errors);
+      validateOnlyRequired(values.device, errors, "Please Select a Device");
+      break;
+    case "type":
+      validateOnlyRequired(values.type, errors, "Please Select a Notification Type");
+      break;
+    case "expressionfield":
+      validateOnlyRequired(values.expressionfield, errors, "Condition is Required");
+      break;
+    case "variable":
+      validateOnlyRequired(values.variable, errors, "Please Select a Variable");
+      break;
+    case "label":
+      validateOnlyRequired(values.label, errors, "Label is Required");
       break;
     default:
   }
@@ -172,12 +184,49 @@ function validateUserType(usertype, errors) {
 
 function validateDevice(device, errors) {
   let result = true;
+  console.log(device);
   if (!device) {
-    errors.device = "Device is Required";
+    errors.device = "Please Select a Device";
     result = false;
   }
   else {
     errors.device = "";
+  }
+  return result;
+}
+
+function validateNotificationType(notificationtype, errors) {
+  let result = true;
+  if (!notificationtype) {
+    errors.type = "Please select a notification type";
+    result = false;
+  }
+  else {
+    errors.type = "";
+  }
+  return result;
+}
+
+function validateExpressionField(expressionfield, errors) {
+  let result = true;
+  if (!expressionfield) {
+    errors.expressionfield = "Condition is required";
+    result = false;
+  }
+  else {
+    errors.expressionfield = "";
+  }
+  return result;
+}
+
+function validateOnlyRequired(value, errors, msg) {
+  let result = true;
+  if (!value) {
+    errors.value = msg;
+    result = false;
+  }
+  else {
+    errors.value = "";
   }
   return result;
 }

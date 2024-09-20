@@ -51,6 +51,7 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
   const [delopen, setDelOpen] = useState(false);
   const [selectedDashboard, setSelectedDashboard] = useState({});
   const { open, openDialog, closeDialog } = useDialogActions();
+  const [isAdd, setIsAdd] = useState(false);
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
   let user = useSelector((store) => store.user);
   user = user ? user : JSON.parse(localStorage.getItem("user"));
@@ -174,6 +175,7 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
     if (params.field === "actions") {
       if( user.user_Type !== "User")
       seteditDashboard(true);
+      setIsAdd(false);
     }
     if (params.field === "actions2") {
       if( user.user_Type !== "User")
@@ -181,11 +183,26 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
     }
   };
 
-  const initState = {
+  const [initState, setInitState] = useState({
     customer: selectedDashboard.customer,
     name: selectedDashboard.name,
     description: selectedDashboard.description,
-  }
+  });
+
+  useEffect(() => {
+    if(isAdd)
+      setInitState({
+        customer: "",
+        name: "",
+        description: "",
+      });
+    else
+      setInitState({
+        customer: selectedDashboard.customer,
+        name: selectedDashboard.name,
+        description: selectedDashboard.description,
+      })
+  }, [isAdd])
 
   const submit = () => {
     console.log(" Submited");
@@ -355,7 +372,7 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
         title={""}
         action={ user.user_Type !== "User" && (
           <Fab
-            onClick={openDialog}
+            onClick={() => {openDialog(); setIsAdd(true);}}
             aria-label="add"
             className="add_from_section"
             size="medium"

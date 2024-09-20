@@ -608,6 +608,8 @@ const Dashboard = () => {
       .catch((error) => { });
   };
 
+  // console.log(user);
+
   const drggagingDone = (layoutData) => {
     let positions = [];
     layoutData && layoutData.forEach((control) => {
@@ -741,7 +743,7 @@ const Dashboard = () => {
           className="main_dashboard"
           action={
             <div>
-              {user.user_Type !== "User" && (<Fab
+              {user && user.user_Type !== "User" && (<Fab
                 sx={{ mx: 2 }}
                 onClick={handleAdd}
                 aria-label="Add"
@@ -851,7 +853,7 @@ const Dashboard = () => {
                     <ImageComponent control={controls.controlList[i]}/>
                   </div>
                 )}
-                {user.user_Type !== "User" && (<ActionButtons className="actionButtons">
+                {user && user.user_Type !== "User" && (<ActionButtons className="actionButtons">
                   <Tooltip title="Edit">
                     <IconButton
                       onClick={() => handleEdit(controls.controlList[i])}

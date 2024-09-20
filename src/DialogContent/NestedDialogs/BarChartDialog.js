@@ -13,9 +13,13 @@ import {
   FormControl,
   Select,
   MenuItem,
+  FormHelperText,
     
 } from "@mui/material";
 import RightDrawerDialog from "../../common/RightDrawerDialog";
+import { ErrorSharp } from "@mui/icons-material";
+import useForm from "../../Hooks/useForm";
+import { validator } from "../../Helpers/validator";
 
 const BarChartDialog = ({
   customerid,
@@ -49,6 +53,7 @@ const BarChartDialog = ({
   const [selectedVariable, setSelectedVariable] = useState({});
   const [showavg, setShowavg] = useState(false);
   const [displayavg, setDisplayavg] = useState(false);
+  const [isAdd, setIsAdd] = useState(true);
   const handleDeviceClick = (e) => {
     setSelectedDevice(e.target.value);
     getVariables(e.target.value.deviceid);
@@ -106,32 +111,37 @@ const BarChartDialog = ({
   };
 
   const handleChartSubmit = (e) => {
-    let id = editData!=undefined ? editData.id : "";
-      const barChartObj = {
-        controls: [
-          { 
-            controlId : id,
-            deviceid: selectedDevice,
-            //variableid: selectedVariable,
-            controlType: "Bar",
-            position : "[3,2,0,0]",
-            properties: [{
-              variableid: selectedVariable,
-              skipAnimation: e.target.form.skipAnimation.value,
-              layout: e.target.form.layout.value,
-              chartSetting: { ...settings },
-              categoryGapRatio: e.target.form.CategoryGapRatio.value,
-              barGapRatio: e.target.form.BarGapRatio.value,
-              showavg: e.target.form.avg === undefined ? false :e.target.form.avg.checked,
-            }],
-          },
-        ],
-      };
-      handleChartObjChange(barChartObj, "Bar");
-      if (openEditDialog) {
-        closeEditDrawer();
-      } else {
-        closeDialog();
+    handleSubmit();
+    const isValidated = Object.values(errors).every((value) => value === "");
+    console.log(isValidated);
+    if(isValidated) {
+      let id = editData!=undefined ? editData.id : "";
+        const barChartObj = {
+          controls: [
+            { 
+              controlId : id,
+              deviceid: selectedDevice,
+              //variableid: selectedVariable,
+              controlType: "Bar",
+              position : "[3,2,0,0]",
+              properties: [{
+                variableid: selectedVariable,
+                skipAnimation: e.target.form.skipAnimation.value,
+                layout: e.target.form.layout.value,
+                chartSetting: { ...settings },
+                categoryGapRatio: e.target.form.CategoryGapRatio.value,
+                barGapRatio: e.target.form.BarGapRatio.value,
+                showavg: e.target.form.avg === undefined ? false :e.target.form.avg.checked,
+              }],
+            },
+          ],
+        };
+        handleChartObjChange(barChartObj, "Bar");
+        if (openEditDialog) {
+          closeEditDrawer();
+        } else {
+          closeDialog();
+        }
       }
    
   };
@@ -164,11 +174,52 @@ const BarChartDialog = ({
 
   }, [editData]);
 
+  const [initState, setInitState] = useState({
+    device: "",
+    variable: "",
+    label: "",
+    width: "",
+    height: "",
+    categoryGapRatio: "",
+    barGapRatio: "",
+  });
+
+  const submit = () => {
+    console.log(" Submited");
+  };
+
+  const {
+    handleChange,
+    handleSubmit,
+    state,
+    errors,
+    setErrors,
+    resetErrors,
+  } = useForm({
+    initState,
+    callback: submit,
+    validator,
+  });
+
+  useEffect(() => {
+    if(!isAdd) {
+      setInitState({
+        device: "",
+        variable: "",
+        label: "",
+        width: "",
+        height: "",
+        categoryGapRatio: "",
+        barGapRatio: ""
+      });
+    }
+  },[isAdd]);
+
   return (
     <>
       <RightDrawerDialog
         open={open || openEditDialog}
-        onClose={closeDialog || closeEditDrawer}
+        onClose={() => {(closeDialog ? closeDialog() : closeEditDrawer()); setIsAdd(false);}}
         isChatDialog={isChatDialog}
         title={"Bar Chart Details"}
       >
@@ -180,14 +231,14 @@ const BarChartDialog = ({
         <Grid container spacing={2} my={1}>
 
           <Grid item xs={6}>
-          <FormControl fullWidth>
+          <FormControl fullWidth error={errors.device ? true : false}>
               <InputLabel>Device</InputLabel>
               <Select
                 id="device"
                 name="device"
                
                 label="Device"
-                onChange={handleDeviceClick}
+                onChange={(e) => {handleDeviceClick(e); handleChange(e);}}
               >
                 {devices.map((item, index) => (
                   <MenuItem key={index} value={item} sx={{ font: 12 }}>
@@ -195,17 +246,18 @@ const BarChartDialog = ({
                   </MenuItem>
                 ))}
               </Select>
+              <FormHelperText>{errors.device}</FormHelperText>
             </FormControl>
           </Grid>
           <Grid item xs={6}>
-          <FormControl fullWidth>
+          <FormControl fullWidth error={errors.device ? true : false}>
               <InputLabel>Variable</InputLabel>
               <Select
                 id="variable"
                 name="variable"
                
                 label="Variable"
-                onChange={handleVariableClick}
+                onChange={(e) => {handleVariableClick(e); handleChange(e);}}
               >
                 {variables.map((item, index) => (
                   <MenuItem key={index} value={item} sx={{ font: 12 }}>
@@ -213,6 +265,7 @@ const BarChartDialog = ({
                   </MenuItem>
                 ))}
               </Select>
+              <FormHelperText>{errors.variable}</FormHelperText>
             </FormControl>
           </Grid>
           <Grid item xs={12}>
@@ -224,10 +277,13 @@ const BarChartDialog = ({
               label="label"
               id="label"
               name="label"
+              error={errors.label ? true : false}
+              helperText={errors.label}
               defaultValue={editData!=null ?editData.label:""}
-              onChange={(event) =>
-                handleChartSettingChange("label", event.target.value)
-              }
+              onChange={(event) => {
+                handleChartSettingChange("label", event.target.value);
+                handleChange(event);
+              }}
             />
           </Grid>
           <Grid item xs={3}>

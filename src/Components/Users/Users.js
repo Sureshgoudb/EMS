@@ -131,6 +131,7 @@ const Users = () => {
   const [selectedValue, setSelectedValue] = useState("");
   const [customerData, setCustomerData] = useState([]);
   const [customerInfo, setCustomerInfo] = useState({});
+  const [isAdd, setIsAdd] = useState(false);
   const user = useSelector((store) => store.user);
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
   const customerID = user
@@ -240,7 +241,7 @@ const Users = () => {
       },
     ];
 
-    
+    // console.log(user);
 
   const getUsers = async () => {
     const customer = await axios.get(apiKey + "customer/item/" + customerID);
@@ -320,6 +321,7 @@ const Users = () => {
     setselectedUsers(parsedUser);
     if (params.field === "actions") {
       seteditUser(true);
+      setIsAdd(false);
     }
     if (params.field === "actions2") {
       let userID;
@@ -478,12 +480,32 @@ const Users = () => {
     },
   ];
   const label = { inputProps: { "aria-label": "Active User" } };
-  const initState = {
-    username: "",
-    email: "",
-    phone: "",
-    usertype: ""
-  };
+  
+  const [initState, setInitState] = useState({
+    username: selectedUser.username,
+    email: selectedUser.email,
+    phone: selectedUser.phone,
+    usertype: selectedUser.usertype,
+  });
+
+  useEffect(() => {
+    if(isAdd)
+      setInitState({
+        username: "",
+        email: "",
+        phone: "",
+        usertype: "",
+      });
+    else
+      setInitState({
+        username: selectedUser.username,
+        email: selectedUser.email,
+        phone: selectedUser.phone,
+        usertype: selectedUser.usertype,
+      })
+  }, [isAdd])
+
+
   const handleCustomerCellClick = (params, event) => {
     event.preventDefault();
     let customerSelected = JSON.stringify(params.row);
@@ -556,7 +578,7 @@ const Users = () => {
         title={`${users.length} Users`}
         action={
           <Fab
-            onClick={openDialog}
+            onClick={() => {openDialog(); setIsAdd(true);}}
             aria-label="add"
             className="add_from_section"
             size="medium"
@@ -683,11 +705,12 @@ const Users = () => {
 
             <PhoneNumber 
               errors={errors}
+              // defaultValue={selectedUser.phone}
               state={selectedUser}
               handleChange={handleChange}
               handleBlur={handleBlur}
               countryCode={countryCode}
-              defaultValue={selectedUser.phone}
+              // value={state.phone}
             />
           </DialogContent>
           <DialogActions>
@@ -749,7 +772,7 @@ const Users = () => {
             name="username"
             label="Name"
             defaultValue=""
-            value={state.name}
+            // value={state.name}
             type="text"
             fullWidth
             variant="standard"
@@ -765,7 +788,7 @@ const Users = () => {
             name="email"
             label="Email"
             defaultValue=""
-            value={state.email}
+            // value={state.email}
             type="email"
             fullWidth
             variant="standard"
@@ -782,7 +805,7 @@ const Users = () => {
                   name="usertype"
                   select
                   label="User Type"
-                  value={state.usertype}
+                  // value={state.usertype}
                   onChange={handleChange}
                   error={errors.usertype ? true : false}
                   helperText="Please Select User Type"
@@ -798,7 +821,8 @@ const Users = () => {
               <PhoneNumber
                 errors={errors}
                 state={state}
-                value={state.phone}
+                defaultValue=""
+                // value={state.phone}
                 handleChange={handleChange}
                 handleBlur={handleBlur}
                 countryCode={countryCode}

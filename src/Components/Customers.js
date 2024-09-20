@@ -65,6 +65,7 @@ function Customers() {
   const [delopen, setDelOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState({});
   const [selectedValue, setSelectedValue] = useState("");
+  const [isAdd, setIsAdd] = useState(false);
   const user = useSelector((store) => store.user);
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
   console.log("store -- " + user);
@@ -165,10 +166,23 @@ function Customers() {
     },
   ];
 
-  const initState = {
+  const [initState, setInitState] = useState({
     name: selectedCustomer.name,
     description: selectedCustomer.description,
-  }
+  });
+
+  useEffect(() => {
+    if(isAdd)
+      setInitState({
+        name: "",
+        description: "",
+      });
+    else
+      setInitState({
+        name: selectedCustomer.name,
+        description: selectedCustomer.description,
+      })
+  }, [isAdd])
 
   const submit = () => {
     console.log(" Submited");
@@ -191,6 +205,7 @@ function Customers() {
     //console.log('Cell clicked:', params.field, params.value);
     if (params.field === "actions") {
       seteditCustomer(true);
+      setIsAdd(false);
     }
     if (params.field === "actions2") {
        if(selectedCustomer.customerid !== customerID){
@@ -311,7 +326,7 @@ function Customers() {
         title={`${customers.length} Customers`}
         action={
           <Fab
-            onClick={openDialog}
+            onClick={() => {openDialog(); setIsAdd(true);}}
             aria-label="add"
             className="add_from_section"
             size="medium"

@@ -11,6 +11,7 @@ import {
   Box,
   Fab,
   FormControl,
+  FormHelperText,
   InputLabel,
   MenuItem,
   Paper,
@@ -169,6 +170,7 @@ function Notifications() {
   const [selectedValue, setSelectedValue] = useState("");
   const [variable, setVariable] = useState([]);
   const [withoutVariable, setwithoutVariable] = useState([]);
+  const [isAdd, setIsAdd] = useState(false);
   const [params, setParams] = useState({
     id: 1,
     variableid: "",
@@ -265,6 +267,7 @@ function Notifications() {
       setExpression(parsedNotificationSelected.conditionfield);
       getDeviceList(false);
       getParamsForDevice(apiKey + "instant/list/" + parsedNotificationSelected.deviceid);
+      setIsAdd(false);
 
     }
     if (params.field === "actions2") {
@@ -340,12 +343,33 @@ function Notifications() {
     }
 
   }
-  const initState = {
+  const [initState, setInitState] = useState({
     notificationname: selectedNotification.notificationname,
     type: selectedNotification.type,
-    device: selectedNotification.device,
+    device: selectedNotification.deviceid,
     message: selectedNotification.message,
-  };
+    expressionfield: selectedNotification.expressionfield
+  });
+
+  useEffect(() => {
+    if(isAdd)
+      setInitState({
+        notificationname: "",
+        message: "",
+        type: "",
+        device: "",
+        expressionfield: "",
+      });
+    else
+      setInitState({
+        notificationname: selectedNotification.notificationname,
+        message: selectedNotification.message,
+        type: selectedNotification.type,
+        device: selectedNotification.deviceid,
+        expressionfield: selectedNotification.expressionfield,
+      })
+  }, [isAdd])
+
   const submit = () => {
     console.log(" Submited");
   };
@@ -364,7 +388,9 @@ function Notifications() {
   });
 
   const handleaddFormSubmit = async (e) => {
-    if (e != null || e != undefined) {
+    handleSubmit();
+    const isValidated = Object.values(errors).every((value) => value === "");
+    if ((e != null || e != undefined) && isValidated && errorMsg === "Vaid Expression") {
       if(e.target.form.notificationname.value !== "" && e.target.form.type.value !== "" && e.target.form.expressionfield.value !== "" && e.target.form.device.value !== "" && e.target.form.message.value !== ""){
       
       let createNotification = {
@@ -403,9 +429,8 @@ function Notifications() {
   }
   };
   const handleEditFormSubmit = async (e) => {
-    handleSubmit();
     const isValidated = Object.values(errors).every((value) => value === "");
-    if ((e != null || e != undefined) && isValidated) {
+    if ((e != null || e != undefined) && isValidated && errorMsg === "Valid Expression") {
       if(e.target.form.notificationname.value !== "" && e.target.form.type.value !== "" && e.target.form.expressionfield.value !== "" && e.target.form.device.value !== "" && e.target.form.message.value !== ""){
       let updateNotificationData = {
         notificationname: e.target.form.notificationname.value,
@@ -533,7 +558,7 @@ function Notifications() {
         title={`${notifications.length} Notifications`}
         action={
           <Fab
-            onClick={handleaddNotification}
+            onClick={() => {handleaddNotification(); setIsAdd(true);}}
             aria-label="add"
             className="add_from_section"
             size="medium"
@@ -578,7 +603,7 @@ function Notifications() {
         </DialogTitle>
         <IconButton
           aria-label="close"
-          onClick={handleEditClose}
+          onClick={() => {handleEditClose(); resetErrors();}}
           sx={{
             position: "absolute",
             right: 8,
@@ -600,7 +625,7 @@ function Notifications() {
                     id="notificationname"
                     name="notificationname"
                     label="NotificationName"
-                    value={state.notificationname}
+                    // value={state.notificationname}
                     type="text"
                     fullWidth
                     variant="standard"
@@ -617,7 +642,7 @@ function Notifications() {
                     id="message"
                     name="message"
                     label="message"
-                    value={state.message}
+                    // value={state.message}
                     defaultValue={selectedNotification.message}
                     type="text"
                     fullWidth
@@ -636,10 +661,17 @@ function Notifications() {
                     name="expressionfield"
                     label="Notification Condition."
                     value={expression}
-                    onChange={conditioncheck}
+                    error={!!(errors.expressionfield || errorMsg === "Invalid Expression")}
+                    helperText={
+                      <>
+                        <span>{errors.expressionfield}</span><br />
+                        <span>{errorMsg}</span>
+                      </>
+                    }
+                    onChange={(e) => {conditioncheck(e); handleChange(e);}}
                     defaultValue={selectedNotification.conditionfield}
                   />
-                   <Typography>{errorMsg}</Typography>
+                   {/* <Typography>{errorMsg}</Typography> */}
                    <Typography>Select the Device Variable</Typography>
                   <Paper style={{ maxHeight: 200, overflow: "auto" }}>
                     <List sx={{ mx: 2, p: 2 }}>
@@ -676,7 +708,7 @@ function Notifications() {
                       fullWidth
                       label="Notification Type"
                       margin="dense"
-                      value={state.type}
+                      // value={state.type}
                       defaultValue={selectedNotification.notificationtype}
                     >
                       {notificationTypeList.map((option) => (
@@ -696,7 +728,7 @@ function Notifications() {
                     select
                     label="Device"
                     margin="dense"
-                    value={state.device}
+                    // value={state.device}
                     fullWidth
                     onChange={handleDeviceClick}
                     defaultValue={selectedNotification.deviceid}
@@ -751,7 +783,7 @@ function Notifications() {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button className="action-cancel-btn" onClick={handleEditClose}>
+            <Button className="action-cancel-btn" onClick={() => {handleEditClose(); resetErrors();}}>
               Cancel
             </Button>
             <Button
@@ -809,7 +841,7 @@ function Notifications() {
         </DialogTitle>
         <IconButton
           aria-label="close"
-          onClick={closeDialog}
+          onClick={()=> {closeDialog(); resetErrors();}}
           sx={{
             position: "absolute",
             right: 8,
@@ -859,7 +891,7 @@ function Notifications() {
             </Grid>
       
             <Grid item xs={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth error={errors.type ? true : false}>
                 <InputLabel id="demo-simple-select-label">
                   Notification Type
                 </InputLabel>
@@ -868,6 +900,7 @@ function Notifications() {
                   id="tupe"
                   name="type"
                   label="Notification Type"
+                  onChange={handleChange}
                 >
                   {notificationTypeList.map((option) => (
                     <MenuItem
@@ -879,17 +912,18 @@ function Notifications() {
                     </MenuItem>
                   ))}
                 </Select>
+                <FormHelperText>{errors.type}</FormHelperText>
               </FormControl>
             </Grid>
             <Grid item xs={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth error={errors.device ? true : false}>
                 <InputLabel id="demo-simple-select-label">Device</InputLabel>
                 <Select
                   labelId="demo-simple-select-label"
                   id="device"
                   name="device"
                   label="Device"
-                  onChange={handleDeviceClick}
+                  onChange={(e) => {handleDeviceClick(e); handleChange(e);}}
                 >
                   {devices.map((option) => (
                     <MenuItem
@@ -901,6 +935,7 @@ function Notifications() {
                     </MenuItem>
                   ))}
                 </Select>
+                <FormHelperText>{errors.device}</FormHelperText>
               </FormControl>
             </Grid>
             <Grid item xs={6} md={6}>
@@ -913,9 +948,16 @@ function Notifications() {
                 name="expressionfield"
                 label="Notification Condition."
                 value={expression}
-                onChange={conditioncheck}
+                error={!!(errors.expressionfield || errorMsg === "Invalid Expression")}
+                helperText={
+                  <>
+                    <span>{errors.expressionfield}</span><br />
+                    <span>{errorMsg}</span>
+                  </>
+                }
+                onChange={(e) => {conditioncheck(e); handleChange(e);}}
               />
-            <Typography>{errorMsg}</Typography>
+            {/* <Typography>{errorMsg}</Typography> */}
             <Typography>Select the Device Variable</Typography>
                   <Paper style={{ maxHeight: 200, overflow: "auto" }}>
                     <List sx={{ mx: 2, p: 2 }}>
@@ -973,13 +1015,13 @@ function Notifications() {
           </Box>
           </DialogContent>
           <DialogActions sx={{ justifyContent: "center" }}>
-            <Button className="action-cancel-btn" onClick={closeDialog}>
+            <Button className="action-cancel-btn" onClick={() => {closeDialog(); resetErrors();}}>
               Cancel
             </Button>
             <Button
               className="share-device-btn"
               autoFocus
-              disabled={!isValidForm}
+              // disabled={!isValidForm}
               onClick={handleaddFormSubmit}
             >
               Add

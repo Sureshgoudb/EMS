@@ -8,13 +8,17 @@ const useForm = ({ initState, callback, validator }) => {
   const [isSubmited, setIsSubmited] = useState(false);
   const [countryCode, setCountryCode] = useState("");
 
-  // ******************************
   useEffect(() => {
-    const isValidErrors = () =>
-      Object.values(errors).filter(error => typeof error !== "undefined")
-        .length > 0;
-    if (isSubmited && !isValidErrors()) callback();
-  }, [errors]);
+    setState(initState);
+  }, [initState]);
+
+  // ******************************
+  // useEffect(() => {
+  //   const isValidErrors = () =>
+  //     Object.values(errors).filter(error => typeof error !== "undefined")
+  //       .length > 0;
+  //   if (isSubmited && !isValidErrors()) callback();
+  // }, [errors]);
 
   // ******************************
   const handleChange = e => {
@@ -53,12 +57,12 @@ const useForm = ({ initState, callback, validator }) => {
   const handleSubmit = () => {
     // e.preventDefault();
     // const { name: fieldName } = e.target;
-    console.log(initState);
     const newErrors = {};
     Object.keys(state).forEach(key => {
       const faildFiels = validator(state, key);
       newErrors[key] = Object.values(faildFiels)[0];
     });
+    console.log(newErrors);
     setErrors(newErrors);
   }
 
