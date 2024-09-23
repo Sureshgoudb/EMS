@@ -13,6 +13,8 @@ import {
 import RightDrawerDialog from "../../common/RightDrawerDialog";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
+import useForm from "../../Hooks/useForm";
+import { validator } from "../../Helpers/validator";
 
 const LabelDialog = ({   customerid,closeDialog, open, isChatDialog, handleChartObjChange,editData }) => {
 
@@ -38,6 +40,8 @@ const LabelDialog = ({   customerid,closeDialog, open, isChatDialog, handleChart
     controlType: "Label",
     controlId:""
   });
+
+  // const [isAdd, setIsAdd] = useState(true);
 
   const handleFontChange = (event) => {
     setTextProperties({ ...textProperties, font: event.target.value });
@@ -77,7 +81,7 @@ const LabelDialog = ({   customerid,closeDialog, open, isChatDialog, handleChart
     setTextProperties({ ...textProperties, label: event.target.value });
   };
   
-  const handleSubmit = () => {
+  const handleLabelSubmit = () => {
     let id = editData!=undefined ? editData.id : "";
     setTextProperties({ ...textProperties, controlId: id});
     const tetxObj = {
@@ -121,11 +125,40 @@ bgcolor:editData.bgcolor
   }
    }, [editData]);
 
+  const [initState, setInitState] = useState(editData ? {
+    name : editData.name,
+    label : editData.label,
+    } : {
+      name: "",
+      label: ""
+  })
+
+  // useEffect(() => {
+  //   if(!isAdd)
+  //     setInitState({
+  //       name: textProperties.name,
+  //       label: textProperties.label
+  //     }) 
+  // }, [isAdd]);
+
+  const {
+    handleChange,
+    handleSubmit,
+    state,
+    errors,
+    setErrors,
+    resetErrors,
+  } = useForm({
+    initState,
+    callback: handleLabelSubmit,
+    validator,
+  });
+
   return (
     <>
       <RightDrawerDialog
         open={open}
-        onClose={closeDialog}
+        onClose={() => {closeDialog(); }}
         isChatDialog={isChatDialog}
         title={"Add Label Details"}
       >
@@ -164,8 +197,10 @@ bgcolor:editData.bgcolor
               id="name"
               label="Name"
               variant="standard"
+              error={errors.name ? true : false}
+              helperText={errors.name}
               defaultValue={editData!=null ? editData.name : ""}
-              onChange={handleNameLable}
+              onChange={(e) => {handleNameLable(e); handleChange(e);}}
             />
           </Grid>
           <Grid item xs={12}>
@@ -175,8 +210,10 @@ bgcolor:editData.bgcolor
               id="label"
               label="label"
               variant="standard"
+              error={errors.label? true : false}
+              helperText={errors.label}
               defaultValue={editData!=null ?editData.label : ""}
-              onChange={handleLable}
+              onChange={(e) => {handleLable(e); handleChange(e);}}
             />
           </Grid>
           <Grid item xs={6}>

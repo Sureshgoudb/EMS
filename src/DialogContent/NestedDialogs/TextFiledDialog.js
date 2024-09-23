@@ -16,10 +16,13 @@ import {
   Slider,
   FormControl,
   Select,
+  FormHelperText,
 } from "@mui/material";
 import RightDrawerDialog from "../../common/RightDrawerDialog";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
+import useForm from "../../Hooks/useForm";
+import { validator } from "../../Helpers/validator";
 
 const TextFieldDialog = ({   customerid,closeDialog, open, isChatDialog,   handleChartObjChange,editData }) => {
   const fontFamilies = [
@@ -60,6 +63,8 @@ const TextFieldDialog = ({   customerid,closeDialog, open, isChatDialog,   handl
   const [showavg, setShowavg] = useState(false);
   
   const [displayavg, setDisplayavg] = useState(false);
+  // const [isAdd, setIsAdd] = useState(editData ? false : true);
+
   const handleDeviceClick = (e) => {
     setSelectedDevice(e.target.value);
     setTextProperties({ ...textProperties, deviceid: e.target.value });
@@ -146,7 +151,7 @@ const TextFieldDialog = ({   customerid,closeDialog, open, isChatDialog,   handl
     setTextProperties({ ...textProperties, property: event.target.value });
   };*/
   
-  const handleSubmit = () => {
+  const handleTextSubmit = () => {
     let id = editData!=undefined ? editData.id : "";
     setTextProperties({ ...textProperties, controlId: id});
     const tetxObj = {
@@ -222,11 +227,57 @@ const TextFieldDialog = ({   customerid,closeDialog, open, isChatDialog,   handl
     getData();
    }, [editData]);
 
+  //  const [initState, setInitState] = useState({
+  //   labelData : "",
+  //   device: "",
+  //   variable: "",
+  // });
+
+  const [initState, setInitState] = useState(editData ? {
+    labelData : editData.name,
+    device : editData.deviceid,
+    variable : editData.variableid,
+  } : {
+    labelData : "",
+    device : "",
+    variable : "",
+  })
+
+  const {
+    handleChange,
+    handleSubmit,
+    state,
+    errors,
+    setErrors,
+    resetErrors,
+  } = useForm({
+    initState,
+    callback: handleTextSubmit,
+    validator,
+  });
+
+  // useEffect(() => {
+  //   if(isAdd) {
+  //     setInitState({
+  //       labelData : "",
+  //       device : "",
+  //       variable : "",
+  //     });
+  //   }
+  //   else if(editData) {
+  //     setInitState({
+  //       labelData : editData.name,
+  //       device : editData.deviceid,
+  //       variable : editData.variableid,
+  //     });
+  //   }
+  // },[isAdd]);
+
   return (
     <>
       <RightDrawerDialog
         open={open}
-        onClose={closeDialog}
+        onClose={() => {closeDialog(); }}
         isChatDialog={isChatDialog}
         title={"Add Text Field Detail"}
       >
@@ -265,8 +316,10 @@ const TextFieldDialog = ({   customerid,closeDialog, open, isChatDialog,   handl
               id="standard-basic"
               label="Name"
               variant="standard"
+              error={errors.labelData ? true : false}
+              helperText={errors.labelData}
               defaultValue={editData!=null ? editData.name : ""}
-              onChange={handleNameLable}
+              onChange={(e) => {handleNameLable(e); handleChange(e);}}
             />
           </Grid>
 
@@ -283,14 +336,14 @@ const TextFieldDialog = ({   customerid,closeDialog, open, isChatDialog,   handl
                   </Grid>
 
           <Grid item xs={6}>
-          <FormControl fullWidth>
+          <FormControl fullWidth error={errors.device ? true : false}>
               <InputLabel>Device</InputLabel>
               <Select
                 id="device"
                 name="device"
                 defaultValue={editData!=null ? editData.deviceid : ""}
                 label="Device"
-                onChange={handleDeviceClick}
+                onChange={(e) => {handleDeviceClick(e); handleChange(e);}}
               >
                {devices.map((item, index) => (
                   <MenuItem key={item.deviceid} value={item.deviceid} sx={{ font: 12 }}>
@@ -298,18 +351,19 @@ const TextFieldDialog = ({   customerid,closeDialog, open, isChatDialog,   handl
                   </MenuItem>
                 ))}
               </Select>
+              <FormHelperText>{errors.device}</FormHelperText>
             </FormControl>
           </Grid>
 
           <Grid item xs={6}>
-          <FormControl fullWidth>
+          <FormControl fullWidth error={errors.variable ? true : false}>
               <InputLabel>Variable</InputLabel>
               <Select
                 id="variable"
                 name="variable"
                 defaultValue={editData!=null ? editData.variableid : ""}
                 label="Variable"
-                onChange={handleVariableClick}
+                onChange={(e) => {handleVariableClick(e); handleChange(e);}}
               >
                  {variables.map((item, index) => (
                   <MenuItem key={item.variableid} value={item.variableid} sx={{ font: 12 }}>
@@ -317,6 +371,7 @@ const TextFieldDialog = ({   customerid,closeDialog, open, isChatDialog,   handl
                   </MenuItem>
                 ))}
               </Select>
+              <FormHelperText>{errors.variable}</FormHelperText>
             </FormControl>
           </Grid>
                   <Grid item xs={6}>

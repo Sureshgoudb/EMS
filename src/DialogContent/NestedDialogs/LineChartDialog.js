@@ -6,6 +6,7 @@ import {
   TextField,
   Grid,
   FormControl,
+  FormHelperText,
   InputLabel,
   Select,
   Divider,
@@ -18,6 +19,8 @@ import {
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RightDrawerDialog from "../../common/RightDrawerDialog";
+import useForm from "../../Hooks/useForm";
+import { validator } from "../../Helpers/validator";
 const chatOptionData = [
   "catmullRom",
   "linear",
@@ -230,6 +233,31 @@ const LineChartDialog = ({
     console.log("customerid" + customerid);
   }, [editData]);
 
+  const [initState, setInitState] = useState(editData ? {
+    name: editData.name,
+    label: editData.label,
+    style: editData.style,
+    device: editData.deviceid
+  }: {
+      name: "",
+      label: "",
+      style: "",
+      device: ""
+    })
+
+  const {
+    handleChange,
+    handleSubmit,
+    state,
+    errors,
+    setErrors,
+    resetErrors,
+  } = useForm({
+    initState,
+    callback: handleChartSubmit,
+    validator,
+  });
+
   return (
     <>
       <RightDrawerDialog
@@ -250,8 +278,10 @@ const LineChartDialog = ({
                 id="name"
                 name="name"
                 label="Name"
+                error={errors.name ? true : false}
+                helperText={errors.name}
                 defaultValue={editData != null ? editData.name : ""}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {setName(event.target.value); handleChange(event);}}
               />
             </Grid>
             <Grid item xs={6}>
@@ -260,8 +290,10 @@ const LineChartDialog = ({
                 id="label"
                 name="label"
                 label="label"
+                error={errors.label? true : false}
+                helperText={errors.label}
                 defaultValue={editData != null ? editData.label : ""}
-                onChange={(event) => setLabel(event.target.value)}
+                onChange={(event) => {setLabel(event.target.value); handleChange(event);}}
               />
             </Grid>
             {/*
@@ -287,7 +319,7 @@ const LineChartDialog = ({
           </Grid>*/
             }
             <Grid item xs={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth error={errors.style ? true : false}>
                 <InputLabel id="demo-simple-select-label">Chart Style</InputLabel>
                 <Select
                   labelId="demo-simple-select-label"
@@ -296,7 +328,7 @@ const LineChartDialog = ({
                   defaultValue={editData != null ? editData.style : ""}
 
                   label="Select Device"
-                  onChange={handleChartClick}
+                  onChange={(e) => {handleChartClick(e); handleChange(e);}}
                 >
                   {chatOptionData.map((item, index) => (
                     <MenuItem key={index} value={item} sx={{ font: 12 }}>
@@ -304,17 +336,18 @@ const LineChartDialog = ({
                     </MenuItem>
                   ))}
                 </Select>
+                <FormHelperText>{errors.style}</FormHelperText>
               </FormControl>
             </Grid>
             <Grid item xs={6}>
-              <FormControl fullWidth>
+              <FormControl fullWidth error={errors.device ? true : false}>
                 <InputLabel>Device</InputLabel>
                 <Select
                   id="device"
                   name="device"
                   defaultValue={editData != null ? editData.deviceid : ""}
                   label="Device"
-                  onChange={handleDeviceClick}
+                  onChange={(e) => {handleDeviceClick(e); handleChange(e);}}
                 >
                   {devices.map((item, index) => (
                     <MenuItem key={item.deviceid} value={item.deviceid} sx={{ font: 12 }}>
@@ -322,6 +355,7 @@ const LineChartDialog = ({
                     </MenuItem>
                   ))}
                 </Select>
+                <FormHelperText>{errors.device}</FormHelperText>
               </FormControl>
             </Grid>
             <Grid item xs={6}>
@@ -489,7 +523,7 @@ const LineChartDialog = ({
 
             <Grid item xs={12}>
               <Button
-                onClick={handleChartSubmit}
+                onClick={handleSubmit}
                 variant="contained"
                 color="primary"
                 sx={{ background: "rgba(0, 0, 0, 0.6)" }}

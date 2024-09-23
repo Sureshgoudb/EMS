@@ -184,21 +184,6 @@ function Customers() {
       })
   }, [isAdd])
 
-  const submit = () => {
-    console.log(" Submited");
-  };
-
-  const {
-    handleChange,
-    handleSubmit,
-    errors,
-    resetErrors,
-  } = useForm({
-    initState,
-    callback: submit,
-    validator,
-  });
-
   const handleCellClick = (params, event) => {
     let customerSelected = JSON.stringify(params.row);
     setSelectedCustomer(JSON.parse(customerSelected));
@@ -228,7 +213,6 @@ function Customers() {
     console.log("handleUserUpdate" + e);
   };
   const handleaddFormSubmit = async (e) => {
-    handleSubmit();
     if (e != null || e != undefined) {
       if(e.target.form.name.value !== "" && e.target.form.description.value !== ""){
       let createCustomer = {
@@ -316,6 +300,17 @@ function Customers() {
   const handleDeleteClose = () => {
     setDelOpen(false);
   };
+
+  const {
+    handleChange,
+    handleSubmit,
+    errors,
+    resetErrors,
+  } = useForm({
+    initState,
+    callback: handleaddFormSubmit,
+    validator,
+  });
 
   const label = { inputProps: { "aria-label": "Active User" } };
   const { open, openDialog, closeDialog } = useDialogActions();
@@ -513,7 +508,7 @@ function Customers() {
               type="submit"
               variant="outlined"
               color="secondary"
-              onClick={handleaddFormSubmit}
+              onClick={handleSubmit}
             >
               Add
             </Button>

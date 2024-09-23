@@ -370,27 +370,8 @@ function Notifications() {
       })
   }, [isAdd])
 
-  const submit = () => {
-    console.log(" Submited");
-  };
-  const {
-    handleChange,
-    resetErrors,
-    handleBlur,
-    handleSubmit,
-    state,
-    errors,
-    countryCode,
-  } = useForm({
-    initState,
-    callback: submit,
-    validator,
-  });
-
   const handleaddFormSubmit = async (e) => {
-    handleSubmit();
-    const isValidated = Object.values(errors).every((value) => value === "");
-    if ((e != null || e != undefined) && isValidated && errorMsg === "Vaid Expression") {
+    if ((e != null || e != undefined) && errorMsg === "Vaid Expression") {
       if(e.target.form.notificationname.value !== "" && e.target.form.type.value !== "" && e.target.form.expressionfield.value !== "" && e.target.form.device.value !== "" && e.target.form.message.value !== ""){
       
       let createNotification = {
@@ -550,6 +531,20 @@ function Notifications() {
   const handleOnChange = (event) => {
     setSelectedValue(event.target.value);
   };
+
+  const {
+    handleChange,
+    resetErrors,
+    handleBlur,
+    handleSubmit,
+    state,
+    errors,
+    countryCode,
+  } = useForm({
+    initState,
+    callback: handleaddFormSubmit,
+    validator,
+  });
 
   return (
     <div>
@@ -1022,7 +1017,7 @@ function Notifications() {
               className="share-device-btn"
               autoFocus
               // disabled={!isValidForm}
-              onClick={handleaddFormSubmit}
+              onClick={handleSubmit}
             >
               Add
             </Button>

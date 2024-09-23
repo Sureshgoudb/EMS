@@ -364,9 +364,7 @@ const Users = () => {
 
   const handleaddFormSubmit = async (e) => {
     e.preventDefault();
-    handleSubmit();
-    const isValidated = Object.values(errors).every((value) => value === "");
-    if ((e !== null || e !== undefined) && isValidated) {
+    if (e !== null || e !== undefined) {
       if(e.target.form.username.value !== "" && e.target.form.email.value !== "" && e.target.form.phone.value !== ""&& e.target.form.usertype.value !== ""){
       let createUser = {
         name: e.target.form.username.value,
@@ -548,9 +546,7 @@ const Users = () => {
     };
     updateUser();
   };
-  const submit = () => {
-    console.log(" Submited");
-  };
+  
   const {
     handleChange,
     handleSubmit,
@@ -563,7 +559,7 @@ const Users = () => {
     countryCode,
   } = useForm({
     initState,
-    callback: submit,
+    callback: handleaddFormSubmit,
     validator,
   });
   // let isValidForm =
@@ -840,7 +836,7 @@ const Users = () => {
               variant="outlined"
               color="secondary"
               // disabled={!isValidForm}
-              onClick={handleaddFormSubmit}
+              onClick={handleSubmit}
             >
               Add
             </Button>

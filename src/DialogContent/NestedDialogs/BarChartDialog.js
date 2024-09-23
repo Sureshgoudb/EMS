@@ -111,10 +111,10 @@ const BarChartDialog = ({
   };
 
   const handleChartSubmit = (e) => {
-    handleSubmit();
-    const isValidated = Object.values(errors).every((value) => value === "");
-    console.log(isValidated);
-    if(isValidated) {
+    // handleSubmit();
+    // const isValidated = Object.values(errors).every((value) => value === "");
+    // console.log(isValidated);
+    // if(isValidated) {
       let id = editData!=undefined ? editData.id : "";
         const barChartObj = {
           controls: [
@@ -142,7 +142,7 @@ const BarChartDialog = ({
         } else {
           closeDialog();
         }
-      }
+      // }
    
   };
 
@@ -184,10 +184,6 @@ const BarChartDialog = ({
     barGapRatio: "",
   });
 
-  const submit = () => {
-    console.log(" Submited");
-  };
-
   const {
     handleChange,
     handleSubmit,
@@ -197,7 +193,7 @@ const BarChartDialog = ({
     resetErrors,
   } = useForm({
     initState,
-    callback: submit,
+    callback: handleChartSubmit,
     validator,
   });
 
@@ -407,7 +403,7 @@ const BarChartDialog = ({
             )}
           <Grid item xs={12}>
             <Button
-              onClick={handleChartSubmit}
+              onClick={handleSubmit}
               variant="contained"
               color="primary"
               sx={{ background: "rgba(0, 0, 0, 0.6)" }}

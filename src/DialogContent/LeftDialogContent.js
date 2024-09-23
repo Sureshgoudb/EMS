@@ -204,22 +204,6 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
       })
   }, [isAdd])
 
-  const submit = () => {
-    console.log(" Submited");
-  };
-
-  const {
-    handleChange,
-    handleSubmit,
-    errors,
-    resetErrors,
-    state,
-  } = useForm({
-    initState,
-    callback: submit,
-    validator,
-  })
-
   const handleEditClose = () => {
     seteditDashboard(false);
     resetErrors();
@@ -283,7 +267,7 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
     }
   };
   const handleaddFormSubmit = async (e) => {
-    handleSubmit();
+    // handleSubmit();
     if (e != null || e != undefined) {
        if(e.target.form.name.value !== "" && e.target.form.description.value !== "" && e.target.form.customer.value !== ""){
       let createDashboard = {
@@ -365,6 +349,18 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
 
     fetchDashboards();
   }, []);
+
+  const {
+    handleChange,
+    handleSubmit,
+    errors,
+    resetErrors,
+    state,
+  } = useForm({
+    initState,
+    callback: handleaddFormSubmit,
+    validator,
+  })
 
   return (
     <>
@@ -647,7 +643,7 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
               type="submit"
               variant="outlined"
               color="secondary"
-              onClick={handleaddFormSubmit}
+              onClick={handleSubmit}
             >
               Add
             </Button>

@@ -54,9 +54,8 @@ const useForm = ({ initState, callback, validator }) => {
   };
 
   // ******************************
-  const handleSubmit = () => {
-    // e.preventDefault();
-    // const { name: fieldName } = e.target;
+  const handleSubmit = (e) => {
+    e.preventDefault();
     const newErrors = {};
     Object.keys(state).forEach(key => {
       const faildFiels = validator(state, key);
@@ -64,6 +63,12 @@ const useForm = ({ initState, callback, validator }) => {
     });
     console.log(newErrors);
     setErrors(newErrors);
+
+    const isValidated = Object.values(newErrors).every((value) => value === "");
+    if(isValidated) {
+      setIsSubmited(true);
+      callback();
+    }
   }
 
   const resetErrors = () => {
