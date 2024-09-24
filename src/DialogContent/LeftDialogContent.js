@@ -589,6 +589,7 @@ const LeftDialogContent = ({ closeLeftDrawer, setDashBoardData }) => {
             label="Customer"
             value={state.customer}
             fullWidth
+            defaultValue=""
             onChange={handleChange}
             error={errors.customer ? true : false}
             helperText={errors.customer}

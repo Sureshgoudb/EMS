@@ -56,6 +56,15 @@ export const validator = (values, fieldName) => {
     case "style":
       validateOnlyRequired(values.style, errors, "Please Select a Chart Style");
       break;
+    case "variableid":
+      validateOnlyRequired(values.variableid, errors, "Please Select a Variable");
+      break;
+    case "chartLabel":
+      validateOnlyRequired(values.chartLabel, errors, "Label is Required");
+      break;
+    case "stack":
+      validateOnlyRequired(values.stack, errors, "Stack is Required");
+      break;
     default:
   }
   return errors;

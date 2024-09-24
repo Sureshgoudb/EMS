@@ -409,6 +409,21 @@ function Notifications() {
     }
   }
   };
+
+  const {
+    handleChange,
+    resetErrors,
+    handleBlur,
+    handleSubmit,
+    state,
+    errors,
+    countryCode,
+  } = useForm({
+    initState,
+    callback: handleaddFormSubmit,
+    validator,
+  });
+
   const handleEditFormSubmit = async (e) => {
     const isValidated = Object.values(errors).every((value) => value === "");
     if ((e != null || e != undefined) && isValidated && errorMsg === "Valid Expression") {
@@ -531,20 +546,6 @@ function Notifications() {
   const handleOnChange = (event) => {
     setSelectedValue(event.target.value);
   };
-
-  const {
-    handleChange,
-    resetErrors,
-    handleBlur,
-    handleSubmit,
-    state,
-    errors,
-    countryCode,
-  } = useForm({
-    initState,
-    callback: handleaddFormSubmit,
-    validator,
-  });
 
   return (
     <div>

@@ -67,7 +67,7 @@ const useForm = ({ initState, callback, validator }) => {
     const isValidated = Object.values(newErrors).every((value) => value === "");
     if(isValidated) {
       setIsSubmited(true);
-      callback();
+      callback(e);
     }
   }
 

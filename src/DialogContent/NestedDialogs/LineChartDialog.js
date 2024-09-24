@@ -66,6 +66,7 @@ const LineChartDialog = ({
   const [label, setLabel] = useState("");
   const [devices, setDevices] = useState([]);
   const [variables, setVariables] = useState([]);
+  const [seriesErrors, setSeriesErrors] = useState([{}])
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 
@@ -119,11 +120,21 @@ const LineChartDialog = ({
     else
       data[index][event.target.name] = event.target.value;
     setInputFields(data);
+
+    const name = event.target.name;
+    if(name === "variableid" || name === "chartLabel" || name === "stack") {
+      const error = Object.values(validator(data[index], name))[0]
+      const newErrors = [...seriesErrors];
+      newErrors[index][name] = error;
+      setSeriesErrors(newErrors);
+    }
   }
 
   const addFields = () => {
     let newfield = { variableid: '', chartLabel: '', stack: '', area: false, showMark: false, color: '', showavg: false, displayavg: false }
     setInputFields([...inputFields, newfield])
+    let newError = {variableid: '', chartLabel: '', stack: '',}
+    setSeriesErrors([...seriesErrors, newError]);
   }
 
   const removeFields = (index) => {
@@ -138,51 +149,66 @@ const LineChartDialog = ({
     //const newYAxisValue = parseFloat(e.target.form.yAxisValue.value.trim());
 
     //if (!isNaN(newXAxisValue) && !isNaN(newYAxisValue)) {
-    let propertydata = inputFields.map(x => {
-      return {
-        "variableid": x.variableid,
-        "label": x.chartLabel,
-        "stack": x.stack,
-        "area": x.area,
-        "showMark": x.showMark,
-        "showavg": x.showavg,
-        "color": x.color === '' ? "#000000" : x.color
-      }
-    });
-    const lineChartObj = {
-      controls: [
-        {
-          controlId: id,
-          name: e.target.form.name.value,
-          label: e.target.form.label.value,
-          style: e.target.form.style.value,
-          deviceid: selectedDevice,
-          //variableid: selectedVariable,
-          controlType: "Line",
-          position: "[3,2,0,0]",
-          bgcolor: e.target.form.bgcolor.value,
-          blockwise : e.target.form.blockwise.checked,
-          day : e.target.form.day.checked,
-          properties: propertydata,
-          /*{
+    const newErrors = []
+    inputFields.forEach(obj => {
+      const newError = {}
+      Object.keys(obj).forEach(key => {
+        if(key === "variableid" || key === "chartLabel" || key === "stack") {
+          newError[key] = Object.values(validator(obj, key))[0]
+        }
+      })
+      newErrors.push(newError)
+    })
+    setSeriesErrors(newErrors);
+    const isValidated = newErrors.forEach(obj => Object.values(obj).every(value => value === ""))
 
+    if(isValidated) {
+      let propertydata = inputFields.map(x => {
+        return {
+          "variableid": x.variableid,
+          "label": x.chartLabel,
+          "stack": x.stack,
+          "area": x.area,
+          "showMark": x.showMark,
+          "showavg": x.showavg,
+          "color": x.color === '' ? "#000000" : x.color
+        }
+      });
+      const lineChartObj = {
+        controls: [
+          {
+            controlId: id,
+            name: e.target.form.name.value,
+            label: e.target.form.label.value,
             style: e.target.form.style.value,
-            label: e.target.form.chartLabel.value,
-            stack: e.target.form.stack.value,
-            area: e.target.form.area.checked,
-            showMark: e.target.form.showMark.checked,
-            showavg: e.target.form.avg === undefined ? false : e.target.form.avg.checked,
-            color: e.target.form.color.value
-          },*/
-        },
-      ],
-    };
-    handleChartObjChange(lineChartObj, id);
-    console.log(JSON.stringify(lineChartObj));
-    if (openEditDialog) {
-      closeEditDrawer();
-    } else {
-      closeDialog();
+            deviceid: selectedDevice,
+            //variableid: selectedVariable,
+            controlType: "Line",
+            position: "[3,2,0,0]",
+            bgcolor: e.target.form.bgcolor.value,
+            blockwise : e.target.form.blockwise.checked,
+            day : e.target.form.day.checked,
+            properties: propertydata,
+            /*{
+
+              style: e.target.form.style.value,
+              label: e.target.form.chartLabel.value,
+              stack: e.target.form.stack.value,
+              area: e.target.form.area.checked,
+              showMark: e.target.form.showMark.checked,
+              showavg: e.target.form.avg === undefined ? false : e.target.form.avg.checked,
+              color: e.target.form.color.value
+            },*/
+          },
+        ],
+      };
+      handleChartObjChange(lineChartObj, id);
+      console.log(JSON.stringify(lineChartObj));
+      if (openEditDialog) {
+        closeEditDrawer();
+      } else {
+        closeDialog();
+      }
     }
 
 
@@ -237,12 +263,12 @@ const LineChartDialog = ({
     name: editData.name,
     label: editData.label,
     style: editData.style,
-    device: editData.deviceid
+    device: editData.deviceid,
   }: {
       name: "",
       label: "",
       style: "",
-      device: ""
+      device: "",
     })
 
   const {
@@ -409,7 +435,7 @@ const LineChartDialog = ({
                     </Divider>
                   </Grid>
                   <Grid item xs={6}>
-                    <FormControl fullWidth>
+                    <FormControl fullWidth error={seriesErrors[index].variableid ? true : false}>
                       <InputLabel>Variable</InputLabel>
                       <Select
                         id="variableid"
@@ -427,6 +453,7 @@ const LineChartDialog = ({
                           </MenuItem>
                         ))}
                       </Select>
+                      <FormHelperText>{seriesErrors[index].variableid}</FormHelperText>
                     </FormControl>
                   </Grid>
                   <Grid item xs={6}>
@@ -435,6 +462,8 @@ const LineChartDialog = ({
                       label="Custom Label"
                       id="chartLabel"
                       name="chartLabel"
+                      error={seriesErrors[index].chartLabel ? true : false}
+                      helperText={seriesErrors[index].chartLabel}
                       defaultValue={input != null ? input.chartLabel : ""}
                       //onChange={(event) => setCustomLabel(event.target.value)}
                       onChange={event => handleFormChange(index, event)}
@@ -446,6 +475,8 @@ const LineChartDialog = ({
                       label="Stack"
                       id="stack"
                       name="stack"
+                      error={seriesErrors[index].stack ? true : false}
+                      helperText={seriesErrors[index].stack}
                       defaultValue={input != null ? input.stack : ""}
                       //onChange={(event) => setStack(event.target.value)}
                       onChange={event => handleFormChange(index, event)}
@@ -508,6 +539,7 @@ const LineChartDialog = ({
                       />
                     </Grid>
                   )}
+                  { index !== 0 &&
                   <Tooltip title="Delete">
                     <IconButton
                       onClick={() => removeFields(index)}
@@ -515,7 +547,7 @@ const LineChartDialog = ({
                     >
                       <DeleteIcon fontSize="6px" />
                     </IconButton>
-                  </Tooltip>
+                  </Tooltip> }
                 </Grid>
               )
             })}
