@@ -371,7 +371,7 @@ function Notifications() {
   }, [isAdd])
 
   const handleaddFormSubmit = async (e) => {
-    if ((e != null || e != undefined) && errorMsg === "Vaid Expression") {
+    if ((e != null || e != undefined) && errorMsg === "Valid Expression") {
       if(e.target.form.notificationname.value !== "" && e.target.form.type.value !== "" && e.target.form.expressionfield.value !== "" && e.target.form.device.value !== "" && e.target.form.message.value !== ""){
       
       let createNotification = {
