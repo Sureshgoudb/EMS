@@ -160,7 +160,8 @@ const LineChartDialog = ({
       newErrors.push(newError)
     })
     setSeriesErrors(newErrors);
-    const isValidated = newErrors.forEach(obj => Object.values(obj).every(value => value === ""))
+    const isValidated = newErrors.every(obj => Object.values(obj).every(value => value === "")) ? true : false
+    console.log(isValidated)
 
     if(isValidated) {
       let propertydata = inputFields.map(x => {
