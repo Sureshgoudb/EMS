@@ -116,7 +116,11 @@ const DeviceDetails = () => {
       {
         fields:[
           {name : "DC",value:0},
-          {name : "SG",value:0},
+          {name : "SG_Current",value:0},
+          {name : "SG_Next_1",value:0},
+          {name : "SG_Next_2",value:0},
+          {name : "SG_Next_3",value:0},
+          {name : "SG_Next_4",value:0},
           {name : "BlockNo",value:0}
         ]
       });
