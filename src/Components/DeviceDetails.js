@@ -158,8 +158,8 @@ const DeviceDetails = () => {
       const variableResponse = await axios.get(
         apiKey + "variable/list/" + selectedDeviceId
       ).then(response =>{
-        let variableUnIncludeArr = response.data.filter(str => !str.formula.includes("variable_"));
-        setwithoutVariable(variableUnIncludeArr);
+        // let variableUnIncludeArr = response.data.filter(str => !str.formula.includes("variable_"));
+        // setwithoutVariable(variableUnIncludeArr);
         setVariable(response.data);
       });
  
@@ -803,7 +803,7 @@ const DeviceDetails = () => {
                   <Typography>Select the Device Variable</Typography>
                   <Paper style={{ maxHeight: 150, overflow: "auto" }}>
                     <List sx={{ mx: 2, p: 2 }}>
-                      {withoutVariable?.map((field) => (
+                      {variable?.map((field) => (
                         <Paper>
                           <ListItem
                             onClick={handleFieldClick}
@@ -1065,7 +1065,7 @@ const DeviceDetails = () => {
                   <Typography>Select the Device Variable</Typography>
                   <Paper style={{ maxHeight: 150, overflow: "auto" }}>
                     <List sx={{ mx: 2, p: 2 }}>
-                    {withoutVariable?.map((field) => (
+                    {variable?.map((field) => (
                         <Paper>
                           <ListItem
                             onClick={handleFieldClick}
