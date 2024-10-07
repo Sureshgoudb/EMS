@@ -26,7 +26,8 @@ import CardLayout from "../common/CardLayout";
 import CardTitleBar from "../common/CardTitleBar";
 import dayjs from "dayjs";
 import { io } from 'socket.io-client';
-
+import utc from 'dayjs/plugin/utc';
+dayjs.extend(utc);
 export default function DeviceData() {
   //const [socketVar, setSocketVar] = useState(null);
   const [live, setLive] = useState(false);
@@ -371,7 +372,7 @@ export default function DeviceData() {
                       </div>
                       <div className="card-footer h-12 py-3 text-white dark:bg-white dark:text-black mb-0 text-center rounded " style={{ background: '#007c89' }}>
                         <span> {
-                          dayjs(item.timestamp).format("YYYY-MM-DD HH:mm:ss")
+                          dayjs.utc(item.timestamp).format("YYYY-MM-DD HH:mm:ss")
                         }
                         </span>
                       </div>
