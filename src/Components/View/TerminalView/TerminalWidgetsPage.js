@@ -13,26 +13,36 @@ const TerminalDetailView = () => {
   const [terminals, setTerminals] = useState({});
   const [showForm, setShowForm] = useState(false);
   const navigate = useNavigate();
-  const [currentTerminal, setCurrentTerminal] = useState(null);
+  const [draggingWidgetId, setDraggingWidgetId] = useState(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // --------------- Fetch terminal widgets ---------------
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [terminalsResponse] = await Promise.all([
           axios.get(apiKey + "terminalwidgets"),
         ]);
-        setTerminals(terminalsResponse.data);
+
+        // Load terminals from API
+        const fetchedTerminals = terminalsResponse.data;
+
+        setTerminals(fetchedTerminals);
       } catch (err) {
         console.error("Error fetching data:", err);
-      } finally {
       }
     };
 
     fetchData();
   }, []);
 
-  // --------------- Create terminal widget ---------------
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   const handleCreateWidget = async (widgetData) => {
     try {
       const response = await axios.post(
@@ -49,7 +59,6 @@ const TerminalDetailView = () => {
         return updatedTerminals;
       });
       setShowForm(false);
-      setCurrentTerminal(null);
       toast.success("Widget created successfully!");
     } catch (error) {
       console.error("Error creating widget:", error);
@@ -64,35 +73,94 @@ const TerminalDetailView = () => {
 
     if (widgetIndex !== -1) {
       widgets[widgetIndex] = { ...widgets[widgetIndex], ...newSize };
-
       setTerminals(updatedTerminals);
-      localStorage.setItem("terminals", JSON.stringify(updatedTerminals));
     }
   };
 
-  const handleDeleteWidget = (widgetId) => {
-    const updatedTerminals = { ...terminals };
-    updatedTerminals[terminalName] = updatedTerminals[terminalName].filter(
-      (widget) => widget.id !== widgetId
+  const handleDeleteWidget = async (widgetId) => {
+    try {
+      const updatedTerminals = { ...terminals };
+      updatedTerminals[terminalName] = updatedTerminals[terminalName].filter(
+        (widget) => widget._id !== widgetId
+      );
+      setTerminals(updatedTerminals);
+      toast.success("Widget deleted successfully!");
+    } catch (error) {
+      console.error("Error updating UI after widget deletion:", error);
+      toast.error("Error updating display after widget deletion");
+    }
+  };
+
+  const handleDragStart = (e, widgetId) => {
+    setDraggingWidgetId(widgetId);
+  };
+
+  const handleDragEnd = (e) => {
+    setDraggingWidgetId(null);
+  };
+
+  const handleDrop = (droppedWidgetId) => {
+    const widgetList = terminals[terminalName];
+    const draggingWidgetIndex = widgetList.findIndex(
+      (widget) => widget._id === draggingWidgetId
     );
-    setTerminals(updatedTerminals);
-    localStorage.setItem("terminals", JSON.stringify(updatedTerminals));
+    const droppedWidgetIndex = widgetList.findIndex(
+      (widget) => widget._id === droppedWidgetId
+    );
+
+    if (draggingWidgetIndex !== -1 && droppedWidgetIndex !== -1) {
+      const updatedWidgets = [...widgetList];
+      const [draggedWidget] = updatedWidgets.splice(draggingWidgetIndex, 1);
+      updatedWidgets.splice(droppedWidgetIndex, 0, draggedWidget);
+
+      setTerminals((prevTerminals) => {
+        const newTerminals = {
+          ...prevTerminals,
+          [terminalName]: updatedWidgets,
+        };
+        return newTerminals;
+      });
+    }
   };
 
   return (
-    <Box sx={{ flexGrow: 1, padding: 3 }}>
+    <Box sx={{ flexGrow: 1, padding: 1 }}>
       <Paper
-        elevation={3}
+        elevation={2}
         sx={{
-          padding: 2,
-          borderRadius: 2,
-          background: "#007c89",
+          padding: 1,
+          background: "linear-gradient(135deg, #007c89 20%, #004d53 80%)",
           color: "white",
           textAlign: "center",
-          mb: 3,
+          mb: 4,
+          transition: "transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out",
+          "&:hover": {
+            boxShadow: "0 6px 25px rgba(0,0,0,0.4)",
+          },
         }}
       >
-        <Typography variant="h4">Terminal Name: {terminalName}</Typography>
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: "700",
+            letterSpacing: 1,
+            mb: 1,
+          }}
+        >
+          Device Name: {terminalName}
+          <Typography
+            variant="h6"
+            component="span"
+            sx={{
+              ml: 2,
+              fontSize: "1.2rem",
+              fontStyle: "italic",
+              color: "rgba(255, 255, 255, 0.8)",
+            }}
+          >
+            {currentTime.toLocaleString()}{" "}
+          </Typography>
+        </Typography>
       </Paper>
 
       {showForm ? (
@@ -106,27 +174,41 @@ const TerminalDetailView = () => {
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
             {terminals[terminalName]?.map((widget) => (
               <Widget
-                key={widget.id}
+                key={widget._id}
                 widgetData={widget}
                 onResize={handleResize}
                 onDelete={handleDeleteWidget}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDrop={handleDrop}
+                className="widget"
+                data-id={widget._id} // Store widget ID in a data attribute
               />
             ))}
           </Box>
-          <Button
-            variant="contained"
-            onClick={() => setShowForm(true)}
-            sx={{ mt: 3 }}
-          >
-            + Add New Widget
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => navigate("/view/terminal")}
-            sx={{ mt: 3, ml: 2 }}
-          >
-            Back to Terminal View
-          </Button>
+          <Box sx={{ mb: 3, mt: 2 }}>
+            <Button
+              variant="contained"
+              onClick={() => setShowForm(true)}
+              sx={{
+                mr: 2,
+                background: "linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)",
+                boxShadow: "0 3px 5px 2px rgba(33, 203, 243, .3)",
+              }}
+            >
+              + Add New Widget
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => navigate("/view/terminal")}
+              sx={{
+                background: "linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)",
+                boxShadow: "0 3px 5px 2px rgba(255, 105, 135, .3)",
+              }}
+            >
+              Back to Device View
+            </Button>
+          </Box>
         </>
       )}
       <ToastContainer />

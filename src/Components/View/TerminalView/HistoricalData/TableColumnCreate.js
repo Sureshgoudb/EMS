@@ -84,7 +84,7 @@ const TableColumnCreate = ({
       <DialogTitle>Add New Table Column</DialogTitle>
       <DialogContent>
         <FormControl fullWidth margin="normal">
-          <InputLabel>Select Terminal</InputLabel>
+          <InputLabel>Select Device</InputLabel>
           <Select
             value={selectedTerminal}
             onChange={(e) => setSelectedTerminal(e.target.value)}
@@ -98,7 +98,7 @@ const TableColumnCreate = ({
           </Select>
         </FormControl>
         <FormControl fullWidth margin="normal">
-          <InputLabel>Select Script</InputLabel>
+          <InputLabel>Select Variable</InputLabel>
           <Select
             value={selectedScript}
             onChange={(e) => setSelectedScript(e.target.value)}

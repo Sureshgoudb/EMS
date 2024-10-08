@@ -1,4 +1,10 @@
-import React, { useMemo } from "react";
+import React, {
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+} from "react";
 import {
   ComposedChart,
   Area,
@@ -34,13 +40,14 @@ const blinkAnimation = keyframes`
 const formatDate = (timestamp) => {
   if (!timestamp) return "";
   const date = new Date(timestamp);
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const hours = String(date.getUTCHours()).padStart(2, "0");
-  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(date.getUTCDate()).padStart(2, "0")} ${String(
+    date.getUTCHours()
+  ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(
+    date.getUTCSeconds()
+  ).padStart(2, "0")}`;
 };
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -67,7 +74,7 @@ const CustomTooltip = ({ active, payload, label }) => {
             }}
           >
             <span style={{ marginRight: "10px" }}>
-              {`${entry.dataKey}: ${entry.value.toFixed(2)}`}
+              {`${entry.dataKey}: ${entry.value}`}
             </span>
           </p>
         ))}
@@ -85,6 +92,11 @@ const MultiAxisGraph = ({
   hideXAxis = false,
   scriptName = "",
 }) => {
+  const [zoomState, setZoomState] = useState({
+    startIndex: 0,
+    endIndex: data.length - 1,
+  });
+  const chartRef = useRef(null);
   const textColor = backgroundColor === "#ffffff" ? "#000000" : "#ffffff";
 
   const allScripts = useMemo(
@@ -117,98 +129,143 @@ const MultiAxisGraph = ({
     }, {});
   }, [allScripts, combinedData]);
 
+  const handleWheel = useCallback(
+    (event) => {
+      event.preventDefault();
+      const zoomFactor = event.deltaY > 0 ? 1.1 : 0.9;
+      const dataLength = combinedData.length;
+      const currentRange = zoomState.endIndex - zoomState.startIndex;
+      const newRange = Math.max(
+        2,
+        Math.min(dataLength, Math.round(currentRange * zoomFactor))
+      );
+
+      const mouseX = event.nativeEvent.offsetX;
+      const chartWidth = chartRef.current.offsetWidth;
+      const zoomCenter =
+        zoomState.startIndex + (mouseX / chartWidth) * currentRange;
+
+      let newStartIndex = Math.max(0, Math.round(zoomCenter - newRange / 2));
+      let newEndIndex = Math.min(dataLength - 1, newStartIndex + newRange);
+
+      if (newEndIndex - newStartIndex < newRange) {
+        newStartIndex = Math.max(0, newEndIndex - newRange);
+      }
+
+      setZoomState({ startIndex: newStartIndex, endIndex: newEndIndex });
+    },
+    [zoomState, combinedData.length]
+  );
+
+  // Reset zoom state when expanded changes
+  useEffect(() => {
+    if (expanded) {
+      setZoomState({
+        startIndex: 0,
+        endIndex: combinedData.length - 1,
+      });
+    }
+  }, [expanded, combinedData.length]);
+
+  const zoomedData = combinedData.slice(
+    zoomState.startIndex,
+    zoomState.endIndex + 1
+  );
+
   return (
-    <ResponsiveContainer width="100%" height={expanded ? 400 : 200}>
-      <ComposedChart
-        data={combinedData}
-        margin={{
-          right: 30,
-          left: 10,
-          bottom: expanded ? 25 : 5,
-        }}
-      >
-        <defs>
-          {allScripts.map((script, index) => (
-            <linearGradient
-              key={script}
-              id={`colorGradient${index}`}
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="1"
-            >
-              <stop
-                offset="5%"
-                stopColor={colors[index % colors.length]}
-                stopOpacity={0.8}
-              />
-              <stop
-                offset="95%"
-                stopColor={colors[index % colors.length]}
-                stopOpacity={0.1}
-              />
-            </linearGradient>
-          ))}
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#ccc" opacity={0.5} />
-        <XAxis
-          dataKey="x"
-          stroke={textColor}
-          tickFormatter={formatDate}
-          hide={hideXAxis || !expanded}
-          tick={{ fontSize: 10 }}
-          height={expanded ? 75 : 30}
-        />
-        {allScripts.map((script, index) => (
-          <YAxis
-            key={`y-axis-${script}`}
-            yAxisId={script}
-            orientation={index % 2 === 0 ? "left" : "right"}
-            stroke={colors[index % colors.length]}
-            tick={{ fontSize: 10 }}
-          />
-        ))}
-        <Tooltip content={<CustomTooltip />} />
-        <Legend
-          wrapperStyle={{
-            paddingTop: "10px",
+    <div className="w-full" ref={chartRef} onWheel={handleWheel}>
+      <ResponsiveContainer width="100%" height={expanded ? 400 : 200}>
+        <ComposedChart
+          data={zoomedData}
+          margin={{
+            right: 30,
+            left: 10,
+            bottom: expanded ? 25 : 5,
           }}
-        />
-        {allScripts.map((script, index) => (
-          <React.Fragment key={script}>
-            <Area
-              type="monotone"
-              dataKey={script}
-              name={script}
-              stroke={colors[index % colors.length]}
-              fill={`url(#colorGradient${index})`}
+        >
+          <defs>
+            {allScripts.map((script, index) => (
+              <linearGradient
+                key={script}
+                id={`colorGradient${index}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop
+                  offset="5%"
+                  stopColor={colors[index % colors.length]}
+                  stopOpacity={0.8}
+                />
+                <stop
+                  offset="95%"
+                  stopColor={colors[index % colors.length]}
+                  stopOpacity={0.1}
+                />
+              </linearGradient>
+            ))}
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#ccc" opacity={0.5} />
+          <XAxis
+            dataKey="x"
+            stroke={textColor}
+            tickFormatter={formatDate}
+            hide={hideXAxis || !expanded}
+            tick={{ fontSize: 10 }}
+            height={expanded ? 75 : 30}
+          />
+          {allScripts.map((script, index) => (
+            <YAxis
+              key={`y-axis-${script}`}
               yAxisId={script}
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
+              orientation={index % 2 === 0 ? "left" : "right"}
+              stroke={colors[index % colors.length]}
+              tick={{ fontSize: 10 }}
             />
-            {latestValues[script] !== null && (
-              <ReferenceLine
-                x={combinedData[0]?.x}
-                y={latestValues[script]}
+          ))}
+          <Tooltip content={<CustomTooltip />} />
+          <Legend
+            wrapperStyle={{
+              paddingTop: "10px",
+            }}
+          />
+          {allScripts.map((script, index) => (
+            <React.Fragment key={script}>
+              <Area
+                type="monotone"
+                dataKey={script}
+                name={script}
                 stroke={colors[index % colors.length]}
-                strokeDasharray="3 3"
-                label={{
-                  value: latestValues[script].toFixed(2),
-                  fill: colors[index % colors.length],
-                  fontSize: 12,
-                  position: "right",
-                }}
+                fill={`url(#colorGradient${index})`}
                 yAxisId={script}
-                style={{
-                  animation: `${blinkAnimation} 1.5s infinite`,
-                }}
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
               />
-            )}
-          </React.Fragment>
-        ))}
-      </ComposedChart>
-    </ResponsiveContainer>
+              {latestValues[script] !== null && (
+                <ReferenceLine
+                  x={zoomedData[0]?.x}
+                  y={latestValues[script]}
+                  stroke={colors[index % colors.length]}
+                  strokeDasharray="3 3"
+                  label={{
+                    value: latestValues[script],
+                    fill: colors[index % colors.length],
+                    fontSize: 12,
+                    position: "right",
+                  }}
+                  yAxisId={script}
+                  style={{
+                    animation: `${blinkAnimation} 1.5s infinite`,
+                  }}
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
   );
 };
 

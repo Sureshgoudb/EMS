@@ -1,4 +1,10 @@
-import React, { useMemo } from "react";
+import React, {
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+} from "react";
 import PropTypes from "prop-types";
 import {
   AreaChart,
@@ -45,17 +51,19 @@ const formatDate = (timestamp) => {
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div
-        style={{
-          backgroundColor: "rgba(255, 255, 255, 0.8)",
-          padding: "10px",
-          border: "1px solid #ccc",
-          borderRadius: "5px",
-        }}
-      >
-        <p style={{ margin: 0 }}>{formatDate(label)}</p>
+      <div className="bg-white bg-opacity-80 p-2 border border-gray-300 rounded">
+        <p className="m-0">{formatDate(label)}</p>
         {payload.map((entry, index) => (
-          <p key={index} style={{ color: entry.color, margin: "5px 0" }}>
+          <p
+            style={{
+              color: entry.color,
+              margin: "5px 0",
+              display: "flex",
+              justifyContent: "space-between",
+            }}
+            key={index}
+            className={`text-${entry.color} my-1`}
+          >
             {`${entry.name}: ${entry.value.toFixed(2)}`}
           </p>
         ))}
@@ -72,6 +80,12 @@ const LineGraph = ({
   backgroundColor = "#f5f5f5",
   scriptName = "Script",
 }) => {
+  const [zoomState, setZoomState] = useState({
+    startIndex: 0,
+    endIndex: data.length - 1,
+  });
+  const chartRef = useRef(null);
+
   const allScripts = useMemo(
     () => [scriptName, ...Object.keys(comparisonData)],
     [comparisonData, scriptName]
@@ -109,76 +123,122 @@ const LineGraph = ({
     [allScripts, data, comparisonData, scriptName]
   );
 
+  const handleWheel = useCallback(
+    (event) => {
+      event.preventDefault();
+      const zoomFactor = event.deltaY > 0 ? 1.1 : 0.9; // Zoom out (>1) or in (<1)
+      const dataLength = combinedData.length;
+      const currentRange = zoomState.endIndex - zoomState.startIndex;
+      const newRange = Math.max(
+        2,
+        Math.min(dataLength, Math.round(currentRange * zoomFactor))
+      );
+
+      const mouseX = event.nativeEvent.offsetX;
+      const chartWidth = chartRef.current.offsetWidth;
+      const zoomCenter =
+        zoomState.startIndex + (mouseX / chartWidth) * currentRange;
+
+      let newStartIndex = Math.max(0, Math.round(zoomCenter - newRange / 2));
+      let newEndIndex = Math.min(dataLength - 1, newStartIndex + newRange);
+
+      if (newEndIndex - newStartIndex < newRange) {
+        newStartIndex = Math.max(0, newEndIndex - newRange);
+      }
+
+      setZoomState({ startIndex: newStartIndex, endIndex: newEndIndex });
+    },
+    [zoomState, combinedData.length]
+  );
+
+  const zoomedData = combinedData.slice(
+    zoomState.startIndex,
+    zoomState.endIndex + 1
+  );
+
+  // Reset zoom state when graph is expanded
+  useEffect(() => {
+    if (expanded) {
+      setZoomState({
+        startIndex: 0,
+        endIndex: combinedData.length - 1,
+      });
+    }
+  }, [expanded, combinedData.length]);
+
   return (
-    <ResponsiveContainer width="100%" height={expanded ? 400 : 200}>
-      <AreaChart
-        data={combinedData}
-        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-      >
-        <defs>
+    <div className="w-full" ref={chartRef} onWheel={handleWheel}>
+      <ResponsiveContainer width="100%" height={expanded ? 400 : 200}>
+        <AreaChart
+          data={zoomedData}
+          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+        >
+          <defs>
+            {allScripts.map((script, index) => (
+              <linearGradient
+                key={script}
+                id={`color${index}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop
+                  offset="5%"
+                  stopColor={colors[index % colors.length]}
+                  stopOpacity={0.8}
+                />
+                <stop
+                  offset="95%"
+                  stopColor={colors[index % colors.length]}
+                  stopOpacity={0.1}
+                />
+              </linearGradient>
+            ))}
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+          <XAxis
+            dataKey="x"
+            stroke="#666"
+            tickFormatter={formatDate}
+            tick={{ fontSize: 10 }}
+            hide={!expanded}
+            allowDataOverflow
+          />
+          <YAxis stroke="#666" tick={{ fontSize: 10 }} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
           {allScripts.map((script, index) => (
-            <linearGradient
-              key={script}
-              id={`color${index}`}
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="1"
-            >
-              <stop
-                offset="5%"
-                stopColor={colors[index % colors.length]}
-                stopOpacity={0.8}
-              />
-              <stop
-                offset="95%"
-                stopColor={colors[index % colors.length]}
-                stopOpacity={0.1}
-              />
-            </linearGradient>
-          ))}
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
-        <XAxis
-          dataKey="x"
-          stroke="#666"
-          tickFormatter={formatDate}
-          tick={{ fontSize: 10 }}
-          hide={!expanded}
-        />
-        <YAxis stroke="#666" tick={{ fontSize: 10 }} />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend />
-        {allScripts.map((script, index) => (
-          <React.Fragment key={script}>
-            <Area
-              type="monotone"
-              dataKey={script === scriptName ? scriptName : script}
-              name={script}
-              stroke={colors[index % colors.length]}
-              fillOpacity={1}
-              fill={`url(#color${index})`}
-              strokeWidth={2}
-              isAnimationActive={false}
-            />
-            {latestValues[script] !== null && (
-              <ReferenceLine
-                x={combinedData[combinedData.length - 1]?.x}
+            <React.Fragment key={script}>
+              <Area
+                type="monotone"
+                dataKey={script === scriptName ? scriptName : script}
+                name={script}
                 stroke={colors[index % colors.length]}
-                strokeDasharray="3 3"
-                label={{
-                  value: latestValues[script].toFixed(2),
-                  fill: colors[index % colors.length],
-                  fontSize: 12,
-                  position: "right",
-                }}
-                style={{ animation: `${blinkAnimation} 1.5s infinite` }}
+                fillOpacity={1}
+                fill={`url(#color${index})`}
+                strokeWidth={2}
+                isAnimationActive={false}
               />
-            )}
-          </React.Fragment>
-        ))}
-      </AreaChart>
-    </ResponsiveContainer>
+              {latestValues[script] !== null && (
+                <ReferenceLine
+                  x={zoomedData[zoomedData.length - 1]?.x}
+                  stroke={colors[index % colors.length]}
+                  strokeDasharray="3 3"
+                  label={{
+                    value: latestValues[script].toFixed(2),
+                    fill: colors[index % colors.length],
+                    fontSize: 12,
+                    position: "right",
+                  }}
+                  style={{ animation: `${blinkAnimation} 1.5s infinite` }}
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   );
 };
 

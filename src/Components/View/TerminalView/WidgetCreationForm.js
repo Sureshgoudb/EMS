@@ -209,7 +209,7 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
         </Typography>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <FormControl fullWidth>
-            <InputLabel>Terminal Name</InputLabel>
+            <InputLabel>Device Name</InputLabel>
             <Select
               value={terminalName}
               onChange={(e) => setTerminalName(e.target.value)}
@@ -223,7 +223,7 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
             </Select>
           </FormControl>
           <FormControl fullWidth>
-            <InputLabel>Script Name</InputLabel>
+            <InputLabel>Variable Name</InputLabel>
             <Select
               value={scriptName}
               onChange={handleScriptSelection}
@@ -237,7 +237,7 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
             </Select>
             {scriptError && (
               <Alert severity="error" sx={{ mt: 2 }}>
-                Please select a terminal before choosing a script.
+                Please select a device before choosing a variable.
               </Alert>
             )}
           </FormControl>
@@ -337,7 +337,7 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
               />
 
               <TextField
-                label="Refresh Interval (seconds)"
+                label="Reset Interval (seconds)"
                 type="number"
                 value={refreshInterval}
                 onChange={(e) => setRefreshInterval(parseInt(e.target.value))}

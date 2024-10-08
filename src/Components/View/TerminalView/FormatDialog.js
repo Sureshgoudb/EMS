@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios"; // Make sure to install and import axios
+
 import {
   Dialog,
   DialogActions,
@@ -18,8 +20,16 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ColorLensIcon from "@mui/icons-material/ColorLens";
+const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
-const FormatDialog = ({ open, onClose, currentStyles, setCurrentStyles }) => {
+const FormatDialog = ({
+  open,
+  onClose,
+  currentStyles,
+  setCurrentStyles,
+  widgetId,
+  onStylesUpdate, // Add this new prop
+}) => {
   const [styles, setStyles] = useState(currentStyles);
 
   useEffect(() => {
@@ -43,9 +53,29 @@ const FormatDialog = ({ open, onClose, currentStyles, setCurrentStyles }) => {
     }));
   };
 
-  const handleApply = () => {
-    setCurrentStyles(styles);
-    onClose();
+  const handleApply = async () => {
+    try {
+      const response = await axios.put(
+        `${apiKey}terminal/updateWidgetProperties/${widgetId}`,
+        {
+          fontFamily: styles.fontFamily,
+          fontSize: styles.fontSize,
+          fontColor: styles.fontColor,
+          backgroundColor: styles.backgroundColor,
+          fontStyle: styles.fontStyle,
+        }
+      );
+
+      if (response.status === 200) {
+        setCurrentStyles(styles);
+        onStylesUpdate(styles); // Call the callback to update parent state
+        onClose();
+      } else {
+        console.error("Failed to update widget properties");
+      }
+    } catch (error) {
+      console.error("Error updating widget properties:", error);
+    }
   };
 
   return (

@@ -536,6 +536,10 @@ const DataTable = () => {
   const calculateDifference = (currentValue, previousValue) => {
     if (previousValue === null || currentValue === null)
       return { value: null, percentage: null };
+    if (previousValue === 0) {
+      // Handle division by zero error
+      return { value: currentValue, percentage: null };
+    }
     const valueDiff = currentValue - previousValue;
     const percentageDiff = (valueDiff / previousValue) * 100;
     return { value: valueDiff, percentage: percentageDiff };
@@ -543,13 +547,14 @@ const DataTable = () => {
 
   const formatDifference = (difference, showPercentage) => {
     if (difference.value === null) return "-";
-    if (difference.value === 0 || Math.abs(difference.value) < 0.001) {
-      return (
-        <Typography variant="body2" component="span">
-          0
-        </Typography>
-      );
-    }
+    // if (difference.value === 0 || difference.value === -0.0) {
+    //   // Return a plain "0" without the arrow icon
+    //   return (
+    //     <Typography variant="body2" component="span">
+    //       0
+    //     </Typography>
+    //   );
+    // }
     const isPositive = difference.value > 0;
     const ArrowIcon = isPositive ? ArrowUpwardIcon : ArrowDownwardIcon;
     const formattedValue = showPercentage
@@ -824,12 +829,12 @@ const DataTable = () => {
           padding: "16px",
         }}
       >
-        Multi-Script Comparison
+        Multi-Variable Comparison
       </DialogTitle>
       <DialogContent style={{ padding: "24px" }}>
         <Box mb={3} mt={2}>
           <FormControl fullWidth variant="outlined">
-            <InputLabel id="script-select-label">Select Scripts</InputLabel>
+            <InputLabel id="script-select-label">Select Variable</InputLabel>
             <Select
               labelId="script-select-label"
               multiple
@@ -971,7 +976,7 @@ const DataTable = () => {
             </Typography>
 
             <StyledFormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel sx={{ color: "#424242" }}>Terminal</InputLabel>
+              <InputLabel sx={{ color: "#424242" }}>Device</InputLabel>
               <Select
                 value={selectedTerminal}
                 disabled
@@ -990,7 +995,7 @@ const DataTable = () => {
               </Select>
             </StyledFormControl>
             <StyledFormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel sx={{ color: "#424242" }}>Select Script</InputLabel>
+              <InputLabel sx={{ color: "#424242" }}>Select Variable</InputLabel>
               <Select
                 value={selectedScript}
                 onChange={handleScriptChange}
@@ -1327,7 +1332,7 @@ const DataTable = () => {
             </TableContainer>
           ) : (
             <Typography variant="body1" align="center" sx={{ mt: 2 }}>
-              No scripts selected. Please select a script to view data.
+              No variables selected. Please select a variable to view data.
             </Typography>
           )}
           {!loading && (

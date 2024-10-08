@@ -55,7 +55,12 @@ function Header() {
         memoizedUser.user_Type === "Super User"
       ) {
         links.push({ id: 1, name: "Dashboard", to: "/dashboard" });
-        links.push({ id: 2, name: "View", to: "/view", hasDropdown: true });
+        links.push({
+          id: 2,
+          name: "Device View",
+          to: "/view/terminal",
+          // hasDropdown: true,
+        });
         links.push({ id: 3, name: "Users", to: "/users" });
         links.push({ id: 4, name: "Devices", to: "/devices" });
         links.push({ id: 5, name: "Customers", to: "/customers" });
@@ -95,7 +100,7 @@ function Header() {
 
   const getViewLabel = () => {
     if (location.pathname === "/view/terminal") {
-      return "Terminal View";
+      return "   Device View";
     } else if (location.pathname === "/view/script") {
       return "Script View";
     }
@@ -193,21 +198,21 @@ function Header() {
         onClose={handleViewClose}
         className="custom-menu"
       >
-        <MenuItem
+        {/* <MenuItem
           component={Link}
           to="/view/script"
           onClick={handleViewClose}
           className={location.pathname === "/view/script" ? "active-tab" : ""}
         >
           Script View
-        </MenuItem>
+        </MenuItem> */}
         <MenuItem
           component={Link}
           to="/view/terminal"
           onClick={handleViewClose}
           className={location.pathname === "/view/terminal" ? "active-tab" : ""}
         >
-          Terminal View
+          Device View
         </MenuItem>
       </Menu>
     </>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useReducer } from "react";
 import MultiAxisGraph from "./MultiAxisGraph";
+import EnhancedDialog from "./EnhancedDialog";
 import {
   Box,
   Typography,
@@ -8,13 +9,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  Select,
-  MenuItem,
   DialogActions,
   Button,
-  FormControl,
-  InputLabel,
-  Grid,
 } from "@mui/material";
 import { ResizableBox } from "react-resizable";
 import "react-resizable/css/styles.css";
@@ -22,7 +18,6 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
-import CloseIcon from "@mui/icons-material/Close";
 import LineGraph from "./LineGraph";
 import FormatDialog from "./FormatDialog";
 
@@ -142,7 +137,7 @@ const dataReducer = (state, action) => {
   }
 };
 
-const Widget = ({ widgetData, onResize, onDelete, index }) => {
+const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isFormatDialog, setIsFormatDialog] = useState(false);
   const [selectedText, setSelectedText] = useState("");
@@ -155,9 +150,18 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
   const [isGraphExpanded, setIsGraphExpanded] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [graphType, setGraphType] = useState(widgetData.graphType || "simple");
+  const [deleteError, setDeleteError] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const properties = widgetData.properties || {};
   const [backgroundColor, setBackgroundColor] = useState(
-    localStorage.getItem(`widgetBackgroundColor_${widgetData.id}`) || "#f0f0f0"
+    properties.backgroundColor || "#ffffff"
   );
+  const [textStyle, setTextStyle] = useState({
+    fontFamily: properties.fontFamily || "Arial",
+    fontSize: properties.fontSize || "14px",
+    fontColor: properties.fontColor || "#000000",
+    fontStyle: properties.fontStyle || "normal",
+  });
   const [terminalName, setTerminalName] = useState(
     widgetData.terminalName || ""
   );
@@ -179,6 +183,7 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
     fontColor: "#FF0000",
     fontStyle: "normal",
   });
+
   const [state, dispatch] = useReducer(dataReducer, {
     value: widgetData.value,
     timestamp: "",
@@ -186,6 +191,15 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
     detailedData: [],
     error: null,
   });
+
+  const handleDragStart = (e) => {
+    onDragStart(e, widgetData._id);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    onDrop(widgetData._id);
+  };
 
   // -------------- Fetch data with hook --------------
   const fetchData = useCallback(
@@ -249,21 +263,45 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
     setIsFormatDialog(true);
   };
 
-  const handleDeleteWidget = (widgetId) => {
-    const terminals = JSON.parse(localStorage.getItem("terminals"));
-    Object.keys(terminals).forEach((terminalId) => {
-      const widgets = terminals[terminalId];
-      const index = widgets.findIndex((widget) => widget.id === widgetId);
-      if (index !== -1) {
-        widgets.splice(index, 1);
-        localStorage.setItem("terminals", JSON.stringify(terminals));
-        onDelete(widgetId);
+  const handleDeleteWidget = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    // ---------- Delete widget ----------
+    const widgetId = widgetData._id;
+
+    if (!widgetId) {
+      setDeleteError("Invalid widget ID");
+      setIsDeleting(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${apiKey}terminal/deleteWidget/${widgetId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete widget");
       }
-    });
+
+      onDelete(widgetId);
+    } catch (error) {
+      console.error("Error deleting widget:", error);
+      setDeleteError(
+        error.message || "Failed to delete widget. Please try again."
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleConfirmDelete = () => {
-    handleDeleteWidget(widgetData.id);
+    handleDeleteWidget();
     setIsConfirmDialogOpen(false);
   };
 
@@ -271,11 +309,12 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
     setIsConfirmDialogOpen(false);
   };
 
+  // -------------- Handle Resize --------------
   const defaultSize = widgetData.areaGraph
     ? { width: 300, height: 300 }
-    : { width: 250, height: 150 };
-  const minConstraints = widgetData.areaGraph ? [300, 300] : [250, 150];
-  const maxConstraints = widgetData.areaGraph ? [620, 600] : [400, 300];
+    : { width: 200, height: 125 };
+  const minConstraints = widgetData.areaGraph ? [300, 300] : [200, 125];
+  const maxConstraints = widgetData.areaGraph ? [620, 400] : [300, 200];
 
   const handleResize = (event, { size }) => {
     onResize(widgetData.id, size);
@@ -344,32 +383,76 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
   const getAutoTextColor = (bgColor) => {
     return isBackgroundDark(bgColor) ? "#ffffff" : "#000000";
   };
-
   const iconColor = isBackgroundDark(backgroundColor) ? "#ffffff" : "#000000";
   const autoTextColor = getAutoTextColor(backgroundColor);
+
   const handleDeleteClick = () => {
     setIsConfirmDialogOpen(true);
   };
 
-  const iconSize = widgetData.areaGraph ? "medium" : "small";
+  const iconSize = widgetData.areaGraph ? "extra-small" : "extra-small";
   const iconStyle = {
     color: iconColor,
-    textShadow: `0 0 5px ${iconColor === "#ffffff" ? "#000000" : "#ffffff"}`,
+    fontSize: "16px",
+    padding: "2px",
+    borderRadius: "50%",
+    transition: "background-color 0.2s ease, transform 0.2s",
+    textShadow: `0 0 3px ${iconColor === "#ffffff" ? "#000000" : "#ffffff"}`,
     "&:hover": {
       backgroundColor: "rgba(255, 255, 255, 0.1)",
+      transform: "scale(1.05)",
+      boxShadow: "0 1px 4px rgba(0, 0, 0, 0.2)",
     },
-    padding: widgetData.areaGraph ? "8px" : "4px",
+  };
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
   };
 
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
+  const handleStylesUpdate = (newStyles) => {
+    setBackgroundColor(newStyles.backgroundColor || backgroundColor);
+    setTextStyle((prevStyle) => ({
+      ...prevStyle,
+      fontFamily: newStyles.fontFamily || prevStyle.fontFamily,
+      fontSize: newStyles.fontSize || prevStyle.fontSize,
+      fontColor: newStyles.fontColor || prevStyle.fontColor,
+      fontStyle: newStyles.fontStyle || prevStyle.fontStyle,
+    }));
+
+    setCategoryStyle((prevStyle) => ({
+      ...prevStyle,
+      fontFamily: newStyles.fontFamily || prevStyle.fontFamily,
+    }));
+
+    setTerminalStyle((prevStyle) => ({
+      ...prevStyle,
+      fontFamily: newStyles.fontFamily || prevStyle.fontFamily,
+    }));
+
+    setValueStyle((prevStyle) => ({
+      ...prevStyle,
+      fontFamily: newStyles.fontFamily || prevStyle.fontFamily,
+    }));
+  };
   return (
     <>
       <ResizableBox
+        draggable
+        onDragStart={handleDragStart}
+        onDrop={handleDrop}
+        onDragOver={(e) => e.preventDefault()}
         width={defaultSize.width || widgetData.width}
         height={defaultSize.height || widgetData.height}
         minConstraints={minConstraints}
         maxConstraints={maxConstraints}
         onResize={handleResize}
         resizeHandles={["se"]}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         <Tooltip title={formatTimestamp(state.timestamp)}>
           <Box
@@ -394,29 +477,29 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
                 alignItems: "center",
                 mb: 1,
                 flexShrink: 0,
+                position: "relative",
               }}
             >
               <Box>
                 <Typography
                   variant="h6"
                   sx={{
-                    fontFamily: categoryStyle.fontFamily,
-                    fontSize: categoryStyle.fontSize,
-                    color: autoTextColor,
-                    fontStyle: categoryStyle.fontStyle,
+                    fontFamily: textStyle.fontFamily,
+                    fontSize: textStyle.fontSize,
+                    color: textStyle.fontColor || autoTextColor,
+                    fontStyle: textStyle.fontStyle,
                   }}
                   onClick={() => handleEdit("category")}
                 >
                   {widgetData.primaryCategory}
                 </Typography>
-
                 <Typography
                   variant="h6"
                   sx={{
-                    fontFamily: terminalStyle.fontFamily,
-                    fontSize: terminalStyle.fontSize,
+                    fontFamily: textStyle.fontFamily,
+                    fontSize: 20,
                     color: autoTextColor,
-                    fontStyle: terminalStyle.fontStyle,
+                    fontStyle: textStyle.fontStyle,
                   }}
                   onClick={() => handleEdit("scriptName")}
                 >
@@ -425,10 +508,10 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
                 <Typography
                   variant="h3"
                   sx={{
-                    fontFamily: valueStyle.fontFamily,
-                    fontSize: valueStyle.fontSize,
-                    color: valueStyle.fontColor || autoTextColor,
-                    fontStyle: valueStyle.fontStyle,
+                    fontFamily: textStyle.fontFamily,
+                    fontSize: textStyle.fontSize,
+                    color: textStyle.fontColor || autoTextColor,
+                    fontStyle: textStyle.fontStyle,
                     fontWeight: "bold",
                   }}
                   onClick={() => handleEdit("value")}
@@ -436,27 +519,42 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
                   {Number(state.value).toFixed(widgetData.decimalPlaces)}
                 </Typography>
               </Box>
-              <Box>
-                <IconButton onClick={() => fetchData()}>
-                  <RefreshIcon />
-                </IconButton>
-                <IconButton
-                  onClick={() => handleEdit("value")}
-                  aria-label="Edit widget"
-                  size={iconSize}
-                  sx={iconStyle}
+              {isHovered && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    display: "flex",
+                    flexDirection: "row",
+                  }}
                 >
-                  <EditIcon fontSize={iconSize} />
-                </IconButton>
-                <IconButton
-                  onClick={handleDeleteClick}
-                  aria-label="Delete widget"
-                  size={iconSize}
-                  sx={iconStyle}
-                >
-                  <DeleteIcon fontSize={iconSize} />
-                </IconButton>
-              </Box>
+                  <IconButton
+                    aria-label="Refresh widget"
+                    size={iconSize}
+                    sx={iconStyle}
+                    onClick={() => fetchData()}
+                  >
+                    <RefreshIcon fontSize={iconSize} />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => handleEdit("value")}
+                    aria-label="Edit widget"
+                    size={iconSize}
+                    sx={iconStyle}
+                  >
+                    <EditIcon fontSize={iconSize} />
+                  </IconButton>
+                  <IconButton
+                    onClick={handleDeleteClick}
+                    aria-label="Delete widget"
+                    size={iconSize}
+                    sx={iconStyle}
+                  >
+                    <DeleteIcon fontSize={iconSize} />
+                  </IconButton>
+                </Box>
+              )}
             </Box>
 
             {widgetData.areaGraph && (
@@ -490,7 +588,6 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
                   ))}
               </Box>
             )}
-
             <Box
               sx={{
                 display: "flex",
@@ -505,6 +602,7 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
                   Last Sync {formatTimestamp(state.timestamp)}
                 </Typography>
               )}
+
               {widgetData.areaGraph && (
                 <Tooltip title="Expand graph">
                   <IconButton
@@ -539,7 +637,7 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
             ? terminalStyle
             : selectedText === "value"
             ? valueStyle
-            : {}
+            : textStyle
         }
         setCurrentStyles={(styles) => {
           if (selectedText === "category") {
@@ -548,104 +646,47 @@ const Widget = ({ widgetData, onResize, onDelete, index }) => {
             setTerminalStyle(styles);
           } else if (selectedText === "value") {
             setValueStyle(styles);
-          }
-
-          if (styles.backgroundColor) {
-            setBackgroundColor(styles.backgroundColor);
-            localStorage.setItem(
-              `widgetBackgroundColor_${widgetData.id}`,
-              styles.backgroundColor
-            );
+          } else {
+            setTextStyle(styles);
           }
         }}
-        backgroundColor={backgroundColor}
+        widgetId={widgetData._id}
+        onStylesUpdate={handleStylesUpdate}
       />
       <Dialog open={isConfirmDialogOpen} onClose={handleCancelDelete}>
         <DialogTitle>Confirm Deletion</DialogTitle>
         <DialogContent>
           Are you sure you want to delete this widget?
+          {deleteError && (
+            <Typography color="error" sx={{ mt: 2 }}>
+              {deleteError}
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCancelDelete}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} color="primary">
-            Delete
+          <Button
+            onClick={handleConfirmDelete}
+            color="primary"
+            disabled={isDeleting}
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
-      <Dialog
-        open={isDialogOpen && isGraphExpanded}
-        onClose={handleCloseDialog}
-        fullWidth
-        maxWidth="md"
-        sx={{
-          "& .MuiDialogTitle-root": {
-            backgroundColor: "#1976d2",
-            color: "#fff",
-            padding: "16px",
-          },
-          "& .MuiDialogContent-root": {
-            backgroundColor: "#f5f5f5",
-            padding: "24px",
-          },
-          "& .MuiButton-contained": {
-            backgroundColor: "#1976d2",
-            color: "#fff",
-            width: "100%",
-            "&:hover": {
-              backgroundColor: "#1565c0",
-            },
-          },
-        }}
-      >
-        <DialogTitle>
-          {terminalName + " " + selectedScript}
-          <IconButton
-            onClick={handleCloseDialog}
-            sx={{ position: "absolute", right: 8, top: 8 }}
-          >
-            <CloseIcon />
-          </IconButton>
-
-          <Grid item xs={2}>
-            <FormControl size="small" sx={{ mb: 2, width: 250 }}>
-              <InputLabel>Compare with</InputLabel>
-              <Select
-                multiple
-                value={comparisonScripts}
-                onChange={handleComparisonScriptChange}
-                renderValue={(selected) => selected.join(", ")}
-                sx={{ width: "100%" }}
-              >
-                <MenuItem value="none">None</MenuItem>
-                {availableScripts.map((script) => (
-                  <MenuItem key={script} value={script}>
-                    {script}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ height: 450, marginBottom: 2 }}>
-            {graphType === "simple" ? (
-              <LineGraph
-                data={state.detailedData}
-                comparisonData={comparisonData}
-                expanded={true}
-                scriptName={selectedScript}
-              />
-            ) : (
-              <MultiAxisGraph
-                data={state.detailedData}
-                comparisonData={comparisonData}
-                expanded={true}
-                scriptName={selectedScript}
-              />
-            )}
-          </Box>
-        </DialogContent>
-      </Dialog>
+      <EnhancedDialog
+        isDialogOpen={isDialogOpen}
+        isGraphExpanded={isGraphExpanded}
+        handleCloseDialog={handleCloseDialog}
+        terminalName={terminalName}
+        selectedScript={selectedScript}
+        comparisonScripts={comparisonScripts}
+        handleComparisonScriptChange={handleComparisonScriptChange}
+        availableScripts={availableScripts}
+        graphType={graphType}
+        state={state}
+        comparisonData={comparisonData}
+      />
     </>
   );
 };
