@@ -23,6 +23,9 @@ import Customers from "./Components/Customers";
 import Dashboard from "./Components/Dashboard";
 import Schedule from "./Components/Schedule";
 import Reports from "./Components/Reports";
+import TerminalView from "./Components/View/TerminalView/TerminalView";
+import TerminalWidgetsPage from "./Components/View/TerminalView/TerminalWidgetsPage";
+import DataTable from "./Components/View/TerminalView/HistoricalData/DataTable"; // Import the DataTable component
 
 const Main = () => {
   const HeaderLayout = () => {
@@ -101,6 +104,14 @@ const Main = () => {
           element: <Dashboard />,
         },
         {
+          path: "/view/terminal",
+          element: <TerminalView />,
+        },
+        {
+          path: "/terminal/:terminalName",
+          element: <TerminalWidgetsPage />,
+        },
+        {
           path: "/schedule",
           element: <Schedule />,
         },
@@ -111,6 +122,10 @@ const Main = () => {
         {
           path: "/profile",
           element: <Profile />,
+        },
+        {
+          path: "/data-table/:tableId",
+          element: <DataTable />,
         },
         {
           path: "*",

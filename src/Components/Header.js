@@ -12,9 +12,12 @@ import {
   Tabs,
   Tab,
   useMediaQuery,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import logo from "../assets/images/logo.svg";
 import eslogo from "../assets/images/es.svg";
@@ -23,12 +26,22 @@ import "../assets/css/header.css";
 function Header() {
   const [open, setOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState(0);
+  const [anchorEl, setAnchorEl] = useState(null);
   const isMobile = useMediaQuery((theme) => theme.breakpoints.down("sm"));
   const location = useLocation();
 
   const handleDrawerOpen = () => {
     setOpen(!open);
   };
+
+  const handleViewClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleViewClose = () => {
+    setAnchorEl(null);
+  };
+
   let user = useSelector((store) => store.user);
   const memoizedUser = useMemo(() => {
     return user ? user : JSON.parse(localStorage.getItem("user"));
@@ -37,18 +50,22 @@ function Header() {
   const getPageLinks = () => {
     const links = [];
     if (memoizedUser) {
-      if (memoizedUser.user_Type === "Admin" || memoizedUser.user_Type === "Super User") {
+      if (
+        memoizedUser.user_Type === "Admin" ||
+        memoizedUser.user_Type === "Super User"
+      ) {
         links.push({ id: 1, name: "Dashboard", to: "/dashboard" });
-        links.push({ id: 2, name: "Users", to: "/users" });
-        links.push({ id: 3, name: "Devices", to: "/devices" });
-        links.push({ id: 4, name: "Customers", to: "/customers" });
-        links.push({ id: 5, name: "Schedule", to: "/schedule" });
-        links.push({ id: 6, name: "Notifications", to: "/notifications" });
-        links.push({ id: 7, name: "Device Data", to: "/devicedata" });
-        links.push({ id: 8, name: "Reports", to: "/reports" });
-        links.push({ id: 9, name: "Profile", to: "/profile" });
-        links.push({ id: 10, name: "Logout", to: "/" });
-      } else if(memoizedUser.user_Type === "User"){
+        links.push({ id: 2, name: "View", to: "/view", hasDropdown: true });
+        links.push({ id: 3, name: "Users", to: "/users" });
+        links.push({ id: 4, name: "Devices", to: "/devices" });
+        links.push({ id: 5, name: "Customers", to: "/customers" });
+        links.push({ id: 6, name: "Schedule", to: "/schedule" });
+        links.push({ id: 7, name: "Notifications", to: "/notifications" });
+        links.push({ id: 8, name: "Device Data", to: "/devicedata" });
+        links.push({ id: 9, name: "Reports", to: "/reports" });
+        links.push({ id: 10, name: "Profile", to: "/profile" });
+        links.push({ id: 11, name: "Logout", to: "/" });
+      } else if (memoizedUser.user_Type === "User") {
         links.push({ id: 1, name: "Dashboard", to: "/dashboard" });
         links.push({ id: 2, name: "Profile", to: "/profile" });
         links.push({ id: 3, name: "Logout", to: "/" });
@@ -61,7 +78,12 @@ function Header() {
 
   useEffect(() => {
     const currentPath = location.pathname;
-    const selectedTab = pageLinks.findIndex((link) => link.to === currentPath);
+    const selectedTab = pageLinks.findIndex((link) => {
+      if (link.hasDropdown) {
+        return currentPath.startsWith(link.to);
+      }
+      return link.to === currentPath;
+    });
     if (selectedTab !== -1) {
       setSelectedTab(selectedTab);
     }
@@ -69,6 +91,43 @@ function Header() {
 
   const handleTabChange = (event, newValue) => {
     setSelectedTab(newValue);
+  };
+
+  const getViewLabel = () => {
+    if (location.pathname === "/view/terminal") {
+      return "Terminal View";
+    } else if (location.pathname === "/view/script") {
+      return "Script View";
+    }
+    return "View";
+  };
+
+  const renderTab = (pageLink, index) => {
+    if (pageLink.hasDropdown) {
+      const isActive = location.pathname.startsWith("/view");
+      return (
+        <Tab
+          key={index}
+          label={
+            <div style={{ display: "flex", alignItems: "center" }}>
+              {getViewLabel()}
+              <ArrowDropDownIcon />
+            </div>
+          }
+          onClick={handleViewClick}
+          className={`custom-tab ${isActive ? "active-tab" : ""}`}
+        />
+      );
+    }
+    return (
+      <Tab
+        key={index}
+        label={pageLink.name}
+        component={NavLink}
+        to={pageLink.to}
+        className={`custom-tab ${selectedTab === index ? "active-tab" : ""}`}
+      />
+    );
   };
 
   return (
@@ -80,7 +139,7 @@ function Header() {
         <Toolbar style={{ paddingLeft: 0, paddingRight: 0 }}>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             <Link to={"/dashboard"}>
-            <img width={180} height={100} src={eslogo} alt="Logo" />
+              <img width={180} height={100} src={eslogo} alt="Logo" />
             </Link>
           </Typography>
           {isMobile ? (
@@ -97,15 +156,7 @@ function Header() {
               onChange={handleTabChange}
               textColor="inherit"
             >
-              {pageLinks.map((pageLink, index) => (
-                <Tab
-                  key={index}
-                  label={pageLink.name}
-                  component={NavLink}
-                  to={pageLink.to}
-                  className={selectedTab === index ? "active-tab" : ""}
-                />
-              ))}
+              {pageLinks.map((pageLink, index) => renderTab(pageLink, index))}
             </Tabs>
           )}
         </Toolbar>
@@ -120,18 +171,45 @@ function Header() {
           {pageLinks.map((pageLink) => (
             <ListItem key={pageLink.id}>
               <ListItemText>
-                <Link
-                  to={pageLink.to}
-                  key={pageLink.id}
-                  onClick={() => setOpen(false)}
-                >
-                  {pageLink.name}
-                </Link>
+                {pageLink.hasDropdown ? (
+                  <div onClick={handleViewClick}>{getViewLabel()}</div>
+                ) : (
+                  <Link
+                    to={pageLink.to}
+                    key={pageLink.id}
+                    onClick={() => setOpen(false)}
+                  >
+                    {pageLink.name}
+                  </Link>
+                )}
               </ListItemText>
             </ListItem>
           ))}
         </List>
       </Drawer>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleViewClose}
+        className="custom-menu"
+      >
+        <MenuItem
+          component={Link}
+          to="/view/script"
+          onClick={handleViewClose}
+          className={location.pathname === "/view/script" ? "active-tab" : ""}
+        >
+          Script View
+        </MenuItem>
+        <MenuItem
+          component={Link}
+          to="/view/terminal"
+          onClick={handleViewClose}
+          className={location.pathname === "/view/terminal" ? "active-tab" : ""}
+        >
+          Terminal View
+        </MenuItem>
+      </Menu>
     </>
   );
 }
