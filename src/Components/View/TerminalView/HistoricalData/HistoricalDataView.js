@@ -6,20 +6,32 @@ import {
   Typography,
   Paper,
   CircularProgress,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { useNavigate } from "react-router-dom";
 import TableColumnCreate from "./TableColumnCreate";
 import axios from "axios";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 const HistoricalDataView = () => {
   const navigate = useNavigate();
   const [openDialog, setOpenDialog] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [tableToDelete, setTableToDelete] = useState(null);
 
   useEffect(() => {
     fetchTables();
@@ -68,6 +80,25 @@ const HistoricalDataView = () => {
     navigate(`/data-table/${tableId}`);
   };
 
+  const handleDeleteTable = async () => {
+    try {
+      await axios.delete(`${apiKey}terminal/table/${tableToDelete}`);
+
+      fetchTables();
+      toast.success("Table deleted successfully");
+      setDeleteDialogOpen(false);
+      setTableToDelete(null);
+    } catch (error) {
+      console.error("Error deleting table:", error);
+      toast.error("Failed to delete table");
+    }
+  };
+
+  const openDeleteConfirmation = (tableId) => {
+    setTableToDelete(tableId);
+    setDeleteDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <Box
@@ -96,6 +127,7 @@ const HistoricalDataView = () => {
 
   return (
     <Box sx={{ p: 3, bgcolor: "#e3f2fd", minHeight: "100vh" }}>
+      <ToastContainer position="top-right" autoClose={3000} />
       <Grid container spacing={3} justifyContent="center">
         <Grid item xs={12} md={8}>
           <Grid container spacing={3}>
@@ -122,6 +154,7 @@ const HistoricalDataView = () => {
                       transform: "translateY(-4px)",
                       boxShadow: 6,
                     },
+                    position: "relative",
                   }}
                   onClick={() => handleTableClick(table._id)}
                 >
@@ -159,6 +192,22 @@ const HistoricalDataView = () => {
                     >
                       Click to View
                     </Typography>
+                    <Tooltip title="Delete Table">
+                      <IconButton
+                        sx={{
+                          position: "absolute",
+                          top: 8,
+                          right: 8,
+                          transition: "opacity 0.3s",
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteConfirmation(table._id);
+                        }}
+                      >
+                        <DeleteIcon sx={{ color: "black" }} />
+                      </IconButton>
+                    </Tooltip>
                   </Box>
                 </Paper>
               </Grid>
@@ -197,6 +246,28 @@ const HistoricalDataView = () => {
         onClose={handleCloseDialog}
         onCreateColumn={handleCreateTable}
       />
+
+      {/* Confirmation Dialog for Deleting Table */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>{"Confirm Deletion"}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this table? This action cannot be
+            undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteTable} color="secondary" autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

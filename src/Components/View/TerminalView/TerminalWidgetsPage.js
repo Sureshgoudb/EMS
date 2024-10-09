@@ -182,7 +182,7 @@ const TerminalDetailView = () => {
                 onDragEnd={handleDragEnd}
                 onDrop={handleDrop}
                 className="widget"
-                data-id={widget._id} // Store widget ID in a data attribute
+                data-id={widget._id}
               />
             ))}
           </Box>

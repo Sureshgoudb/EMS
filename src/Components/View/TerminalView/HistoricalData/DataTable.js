@@ -26,9 +26,12 @@ import {
   DialogActions,
   Switch,
   Tooltip,
+  IconButton,
   CircularProgress,
 } from "@mui/material";
 import dayjs from "dayjs";
+import CloseIcon from "@mui/icons-material/Close";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
@@ -41,6 +44,7 @@ import BarChartIcon from "@mui/icons-material/BarChart";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import TableColumnCreate from "./TableColumnCreate";
+
 import {
   AreaChart,
   Area,
@@ -503,14 +507,46 @@ const DataTable = () => {
     setSelectedGraphScripts([]);
   };
 
-  const graphexportToPdf = () => {
+  const graphexportToPdf = async () => {
     const input = document.getElementById("graph-container");
-    html2canvas(input).then((canvas) => {
+
+    try {
+      const canvas = await html2canvas(input, { useCORS: true });
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF();
-      pdf.addImage(imgData, "PNG", 0, 0);
-      pdf.save("multi_script_comparison.pdf");
-    });
+
+      const pdf = new jsPDF("l", "mm", "a4"); // Landscape orientation for A4 size
+      const imgWidth = pdf.internal.pageSize.getWidth(); // Get PDF width
+      const imgHeight = (canvas.height * imgWidth) / canvas.width; // Calculate the height to maintain aspect ratio
+
+      // If the image is taller than the PDF page, split into multiple pages
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // Add title or header
+      pdf.setFontSize(16);
+      pdf.text("Multi-Variable Comparison", imgWidth / 2, 15, {
+        align: "center",
+      });
+
+      // Add the image to the PDF
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pdf.internal.pageSize.getHeight();
+
+      // If the image is larger than one page, continue adding pages
+      while (heightLeft >= 0) {
+        pdf.addPage();
+        position = heightLeft > 0 ? 0 : heightLeft;
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pdf.internal.pageSize.getHeight();
+      }
+
+      // Save the PDF
+      pdf.save("multi_variable_comparison.pdf");
+      toast.success("PDF exported successfully");
+    } catch (error) {
+      console.error("Error exporting to PDF: ", error);
+      toast.error("Failed to export PDF");
+    }
   };
 
   useEffect(() => {
@@ -625,18 +661,54 @@ const DataTable = () => {
   };
 
   const handleScriptChange = (event) => {
-    const newScript = event.target.value;
-    setSelectedScript(newScript);
+    const {
+      target: { value },
+    } = event;
+    const newSelectedScripts =
+      typeof value === "string" ? value.split(",") : value;
 
-    if (!columns.some((col) => col.id === newScript)) {
-      setColumns((prevColumns) => [
-        ...prevColumns,
-        { id: newScript, label: newScript },
-      ]);
-      setSelectedScripts((prevScripts) => [...prevScripts, newScript]);
-      fetchScriptData(newScript);
+    // Check if the new selection is a subset of the previous selection
+    if (newSelectedScripts.length < selectedScripts.length) {
+      const removedScripts = selectedScripts.filter(
+        (script) => !newSelectedScripts.includes(script)
+      );
+      removedScripts.forEach((script) => {
+        toast.info(`Script ${script} has been removed from the table.`);
+      });
     }
+
+    setSelectedScripts(newSelectedScripts);
   };
+
+  useEffect(() => {
+    // Update columns based on selectedScripts
+    const newColumns = [
+      { id: "timestamp", label: "Timestamp" },
+      ...selectedScripts.map((script) => ({ id: script, label: script })),
+    ];
+    setColumns(newColumns);
+
+    // Fetch data for newly selected scripts
+    selectedScripts.forEach((script) => {
+      if (!columns.some((col) => col.id === script)) {
+        fetchScriptData(script);
+      }
+    });
+
+    // Remove data for unselected scripts
+    setRows((prevRows) =>
+      prevRows.map((row) => {
+        const newRow = { timestamp: row.timestamp };
+
+        selectedScripts.forEach((script) => {
+          if (row.hasOwnProperty(script)) {
+            newRow[script] = row[script];
+          }
+        });
+        return newRow;
+      })
+    );
+  }, [selectedScripts]);
 
   const [loadingScriptData, setLoadingScriptData] = useState(false);
 
@@ -707,12 +779,14 @@ const DataTable = () => {
   };
 
   // ---------- Function to export To Pdf ----------
-  const exportToPdf = () => {
+  const exportToPdf = async () => {
     setExporting(true);
     const doc = new jsPDF("l", "mm", "a4");
 
+    // Title for the PDF
     doc.text(tableName || "Filtered Data", 14, 15);
 
+    // Add the table to the PDF
     autoTable(doc, {
       head: [columns.map((column) => column.label)],
       body: filteredRows.map((row) =>
@@ -728,8 +802,42 @@ const DataTable = () => {
       columnStyles: { 0: { cellWidth: 30 } },
     });
 
+    // Capture the graph as an image using html2canvas
+    const graphContainer = document.getElementById("graph-container");
+
+    // Ensure the graph container exists before capturing
+    if (graphContainer) {
+      const canvas = await html2canvas(graphContainer, {
+        useCORS: true, // Use this if the graph includes images from different origins
+        scale: 2, // Optional: Increase scale for better quality
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const imgWidth = 297; // A4 width in mm
+      const pageHeight = doc.internal.pageSize.height;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+
+      // Add the image to the PDF
+      let position = 20 + (filteredRows.length > 0 ? 40 : 10); // Adjust position based on table height
+
+      if (heightLeft >= pageHeight) {
+        doc.addImage(imgData, "PNG", 14, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+        while (heightLeft >= 0) {
+          doc.addPage();
+          position = heightLeft > 0 ? 0 : heightLeft;
+          doc.addImage(imgData, "PNG", 14, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+      } else {
+        doc.addImage(imgData, "PNG", 14, position, imgWidth, imgHeight);
+      }
+    }
+
+    // Save the PDF
     doc.save("filtered_data.pdf");
-    toast.success("Pdf exported successfully");
+    toast.success("PDF exported successfully");
 
     setExporting(false);
   };
@@ -813,25 +921,51 @@ const DataTable = () => {
       fullWidth
       PaperProps={{
         style: {
-          backgroundColor: "#fafafa",
+          backgroundColor: "#f5f5f5",
           borderRadius: "16px",
-          boxShadow: "0 12px 40px rgba(0, 0, 0, 0.2)",
+          boxShadow: "0 14px 45px rgba(0, 0, 0, 0.15)",
         },
       }}
     >
       <DialogTitle
         style={{
-          backgroundColor: "#3949ab",
+          background: "linear-gradient(135deg, #3f51b5 30%, #5c6bc0 90%)",
           color: "white",
-
-          borderTopLeftRadius: "16px",
-          borderTopRightRadius: "16px",
-          padding: "16px",
+          textAlign: "center",
+          position: "relative", // Set position to relative for icon positioning
         }}
       >
         Multi-Variable Comparison
+        {/* Icon Button for Export to PDF */}
+        <Tooltip title="Export to PDF" arrow>
+          <IconButton
+            style={{
+              position: "absolute",
+              right: "50px",
+              top: "10px",
+              color: "white",
+            }} // Adjust position as needed
+            onClick={graphexportToPdf}
+          >
+            <PictureAsPdfIcon />
+          </IconButton>
+        </Tooltip>
+        {/* Icon Button for Close */}
+        <Tooltip title="Close" arrow>
+          <IconButton
+            style={{
+              position: "absolute",
+              right: "10px",
+              top: "10px",
+              color: "white",
+            }} // Adjust position as needed
+            onClick={handleCloseGraph}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Tooltip>
       </DialogTitle>
-      <DialogContent style={{ padding: "24px" }}>
+      <DialogContent>
         <Box mb={3} mt={2}>
           <FormControl fullWidth variant="outlined">
             <InputLabel id="script-select-label">Select Variable</InputLabel>
@@ -844,13 +978,16 @@ const DataTable = () => {
               style={{
                 backgroundColor: "white",
                 borderRadius: "8px",
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+                boxShadow: "0 3px 10px rgba(0, 0, 0, 0.1)",
+                fontSize: "16px",
+                height: "40px",
+                padding: "0 12px",
               }}
               MenuProps={{
                 PaperProps: {
                   style: {
-                    borderRadius: "8px",
-                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.2)",
+                    borderRadius: "10px",
+                    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.25)",
                   },
                 },
               }}
@@ -868,35 +1005,37 @@ const DataTable = () => {
             </Select>
           </FormControl>
         </Box>
+
         <div
           id="graph-container"
           style={{
-            backgroundColor: "white",
-            padding: "20px",
+            background: "linear-gradient(white, #e3f2fd)",
+            padding: "25px",
             borderRadius: "12px",
-            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.1)",
+            boxShadow: "0 6px 20px rgba(0, 0, 0, 0.1)",
           }}
         >
           <ResponsiveContainer width="100%" height={400}>
             <AreaChart
               data={reversedGraphData}
-              margin={{ top: 20, right: 40, left: 20, bottom: 20 }}
+              margin={{ top: 30, right: 40, left: 20, bottom: 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
               <XAxis
                 dataKey="timestamp"
-                stroke="#666"
-                style={{ fontSize: "12px" }}
+                stroke="#555"
+                style={{ fontSize: "13px" }}
                 tickFormatter={(value) => new Date(value).toLocaleDateString()}
               />
-              <YAxis stroke="#666" style={{ fontSize: "12px" }} />
+              <YAxis stroke="#555" style={{ fontSize: "13px" }} />
               <RechartsTooltip
                 contentStyle={{
-                  backgroundColor: "rgba(255, 255, 255, 0.9)",
-                  borderRadius: "6px",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+                  backgroundColor: "rgba(255, 255, 255, 0.95)",
+                  borderRadius: "8px",
+                  boxShadow: "0 3px 10px rgba(0, 0, 0, 0.15)",
+                  padding: "10px",
                 }}
-                labelStyle
+                labelStyle={{ fontWeight: "bold" }}
               />
               <Legend verticalAlign="top" height={36} />
               {selectedGraphScripts.map((script, index) => (
@@ -904,45 +1043,43 @@ const DataTable = () => {
                   key={script}
                   type="monotone"
                   dataKey={script}
-                  stroke={`hsl(${(index * 137) % 360}, 70%, 50%)`}
-                  fill={`hsl(${(index * 137) % 360}, 70%, 50%)`}
+                  stroke={`hsl(${(index * 137) % 360}, 60%, 50%)`}
+                  fill={`url(#gradient${index})`}
                   strokeWidth={2}
-                  fillOpacity={0.3}
+                  fillOpacity={0.6}
                 />
+              ))}
+              {selectedGraphScripts.map((script, index) => (
+                <defs key={`defs${index}`}>
+                  <linearGradient
+                    id={`gradient${index}`}
+                    x1="0%"
+                    y1="0%"
+                    x2="0%"
+                    y2="100%"
+                  >
+                    <stop
+                      offset="0%"
+                      style={{
+                        stopColor: `hsl(${(index * 137) % 360}, 60%, 50%)`,
+                        stopOpacity: 1,
+                      }}
+                    />
+                    <stop
+                      offset="100%"
+                      style={{
+                        stopColor: `hsl(${(index * 137) % 360}, 60%, 80%)`,
+                        stopOpacity: 0.5,
+                      }}
+                    />
+                  </linearGradient>
+                </defs>
               ))}
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </DialogContent>
-      <DialogActions style={{ padding: "24px" }}>
-        <Button
-          onClick={graphexportToPdf}
-          variant="contained"
-          color="primary"
-          style={{
-            borderRadius: "24px",
-            padding: "10px 20px",
-            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
-            textTransform: "none",
-          }}
-        >
-          Export to PDF
-        </Button>
-        <Button
-          onClick={handleCloseGraph}
-          variant="outlined"
-          color="secondary"
-          style={{
-            borderRadius: "24px",
-            padding: "10px 20px",
-            borderColor: "#f50057",
-            color: "#f50057",
-            textTransform: "none",
-          }}
-        >
-          Close
-        </Button>
-      </DialogActions>
+      {/* Removed DialogActions section */}
     </Dialog>
   );
 
@@ -997,9 +1134,11 @@ const DataTable = () => {
             <StyledFormControl fullWidth sx={{ mb: 3 }}>
               <InputLabel sx={{ color: "#424242" }}>Select Variable</InputLabel>
               <Select
-                value={selectedScript}
+                multiple
+                value={selectedScripts}
                 onChange={handleScriptChange}
-                label="Select Script"
+                renderValue={(selected) => selected.join(", ")}
+                label="Select Variables"
                 sx={{
                   backgroundColor: "#ffffff",
                   borderRadius: "8px",
@@ -1007,22 +1146,9 @@ const DataTable = () => {
                 }}
               >
                 {scripts.map((script) => (
-                  <MenuItem
-                    key={script}
-                    value={script}
-                    sx={{
-                      backgroundColor: columns.some((col) => col.id === script)
-                        ? "#d1eaff"
-                        : "inherit",
-                      borderRadius: "6px",
-                      "&:hover": {
-                        backgroundColor: "#e0f7fa",
-                        transform: "scale(1.02)",
-                        transition: "transform 0.2s ease-in-out",
-                      },
-                    }}
-                  >
-                    {script}
+                  <MenuItem key={script} value={script}>
+                    <Checkbox checked={selectedScripts.indexOf(script) > -1} />
+                    <ListItemText primary={script} />
                   </MenuItem>
                 ))}
               </Select>

@@ -18,6 +18,7 @@ import {
   Paper,
   createTheme,
 } from "@mui/material";
+import { styled } from "@mui/material/styles";
 import InfoIcon from "@mui/icons-material/Info";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -72,6 +73,10 @@ const theme = createTheme({
   },
 });
 
+const StyledFormControl = styled(FormControl)(({ theme }) => ({
+  margin: theme.spacing(0),
+}));
+
 const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
   const [scriptName, setScriptName] = useState("");
   const [terminalName, setTerminalName] = useState(presetTerminal || "");
@@ -87,7 +92,7 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
   const [scripts, setScripts] = useState([]);
   const [scriptError, setScriptError] = useState(false);
   const [decimalPlaces, setDecimalPlaces] = useState(2);
-  const [graphType, setGraphType] = useState("");
+  const [graphType, setGraphType] = useState("simple");
   const [xAxisType, setXAxisType] = useState("records");
   const [xAxisValue, setXAxisValue] = useState(90);
   const [refreshInterval, setRefreshInterval] = useState(60);
@@ -208,9 +213,15 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
           Create New Widget
         </Typography>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <FormControl fullWidth>
-            <InputLabel>Device Name</InputLabel>
+          <StyledFormControl fullWidth>
+            <InputLabel sx={{ color: "#424242" }}>Device</InputLabel>
             <Select
+              label="Device"
+              sx={{
+                backgroundColor: "#ffffff",
+                borderRadius: "8px",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+              }}
               value={terminalName}
               onChange={(e) => setTerminalName(e.target.value)}
               disabled={!!presetTerminal}
@@ -221,10 +232,16 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
                 </MenuItem>
               ))}
             </Select>
-          </FormControl>
-          <FormControl fullWidth>
+          </StyledFormControl>
+          <StyledFormControl fullWidth>
             <InputLabel>Variable Name</InputLabel>
             <Select
+              label="VariableName"
+              sx={{
+                backgroundColor: "#ffffff",
+                borderRadius: "8px",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+              }}
               value={scriptName}
               onChange={handleScriptSelection}
               disabled={!terminalName}
@@ -240,8 +257,8 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
                 Please select a device before choosing a variable.
               </Alert>
             )}
-          </FormControl>
-          <FormControl fullWidth sx={{ mb: 3 }}>
+          </StyledFormControl>
+          <StyledFormControl fullWidth>
             <TextField
               label="Decimal Places"
               type="number"
@@ -252,7 +269,7 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
                 decimalPlaces
               )}`}
             />
-          </FormControl>
+          </StyledFormControl>
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <FormControlLabel
               control={

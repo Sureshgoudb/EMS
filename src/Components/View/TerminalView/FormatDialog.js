@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios"; // Make sure to install and import axios
+import axios from "axios";
 
 import {
   Dialog,
@@ -16,11 +16,18 @@ import {
   IconButton,
   Typography,
   Grid,
+  styled,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ColorLensIcon from "@mui/icons-material/ColorLens";
+
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
+
+// Styled FormControl
+const StyledFormControl = styled(FormControl)(({ theme }) => ({
+  margin: theme.spacing(0),
+}));
 
 const FormatDialog = ({
   open,
@@ -28,7 +35,7 @@ const FormatDialog = ({
   currentStyles,
   setCurrentStyles,
   widgetId,
-  onStylesUpdate, // Add this new prop
+  onStylesUpdate,
 }) => {
   const [styles, setStyles] = useState(currentStyles);
 
@@ -63,12 +70,13 @@ const FormatDialog = ({
           fontColor: styles.fontColor,
           backgroundColor: styles.backgroundColor,
           fontStyle: styles.fontStyle,
+          fontWeight: styles.fontWeight,
         }
       );
 
       if (response.status === 200) {
         setCurrentStyles(styles);
-        onStylesUpdate(styles); // Call the callback to update parent state
+        onStylesUpdate(styles);
         onClose();
       } else {
         console.error("Failed to update widget properties");
@@ -94,7 +102,7 @@ const FormatDialog = ({
     >
       <DialogTitle
         sx={{
-          backgroundColor: "#005f6a",
+          backgroundColor: "#004d54",
           color: "#ffffff",
           borderTopLeftRadius: "16px",
           borderTopRightRadius: "16px",
@@ -108,21 +116,23 @@ const FormatDialog = ({
       <DialogContent
         sx={{
           padding: "24px",
-          backgroundColor: "#ffffff",
+          backgroundColor: "#f9f9f9",
           marginTop: "20px",
         }}
       >
         <Grid container spacing={3}>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
+          <Grid item xs={12} sm={6} mt={1}>
+            <StyledFormControl fullWidth>
               <InputLabel>Font Family</InputLabel>
               <Select
-                name="fontFamily"
+                name="fontFamily "
                 value={styles.fontFamily || ""}
                 onChange={handleChange}
+                label=" Font Family "
                 sx={{
-                  backgroundColor: "#f5f5f5",
+                  backgroundColor: "#ffffff",
                   borderRadius: "8px",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
                 }}
               >
                 <MenuItem value="Arial">Arial</MenuItem>
@@ -131,19 +141,22 @@ const FormatDialog = ({
                 <MenuItem value="Times New Roman">Times New Roman</MenuItem>
                 <MenuItem value="Courier New">Courier New</MenuItem>
               </Select>
-            </FormControl>
+            </StyledFormControl>
           </Grid>
           <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
+            <StyledFormControl fullWidth>
               <Box display="flex" alignItems="center">
                 <IconButton
                   onClick={() => handleFontSizeChange(-2)}
                   sx={{
-                    backgroundColor: "#f5f5f5",
+                    backgroundColor: "#ffffff",
+                    ml: "5px",
+                    mr: "5px",
                     borderRadius: "8px",
                     "&:hover": {
                       backgroundColor: "#e0e0e0",
                     },
+                    border: "1px solid #e0e0e0",
                   }}
                 >
                   <RemoveIcon />
@@ -156,59 +169,65 @@ const FormatDialog = ({
                   InputProps={{
                     endAdornment: <Typography variant="body1">px</Typography>,
                   }}
+                  label="font Size"
                   sx={{
-                    width: "100%",
-                    "& .MuiInputBase-input": {
-                      textAlign: "center",
-                    },
-                    backgroundColor: "#f5f5f5",
+                    backgroundColor: "#ffffff",
                     borderRadius: "8px",
-                    border: "1px solid #e0e0e0",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+                    mt: 1,
                   }}
                 />
                 <IconButton
                   onClick={() => handleFontSizeChange(2)}
                   sx={{
-                    backgroundColor: "#f5f5f5",
+                    backgroundColor: "#ffffff",
+                    ml: "5px",
+                    mr: "5px",
                     borderRadius: "8px",
+
                     "&:hover": {
                       backgroundColor: "#e0e0e0",
                     },
+                    border: "1px solid #e0e0e0",
                   }}
                 >
                   <AddIcon />
                 </IconButton>
               </Box>
-            </FormControl>
+            </StyledFormControl>
           </Grid>
           <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
+            <StyledFormControl fullWidth>
               <InputLabel>Font Style</InputLabel>
               <Select
                 name="fontStyle"
                 value={styles.fontStyle || "normal"}
                 onChange={handleChange}
+                label="Font Style"
                 sx={{
-                  backgroundColor: "#f5f5f5",
+                  backgroundColor: "#ffffff",
                   borderRadius: "8px",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
                 }}
               >
                 <MenuItem value="normal">Normal</MenuItem>
                 <MenuItem value="italic">Italic</MenuItem>
                 <MenuItem value="oblique">Oblique</MenuItem>
               </Select>
-            </FormControl>
+            </StyledFormControl>
           </Grid>
           <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
+            <StyledFormControl fullWidth>
               <InputLabel>Font Weight</InputLabel>
               <Select
                 name="fontWeight"
                 value={styles.fontWeight || "normal"}
                 onChange={handleChange}
+                label="Font Weight"
                 sx={{
-                  backgroundColor: "#f5f5f5",
+                  backgroundColor: "#ffffff",
                   borderRadius: "8px",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
                 }}
               >
                 <MenuItem value="normal">Normal</MenuItem>
@@ -216,7 +235,7 @@ const FormatDialog = ({
                 <MenuItem value="bolder">Bolder</MenuItem>
                 <MenuItem value="lighter">Lighter</MenuItem>
               </Select>
-            </FormControl>
+            </StyledFormControl>
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField
@@ -231,7 +250,7 @@ const FormatDialog = ({
                 ),
               }}
               sx={{
-                backgroundColor: "#f5f5f5",
+                backgroundColor: "#ffffff",
                 borderRadius: "8px",
                 width: "100%",
                 border: "1px solid #e0e0e0",
@@ -251,7 +270,7 @@ const FormatDialog = ({
                 ),
               }}
               sx={{
-                backgroundColor: "#f5f5f5",
+                backgroundColor: "#ffffff",
                 borderRadius: "8px",
                 width: "100%",
                 border: "1px solid #e0e0e0",
@@ -273,12 +292,12 @@ const FormatDialog = ({
           color="secondary"
           variant="outlined"
           sx={{
-            borderColor: "#005f6a",
-            color: "#005f6a",
+            borderColor: "#004d54",
+            color: "#004d54",
             borderRadius: "8px",
             "&:hover": {
-              borderColor: "#004d54",
-              color: "#004d54",
+              borderColor: "#003c42",
+              color: "#003c42",
             },
           }}
         >
@@ -289,11 +308,10 @@ const FormatDialog = ({
           color="primary"
           variant="contained"
           sx={{
-            bgcolor: "#005f6a",
-            color: "#ffffff",
             borderRadius: "8px",
+            backgroundColor: "#004d54",
             "&:hover": {
-              bgcolor: "#004d54",
+              backgroundColor: "#003c42",
             },
           }}
         >

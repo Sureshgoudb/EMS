@@ -77,8 +77,13 @@ const TableGrid = ({ control, onUpdate }) => {
     setGridData(newGridData);
 
     try {
-      await axios.put(`${apiKey}widget/${control.controlId}/update-cells`, {
-        cells: newGridData,
+      await axios.put(`${apiKey}widget/update/${control.controlId}`, {
+        ...control,
+        parameters: [
+          { name: "rows", defaultvalue: control.rows },
+          { name: "columns", defaultvalue: control.columns },
+          { name: "cells", defaultvalue: newGridData },
+        ],
       });
 
       if (onUpdate) {

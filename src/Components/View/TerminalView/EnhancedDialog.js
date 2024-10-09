@@ -13,7 +13,11 @@ import {
   Chip,
   Tooltip,
 } from "@mui/material";
-
+import { toast, ToastContainer } from "react-toastify";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import CloseIcon from "@mui/icons-material/Close";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
@@ -62,6 +66,48 @@ const EnhancedDialog = ({
     }
   };
 
+  const graphexportToPdf = async () => {
+    const input = document.getElementById("graph-container");
+
+    try {
+      const canvas = await html2canvas(input, { useCORS: true });
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF("l", "mm", "a4"); // Landscape orientation for A4 size
+      const imgWidth = pdf.internal.pageSize.getWidth(); // Get PDF width
+      const imgHeight = (canvas.height * imgWidth) / canvas.width; // Calculate the height to maintain aspect ratio
+
+      // If the image is taller than the PDF page, split into multiple pages
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      // Add title or header
+      pdf.setFontSize(16);
+      pdf.text("Multi-Variable Comparison", imgWidth / 2, 15, {
+        align: "center",
+      });
+
+      // Add the image to the PDF
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pdf.internal.pageSize.getHeight();
+
+      // If the image is larger than one page, continue adding pages
+      while (heightLeft >= 0) {
+        pdf.addPage();
+        position = heightLeft > 0 ? 0 : heightLeft;
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pdf.internal.pageSize.getHeight();
+      }
+
+      // Save the PDF
+      pdf.save("graph.pdf");
+      toast.success("PDF exported successfully");
+    } catch (error) {
+      console.error("Error exporting to PDF: ", error);
+      toast.error("Failed to export PDF");
+    }
+  };
+
   return (
     <Dialog
       open={isDialogOpen && isGraphExpanded}
@@ -93,11 +139,6 @@ const EnhancedDialog = ({
           {terminalName} - {selectedScript}
         </Typography>
         <Box>
-          <Tooltip title="Close">
-            <IconButton onClick={handleCloseDialog} sx={{ color: "#fff" }}>
-              <CloseIcon />
-            </IconButton>
-          </Tooltip>
           <Tooltip title={isFullScreen ? "Exit Full Screen" : "Full Screen"}>
             <IconButton
               onClick={handleFullScreen}
@@ -111,6 +152,26 @@ const EnhancedDialog = ({
               }}
             >
               {isFullScreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Export to PDF" arrow>
+            <IconButton
+              sx={{
+                color: "white",
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  transform: "scale(1.1)",
+                },
+                transition: "transform 0.2s ease",
+              }}
+              onClick={graphexportToPdf}
+            >
+              <PictureAsPdfIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Close">
+            <IconButton onClick={handleCloseDialog} sx={{ color: "#fff" }}>
+              <CloseIcon />
             </IconButton>
           </Tooltip>
         </Box>
@@ -203,6 +264,7 @@ const EnhancedDialog = ({
           </FormControl>
         </Box>
         <Box
+          id="graph-container"
           sx={{
             height: 420,
             marginBottom: 2,

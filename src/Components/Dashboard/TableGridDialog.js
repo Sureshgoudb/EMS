@@ -26,10 +26,29 @@ const TableGridDialog = ({
   const handleCreate = async () => {
     try {
       setLoading(true);
-      const response = await axios.post(`${apiKey}widget/table-grid`, {
-        rows,
-        columns,
-        dashboardId: selectedDashBoard.id,
+      const response = await axios.post(`${apiKey}widget/create`, {
+        name: "Table Grid",
+        label: "Table Grid",
+        category: "Custom",
+        type: "TableGrid",
+        active: true,
+        icon: "grid_on",
+        parameters: [
+          {
+            name: "rows",
+            defaultvalue: rows,
+          },
+          {
+            name: "columns",
+            defaultvalue: columns,
+          },
+          {
+            name: "cells",
+            defaultvalue: Array(rows)
+              .fill()
+              .map(() => Array(columns).fill({ terminal: "", variable: "" })),
+          },
+        ],
       });
 
       if (response.data) {

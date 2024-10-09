@@ -36,7 +36,7 @@ const formatTimestamp = (timestamp) => {
 };
 
 // -------------- Fetch Current Data and Historical Data --------------
-const fetchScriptData = async (terminalName, scriptName, limit = 90) => {
+const fetchScriptData = async (terminalName, scriptName) => {
   try {
     const currentDataResponse = await fetch(
       `${apiKey}terminal/${encodeURIComponent(
@@ -48,7 +48,7 @@ const fetchScriptData = async (terminalName, scriptName, limit = 90) => {
     const historicalDataResponse = await fetch(
       `${apiKey}terminal/${encodeURIComponent(
         terminalName
-      )}/script/${encodeURIComponent(scriptName)}/history?limit=${limit}`
+      )}/script/${encodeURIComponent(scriptName)}/history`
     );
     const historicalData = await historicalDataResponse.json();
 
@@ -206,8 +206,7 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
     async (isExpanded = false) => {
       if (terminalName && scriptName) {
         try {
-          const limit = isExpanded ? 900 : 90;
-          const data = await fetchScriptData(terminalName, scriptName, limit);
+          const data = await fetchScriptData(terminalName, scriptName);
           dispatch({
             type: actions.UPDATE_CURRENT_DATA,
             payload: {
@@ -339,7 +338,7 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
     const fetchComparisonData = async () => {
       const newComparisonData = {};
       for (const script of comparisonScripts) {
-        const data = await fetchScriptData(terminalName, script, 900);
+        const data = await fetchScriptData(terminalName, script);
         newComparisonData[script] = transformDataForGraph(data.data || []);
       }
       setComparisonData(newComparisonData);
