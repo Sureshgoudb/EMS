@@ -156,13 +156,17 @@ const DataTable = () => {
   const [insights, setInsights] = useState({});
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState("");
   const [exporting, setExporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const [tableInfo, setTableInfo] = useState(null);
-
+  const [selectedProfile, setSelectedProfile] = useState("");
+  const [profiles] = useState([
+    { value: "trend", label: "Trend" },
+    { value: "block", label: "Block" },
+    { value: "daily", label: "Daily" },
+  ]);
   useEffect(() => {
     fetchTerminals();
   }, []);
@@ -410,6 +414,8 @@ const DataTable = () => {
       const response = await axios.get(`${apiKey}terminal/table/${tableId}`);
       setTableInfo(response.data);
       setTableName(response.data.name);
+      // setSelectedProfile(response.data.profile);
+
       setSelectedTerminal(response.data.terminal);
       setSelectedScripts(
         response.data.columns.filter((col) => col !== "timestamp")
@@ -1111,6 +1117,25 @@ const DataTable = () => {
             >
               Table Name: {tableInfo ? tableInfo.name : "Loading..."}
             </Typography>
+            <StyledFormControl fullWidth sx={{ mb: 3 }}>
+              <InputLabel>Profile</InputLabel>
+              <Select
+                disabled
+                value={selectedProfile}
+                onChange={(e) => {
+                  setSelectedProfile(e.target.value);
+                  setSelectedTerminal("");
+                  setSelectedScripts([]);
+                }}
+                label="Profile"
+              >
+                {profiles.map((profile) => (
+                  <MenuItem key={profile.value} value={profile.value}>
+                    {profile.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </StyledFormControl>
 
             <StyledFormControl fullWidth sx={{ mb: 3 }}>
               <InputLabel sx={{ color: "#424242" }}>Device</InputLabel>

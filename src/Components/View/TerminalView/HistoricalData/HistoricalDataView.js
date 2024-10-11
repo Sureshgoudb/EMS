@@ -61,18 +61,20 @@ const HistoricalDataView = () => {
   };
 
   // --------------- Creating table ---------------
-  const handleCreateTable = async (terminal, script, profile) => {
+  const handleCreateTable = async (terminal, variable, profile) => {
     try {
       const response = await axios.post(`${apiKey}terminal/createTable`, {
-        name: `${terminal} - ${script}`,
+        name: `${profile} - ${terminal} - ${variable}`,
         terminal,
-        columns: ["timestamp", script],
+        columns: ["timestamp", variable],
+        profile,
       });
 
       await fetchTables();
       navigate(`/data-table/${response.data._id}`);
     } catch (error) {
       console.error("Error creating table:", error);
+      toast.error("Failed to create table");
     }
   };
 
@@ -138,7 +140,7 @@ const HistoricalDataView = () => {
                 sm={6}
                 md={4}
                 key={table._id}
-                sx={{ minWidth: "200px" }}
+                sx={{ minWidth: "250px" }}
               >
                 <Paper
                   sx={{
@@ -147,6 +149,8 @@ const HistoricalDataView = () => {
                     cursor: "pointer",
                     backgroundColor: "#ffffff",
                     boxShadow: 3,
+                    width: "100%",
+                    height: "100%",
                     transition: "transform 0.3s, box-shadow 0.3s",
                     "&:hover": {
                       background:
@@ -158,40 +162,15 @@ const HistoricalDataView = () => {
                   }}
                   onClick={() => handleTableClick(table._id)}
                 >
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: "bold", color: "#333" }}
-                  >
+                  <Typography variant="h6" sx={{ color: "#333", mb: 1 }}>
                     {table.name}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "#666", mt: 1 }}>
-                    Terminal:{" "}
-                    <span style={{ fontWeight: "bold" }}>{table.terminal}</span>
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: "#666", mt: 0.5 }}>
-                    Columns:{" "}
-                    <span style={{ fontWeight: "bold" }}>
-                      {table.columns.join(", ")}
-                    </span>
-                  </Typography>
-                  <Box
-                    sx={{
-                      mt: 2,
-                      p: 1,
-                      bgcolor: "#f5f5f5",
-                      borderRadius: "8px",
-                      textAlign: "center",
-                      boxShadow: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: "#888",
-                      }}
-                    >
-                      Click to View
-                    </Typography>
+                  {/* <Typography variant="body2" sx={{ color: "#666" }}>
+                    <span style={{ fontWeight: "bold" }}>Profile:</span>{" "}
+                    {table.profile}
+                  </Typography> */}
+
+                  <Box>
                     <Tooltip title="Delete Table">
                       <IconButton
                         sx={{
@@ -199,13 +178,16 @@ const HistoricalDataView = () => {
                           top: 8,
                           right: 8,
                           transition: "opacity 0.3s",
+                          "&:hover": {
+                            opacity: 1,
+                          },
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
                           openDeleteConfirmation(table._id);
                         }}
                       >
-                        <DeleteIcon sx={{ color: "black" }} />
+                        <DeleteIcon sx={{ color: "#e57373" }} />
                       </IconButton>
                     </Tooltip>
                   </Box>

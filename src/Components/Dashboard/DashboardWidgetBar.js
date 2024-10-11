@@ -9,10 +9,10 @@ import ImageIcon from "@mui/icons-material/Image";
 const WidgetBar = ({ onWidgetSelect }) => {
   const widgets = [
     { id: "table-grid", icon: GridViewIcon, label: "Table Grid" },
-    { id: "chart", icon: InsertChartIcon, label: "Chart" },
-    { id: "text-field", icon: TextFieldsIcon, label: "Text Field" },
-    { id: "label", icon: LabelIcon, label: "Label" },
-    { id: "image", icon: ImageIcon, label: "Image" },
+    // { id: "chart", icon: InsertChartIcon, label: "Chart" },
+    // { id: "text-field", icon: TextFieldsIcon, label: "Text Field" },
+    // { id: "label", icon: LabelIcon, label: "Label" },
+    // { id: "image", icon: ImageIcon, label: "Image" },
   ];
 
   return (

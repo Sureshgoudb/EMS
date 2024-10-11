@@ -1,18 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
-import { LineChart, BarChart } from "@mui/x-charts";
 import { io } from "socket.io-client";
 import {
   Box,
-  Chip,
   Fab,
   Card,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Switch,
-  TextField,
-  Select,
-  Grid,
   FormLabel,
   Tooltip,
   Button,
@@ -25,16 +16,13 @@ import {
 } from "@mui/material";
 import { Close } from "@mui/icons-material";
 import AddIcon from "@mui/icons-material/Add";
-import CreateIcon from "@mui/icons-material/Create";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/Close";
 import MenuIcon from "@mui/icons-material/Menu";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import PauseIcon from "@mui/icons-material/Pause";
-import UpdateIcon from "@mui/icons-material/Update";
 import { Responsive, WidthProvider } from "react-grid-layout";
 import "/node_modules/react-grid-layout/css/styles.css";
 import "/node_modules/react-resizable/css/styles.css";
@@ -57,6 +45,9 @@ import BarChartComponent from "./BarChartComponent.js";
 import TextFieldComponent from "./TextFieldComponent.js";
 import axios from "axios";
 import ImageComponent from "./ImageComponent.js";
+import WidgetBar from "./Dashboard/DashboardWidgetBar.js";
+import TableGridDialog from "./Dashboard/TableGridDialog.js";
+import TableGrid from "./Dashboard/TableGrid.js";
 
 const StyledCard = styled(Card)({
   position: "relative",
@@ -86,16 +77,14 @@ const BootstrapDialog = styled(Dialog)(({ theme }) => ({
 }));
 
 const Dashboard = () => {
-  const dispatch = useDispatch();
-  const controlData = useSelector((store) => store.control);
   const user = useSelector((store) => store.user);
   const [delopen, setDelOpen] = useState(false);
   const [live, setLive] = useState(false);
   const [time, setTime] = useState(new Date());
-  const [values, setValues] = useState([]);
+
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
   const [layout, setLayout] = useState([]);
-  const timeout = useRef(null);
+
   const [assignDevice, setAssignDevice] = useState(false);
   const [update, setUpdate] = useState("");
   const [selectedDevice, setselectedDevices] = useState({});
@@ -128,47 +117,44 @@ const Dashboard = () => {
     controlList: [{}],
   });
   const [selectedControl, setSelectedControl] = useState({});
-  const [fetchVariables, setFetchVariables] = useState([]);
-  const [instantData, setInstantData] = useState({});
-  const [chartData, setChartData] = useState([]);
+
+  const [tableGridDialogOpen, setTableGridDialogOpen] = useState(false);
 
   // Generate auto grids
   const generateLayout = (items) => {
-    const layout = [];
-    for (let i = 0; i < items.controls.length; i++) {
-      let pos = JSON.parse(items.controls[i].position);
-      layout.push({
-        i: items.controls[i].controlId,
-        w: pos[0],
-        h: pos[1],
-        x: pos[2],
-        y: pos[3],
-        /* w: pos[0] 4,
-         h: pos[1] 2,
-         x: pos[2] (i * 4) % 12,
-         y: pos[3] Math.floor(i / 3) * 2*/
-      });
-    }
-    return layout;
-  };
-  const getvariableData = async (variable_id) => {
-    let url = apiKey + "variable/item/" + variable_id;
-    let sf = 1;
-    await axios
-      .get(url)
-      .then(async (response) => {
-        sf = response.data.scale;
-      })
-      .catch((error) => {});
-    return sf;
+    if (!items || !items.controls) return [];
+
+    return items.controls.map((control, index) => {
+      let pos = control.position ? JSON.parse(control.position) : [2, 2, 0, 0];
+      return {
+        i: control.controlId || `item-${index}`,
+        w: pos[0] || 2,
+        h: pos[1] || 2,
+        x: pos[2] || 0,
+        y: pos[3] || 0,
+      };
+    });
   };
 
   const processChartData = (data) => {
     const updatedChartList = [];
-    data.forEach(async (control) => {
-      const controlProperties = control.properties;
+    data.forEach((control) => {
+      if (!control) return; // Skip if control is undefined
+
+      const controlProperties = control.properties || [];
       const cType = control.controlType;
-      if (cType === "Line") {
+      if (cType === "table-grid") {
+        const updatedGridValues = {
+          id: control.controlId || "",
+          type: control.controlType || "",
+          name: control.name || "",
+          label: control.label || "",
+          bgcolor: control.bgcolor || "#ffffff",
+          terminals: control.terminals || [],
+          scripts: control.scripts || [],
+        };
+        updatedChartList.push(updatedGridValues);
+      } else if (cType === "Line") {
         const updatedChartValues = {
           id: "",
           name: "",
@@ -179,41 +165,20 @@ const Dashboard = () => {
           blockwise: false,
           timestamp: "",
           bgcolor: "#ffffff",
-          //showavg:false,
           xAxisValues: [],
           yAxisValues: [],
-          //chartLabel: "",
-          //area: false,
-          //showMark: false,
-          //stack: "",
-          //style: "",
+
           deviceid: "",
           variableid: "",
-          properties: [
-            /* {
-             variableid:"",
-             chartLabel: "",
-             area: false,
-             showMark: false,
-             stack: "",
-             color :"",
-             values : []
-           }*/
-          ],
-          //color :"",
+          properties: [],
+
           data: [],
         };
         updatedChartValues.id = control.controlId || "";
         updatedChartValues.type = control.controlType || "";
         updatedChartValues.name = control.name || "";
         updatedChartValues.label = control.label || "";
-        //updatedChartValues.chartLabel = controlProperties!=undefined ? controlProperties[0].label : "";
-        // updatedChartValues.area = controlProperties!=undefined ? controlProperties[0].area : false;
-        //updatedChartValues.showMark = controlProperties!=undefined ? controlProperties[0].showMark === true : false;
-        // updatedChartValues.stack = controlProperties!=undefined ? controlProperties[0].stack : "";
         updatedChartValues.style = control.style || "";
-        // updatedChartValues.color = controlProperties!=undefined ? controlProperties[0].color : "#23bcc7";
-        // updatedChartValues.showavg = controlProperties!=undefined ? (controlProperties[0].showavg===undefined ? false : controlProperties[0].showavg) : false;
         updatedChartValues.bgcolor =
           control.bgcolor != undefined ? control.bgcolor : "#ffffff";
         updatedChartValues.blockwise =
@@ -255,7 +220,7 @@ const Dashboard = () => {
           categoryGapRatio: "",
           barGapRatio: "",
           deviceid: "",
-          //variableid: "",
+
           properties: [],
           data: [],
         };
@@ -287,6 +252,28 @@ const Dashboard = () => {
         updatedBarChatValues.properties =
           controlProperties != undefined ? controlProperties : [];
         updatedChartList.push(updatedBarChatValues);
+      } else if (cType === "table-grid") {
+        const updatedGridValues = {
+          id: control.controlId || "",
+          type: control.controlType || "",
+          name: control.name || "",
+          label: control.label || "",
+          bgcolor: control.bgcolor || "#ffffff",
+          properties: {
+            rows: control.properties.rows || 2,
+            columns: control.properties.columns || 2,
+          },
+          cells:
+            control.cells ||
+            Array(control.properties.rows || 2)
+              .fill()
+              .map(() =>
+                Array(control.properties.columns || 2)
+                  .fill()
+                  .map(() => ({ terminal: "", variable: "" }))
+              ),
+        };
+        updatedChartList.push(updatedGridValues);
       } else if (cType === "TextField") {
         const updatedTextFieldValues = {
           id: "",
@@ -302,7 +289,7 @@ const Dashboard = () => {
           fontStyle: "not-italic",
           fontFamily: "Courier New",
           fontWeight: "normal",
-          // variableid: "",
+
           properties: [],
           color: "",
           labelcolor: "",
@@ -452,9 +439,6 @@ const Dashboard = () => {
               if (response.variableid === property.variableid) {
                 switch (control.type) {
                   case "Line":
-                    //let lineData = control.data;
-                    // lineData.push(response);
-                    //control.data = lineData;
                     let lineData = property.data;
                     if (control.blockwise) {
                       if (control.blockno !== response.blockno) {
@@ -475,6 +459,12 @@ const Dashboard = () => {
                     let barData = control.data;
                     barData.push(response);
                     property.data = barData;
+                    break;
+                  case "TextField":
+                    control.value = control.showavg
+                      ? response.avg
+                      : response.value;
+                    control.timestamp = response.timestamp;
                     break;
                   case "TextField":
                     control.value = control.showavg
@@ -505,8 +495,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     try {
-      if (dashBoardData.length > 0) {
-        setControls([]);
+      if (dashBoardData) {
         const parsedData = JSON.parse(dashBoardData);
         setSelectedDashBoard(parsedData);
         const newLayout = generateLayout(parsedData);
@@ -514,40 +503,6 @@ const Dashboard = () => {
         const updatedValues = processChartData(parsedData.controls);
         setControls(updatedValues);
         disableRealTime();
-        /*socketVar.on('new-record', (response) => {
-          if (updatedValues.controlList.length > 0) {
-            updatedValues.controlList.forEach((control) => {
-              if (control.properties !== undefined && control.properties.length > 0) {
-                control.properties.forEach((property) => {
-                  if (response.variableid === property.variableid) {
-                    switch (control.type) {
-                      case "Line":
-                        //let lineData = control.data;
-                        // lineData.push(response);
-                        //control.data = lineData;
-                        let lineData = property.data;
-                        lineData.push(response);
-                        control.blockno = response.blockno;
-                        control.timestamp = response.timestamp;
-                        property.data = lineData;
-                        break;
-                      case "Bar":
-                        let barData = control.data;
-                        barData.push(response);
-                        property.data = barData;
-                        break;
-                      case "TextField":
-                        control.value = control.showavg ? response.avg.$numberDecimal : response.value.$numberDecimal
-                        control.timestamp = response.timestamp
-                        break;
-                    }
-                  }
-
-                })
-              }
-            });
-          }
-        })*/
       }
     } catch (error) {
       console.error("Error updating chart values:", error);
@@ -558,7 +513,6 @@ const Dashboard = () => {
     console.log(functionality);
     if (newChartObj) {
       try {
-        // Retrieve existing data from session storage
         const storedData = selectedDashBoard;
 
         if (functionality === "Add") {
@@ -569,12 +523,6 @@ const Dashboard = () => {
             (control) => control.controlId == id
           );
           storedData.controls[objIndex] = newChartObj.controls[0];
-          // Update specific chart values based on the type
-          /*storedData.controls.forEach((control) => {
-            if (control.controlId === id) {
-                Object.assign(control.properties, newControl.properties);
-            }
-          });*/
         }
         addControl(storedData, newChartObj.controls[0]);
       } catch (error) {
@@ -583,6 +531,56 @@ const Dashboard = () => {
     } else {
       console.log("No chart data provided.");
     }
+  };
+
+  useEffect(() => {
+    try {
+      if (dashBoardData.length > 0) {
+        setControls([]);
+        const parsedData = JSON.parse(dashBoardData);
+        parsedData.controls = parsedData.controls || [];
+        setSelectedDashBoard(parsedData);
+        const newLayout = generateLayout(parsedData);
+        setLayout(newLayout);
+        const updatedValues = processChartData(parsedData.controls);
+        setControls(updatedValues);
+        disableRealTime();
+      }
+    } catch (error) {
+      console.error("Error updating chart values:", error);
+    }
+  }, [dashBoardData, update]);
+
+  const handleTableGridSave = (controlData) => {
+    // Ensure the control data has the correct structure
+    const formattedControlData = {
+      ...controlData,
+      controlType: "table-grid",
+      terminals: Array.isArray(controlData.terminals)
+        ? controlData.terminals
+        : [],
+      scripts: Array.isArray(controlData.scripts) ? controlData.scripts : [],
+    };
+
+    if (editingControl) {
+      // Update existing control
+      const updatedControls = selectedDashBoard.controls.map((c) =>
+        c.controlId === editingControl.controlId ? formattedControlData : c
+      );
+      const updatedDashboard = {
+        ...selectedDashBoard,
+        controls: updatedControls,
+      };
+      updateDashboard(updatedDashboard);
+    } else {
+      // Add new control
+      const updatedDashboard = {
+        ...selectedDashBoard,
+        controls: [...selectedDashBoard.controls, formattedControlData],
+      };
+      updateDashboard(updatedDashboard);
+    }
+    setTableGridDialogOpen(false);
   };
 
   const addControl = async (dashboard, data) => {
@@ -611,12 +609,6 @@ const Dashboard = () => {
     await axios
       .delete(apiKey + "dashboard/remove/" + dashboardId + "/" + controlId)
       .then((response) => {
-        // if (response && Array.isArray(selectedDashBoard.controls)) {
-
-        /*selectedDashBoard.controls.splice(index, 1);
-        const updatedLayout = layout.filter(
-          (item, index) => index !== index
-        );*/
         const newLayout = generateLayout(response.data);
         setLayout(newLayout);
 
@@ -631,23 +623,6 @@ const Dashboard = () => {
         //}
       })
       .catch((error) => {});
-  };
-
-  const handleSave = () => {
-    try {
-      const storedData = JSON.parse(
-        sessionStorage.getItem("selectedDashboardItem")
-      );
-
-      if (storedData && Array.isArray(storedData.controls)) {
-        const updatedValues = processChartData(storedData.controls);
-        setControls(updatedValues);
-      } else {
-        console.log("No stored chart values found or data format is invalid.");
-      }
-    } catch (error) {
-      console.error("Error saving chart values:", error);
-    }
   };
 
   const handleClose = () => {
@@ -673,8 +648,6 @@ const Dashboard = () => {
       })
       .catch((error) => {});
   };
-
-  // console.log(user);
 
   const drggagingDone = (layoutData) => {
     let positions = [];
@@ -724,11 +697,25 @@ const Dashboard = () => {
     setDelOpen(false);
   };
 
-  const updateDashboard = (param) => {
-    setUpdate(param);
-  };
-  const RefreshData = async (e) => {
-    setLive(null);
+  // const updateDashboard = (param) => {
+  //   setUpdate(param);
+  // };
+
+  const updateDashboard = async (dashboardData) => {
+    try {
+      const response = await axios.put(
+        `${process.env.REACT_APP_API_LOCAL_URL}dashboard/update/${dashboardData.dashboardid}`,
+        dashboardData
+      );
+      setSelectedDashBoard(response.data);
+      sessionStorage.setItem(
+        "selectedDashboardItem",
+        JSON.stringify(response.data)
+      );
+      setDashBoardData(JSON.stringify(response.data));
+    } catch (error) {
+      console.error("Error updating dashboard:", error);
+    }
   };
 
   const disableRealTime = (event) => {
@@ -741,14 +728,17 @@ const Dashboard = () => {
     socketCallForVariableData();
   };
 
-  const FetchVariablesForCustomer = async (e) => {
-    /* await axios
-     .get(apiKey + "instant/list/" + selectedOption)
-     .then(async (response) => {
-       console.log(apiKey + "instant/list/" + selectedOption +" - hit")
-       setValues(response.data);
-     })
-     .catch((error) => {}); */
+  const [editingControl, setEditingControl] = useState(null);
+
+  const handleWidgetSelect = (widgetType) => {
+    if (widgetType === "table-grid") {
+      setEditingControl(null);
+      setTableGridDialogOpen(true);
+    }
+  };
+  const handleEditTableGrid = (control) => {
+    setEditingControl(control);
+    setTableGridDialogOpen(true);
   };
 
   return (
@@ -788,13 +778,6 @@ const Dashboard = () => {
             <>
               {!live && (
                 <>
-                  {/* <Tooltip title="Refresh">
-           <IconButton size="small" sx={{
-               color: "white",
-             }}>
-             <RefreshIcon onClick={RefreshData} />
-           </IconButton>
-           </Tooltip>*/}
                   <Tooltip title="Enable Real-Time">
                     <IconButton
                       size="small"
@@ -846,17 +829,11 @@ const Dashboard = () => {
                     </Tooltip>
                   </Fab>
                 )}
-                {/*<Fab
-                onClick={handleSave}
-                aria-label="Save"
-                className="add_from_section"
-                size="medium"
-              >
-                <UpdateIcon className="add_from_Icon" />
-               </Fab>*/}
               </div>
             }
           >
+            <WidgetBar onWidgetSelect={handleWidgetSelect} />
+
             <ResponsiveReactGridLayout
               className="layout"
               cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
@@ -870,159 +847,150 @@ const Dashboard = () => {
                 drggagingDone(layoutData);
               }}
             >
-              {layout.map((item, i) => (
-                <StyledCard
-                  key={item.i}
-                  data-grid={item}
-                  variant="outlined"
-                  className="main_dashboard_cards"
-                  sx={{ width: "100%", height: "100%", zIndex: 100 }}
-                >
-                  {controls.controlList[i].type === "Line" && (
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        background: controls.controlList[i].bgcolor,
-                      }}
-                    >
-                      {/*<LineChart
-                     xAxis={[{ data: controls.controlList[i].xAxisValues }]}
-                      series={[
-                        {
-                          label: controls.controlList[i].chartLabel,
-                          stack: controls.controlList[i].stack,
-                          area: controls.controlList[i].area,
-                          showMark: controls.controlList[i].showMark,
-                          curve: controls.controlList[i].style,
-                          data: controls.controlList[i].yAxisValues,
-                        },
-                      ]}
-                    />*/}
-                      <LineChartComponent
-                        handleCallback={updateDashboard}
-                        live={live}
-                        control={controls.controlList[i]}
-                      />
-                    </div>
-                  )}
-                  {controls.controlList[i].type === "Bar" && (
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        background: controls.controlList[i].bgcolor,
-                      }}
-                    >
-                      {/*<BarChart
-                      xAxis={[
-                        {
-                          scaleType: "band",
-                          data: controls.controlList[i].xAxisValues,
-                        },
-                      ]}
-                      series={[
-                        {
-                          categoryGapRatio: controls.controlList[i].categoryGapRatio,
-                          barGapRatio: controls.controlList[i].barGapRatio,
-                          data: controls.controlList[i].yAxisValues,
-                        },
-                      ]}
-                    />*/}
-                      <BarChartComponent
-                        handleCallback={updateDashboard}
-                        live={live}
-                        control={controls.controlList[i]}
-                      />
-                    </div>
-                  )}
-                  {controls.controlList[i].type === "TextField" && (
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        background: controls.controlList[i].bgcolor,
-                      }}
-                    >
-                      {/* <TextField
-                      margin="dense"
-                      id={controls.controlList[i].name}
-                      name={controls.controlList[i].name}
-                      label={controls.controlList[i].label}
-                      defaultValue={controls.controlList[i].value}
-                      type="text"
-                      fullWidth
-                      variant="standard"
-                />*/}
-                      <TextFieldComponent
-                        handleCallback={updateDashboard}
-                        live={live}
-                        control={controls.controlList[i]}
-                      />
-                    </div>
-                  )}
-                  {controls.controlList[i].type === "Label" && (
-                    <div
-                      class="flex items-center justify-center h-screen mx-auto"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        background: controls.controlList[i].bgcolor,
-                      }}
-                    >
-                      <FormLabel
-                        sx={{
-                          fontSize: controls.controlList[i].fontSize,
-                          color: controls.controlList[i].color,
-                          fontFamily: controls.controlList[i].fontFamily,
-                          fontWeight: controls.controlList[i].fontWeight,
-                          fontStyle: controls.controlList[i].fontStyle,
+              {layout.map((item, i) => {
+                const control = controls.controlList[i];
+                if (!control) return null;
+
+                return (
+                  <StyledCard
+                    key={item.i}
+                    data-grid={item}
+                    variant="outlined"
+                    className="main_dashboard_cards"
+                    sx={{ width: "100%", height: "100%", zIndex: 100 }}
+                  >
+                    {control.type === "table-grid" && (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          background: control.bgcolor,
                         }}
                       >
-                        {controls.controlList[i].label}
-                      </FormLabel>
-                    </div>
-                  )}
-                  {controls.controlList[i].type === "Image" && (
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        background: controls.controlList[i].bgcolor,
-                      }}
-                    >
-                      <ImageComponent control={controls.controlList[i]} />
-                    </div>
-                  )}
-                  {user && user.user_Type !== "User" && (
-                    <ActionButtons className="actionButtons">
-                      <Tooltip title="Edit">
-                        <IconButton
-                          onClick={() => handleEdit(controls.controlList[i])}
-                          size="small"
-                          sx={{ color: "#007c89" }}
+                        <TableGrid
+                          control={control}
+                          key={`${control.id}-${JSON.stringify(
+                            control.terminals
+                          )}-${JSON.stringify(control.scripts)}`}
+                        />
+                      </div>
+                    )}
+                    {control.type === "Line" && (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          background: control.bgcolor,
+                        }}
+                      >
+                        <LineChartComponent
+                          handleCallback={updateDashboard}
+                          live={live}
+                          control={control}
+                        />
+                      </div>
+                    )}
+                    {control.type === "Bar" && (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          background: control.bgcolor,
+                        }}
+                      >
+                        <BarChartComponent
+                          handleCallback={updateDashboard}
+                          live={live}
+                          control={control}
+                        />
+                      </div>
+                    )}
+                    {control.type === "TextField" && (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          background: control.bgcolor,
+                        }}
+                      >
+                        <TextFieldComponent
+                          handleCallback={updateDashboard}
+                          live={live}
+                          control={control}
+                        />
+                      </div>
+                    )}
+                    {control.type === "Label" && (
+                      <div
+                        className="flex items-center justify-center h-screen mx-auto"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          background: control.bgcolor,
+                        }}
+                      >
+                        <FormLabel
+                          sx={{
+                            fontSize: control.fontSize,
+                            color: control.color,
+                            fontFamily: control.fontFamily,
+                            fontWeight: control.fontWeight,
+                            fontStyle: control.fontStyle,
+                          }}
                         >
-                          <EditIcon fontSize="3px" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          onClick={() =>
-                            handleDeleteOpen(controls.controlList[i], i)
-                          }
-                          size="small"
-                          sx={{ color: "#e2640b " }}
-                        >
-                          <DeleteIcon fontSize="3px" />
-                        </IconButton>
-                      </Tooltip>
-                    </ActionButtons>
-                  )}
-                </StyledCard>
-              ))}
+                          {control.label}
+                        </FormLabel>
+                      </div>
+                    )}
+                    {control.type === "Image" && (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          background: control.bgcolor,
+                        }}
+                      >
+                        <ImageComponent control={control} />
+                      </div>
+                    )}
+
+                    {user && user.user_Type !== "User" && (
+                      <ActionButtons className="actionButtons">
+                        <Tooltip title="Edit">
+                          <IconButton
+                            onClick={() => handleEdit(control)}
+                            size="small"
+                            sx={{ color: "#007c89" }}
+                          >
+                            <EditIcon fontSize="3px" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            onClick={() => handleDeleteOpen(control, i)}
+                            size="small"
+                            sx={{ color: "#e2640b " }}
+                          >
+                            <DeleteIcon fontSize="3px" />
+                          </IconButton>
+                        </Tooltip>
+                      </ActionButtons>
+                    )}
+                  </StyledCard>
+                );
+              })}
             </ResponsiveReactGridLayout>
           </CardLayout>
         )}
+      {selectedDashBoard && tableGridDialogOpen && (
+        <TableGridDialog
+          open={tableGridDialogOpen}
+          onClose={() => setTableGridDialogOpen(false)}
+          onSave={handleTableGridSave}
+          dashboardId={selectedDashBoard?.dashboardid}
+          existingControl={editingControl}
+        />
+      )}
       {/* Rightside Dialog */}
       {selectedDashBoard != null && (
         <RightDrawerDialog
@@ -1081,7 +1049,6 @@ const Dashboard = () => {
           editData={control}
         />
       )}
-
       {/* LeftSide dialog */}
       <LeftDrawerDialog
         open={openLeftDialog}
@@ -1125,7 +1092,6 @@ const Dashboard = () => {
           <CloseIcon />
         </IconButton>
       </BootstrapDialog>
-
       <Dialog open={delopen} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ m: 0, p: 2, background: "#007c89", color: "#fff" }}>
           Confirmation Alert

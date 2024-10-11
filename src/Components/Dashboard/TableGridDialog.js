@@ -4,123 +4,120 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button,
   TextField,
+  Button,
   Grid,
-  IconButton,
+  Typography,
+  Box,
+  Chip,
 } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
-import axios from "axios";
+import InfoIcon from "@mui/icons-material/Info"; // Importing the Info icon
 
 const TableGridDialog = ({
   open,
   onClose,
-  onCreateGrid,
-  selectedDashBoard,
+  onSave,
+  dashboardId,
+  existingControl,
 }) => {
-  const [rows, setRows] = useState(2);
-  const [columns, setColumns] = useState(2);
-  const [loading, setLoading] = useState(false);
-  const apiKey = process.env.REACT_APP_API_LOCAL_URL;
+  const [formData, setFormData] = useState({
+    name: "",
+    label: "",
+    terminals: [],
+    scripts: [],
+    ...existingControl, // Spread existing control data if editing
+  });
 
-  const handleCreate = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.post(`${apiKey}widget/create`, {
-        name: "Table Grid",
-        label: "Table Grid",
-        category: "Custom",
-        type: "TableGrid",
-        active: true,
-        icon: "grid_on",
-        parameters: [
-          {
-            name: "rows",
-            defaultvalue: rows,
-          },
-          {
-            name: "columns",
-            defaultvalue: columns,
-          },
-          {
-            name: "cells",
-            defaultvalue: Array(rows)
-              .fill()
-              .map(() => Array(columns).fill({ terminal: "", variable: "" })),
-          },
-        ],
-      });
+  const handleSave = () => {
+    const controlData = {
+      controlId: existingControl
+        ? existingControl.controlId
+        : `grid-${Date.now()}`,
+      controlType: "table-grid",
+      name: formData.name,
+      label: formData.label,
+      terminals: formData.terminals,
+      scripts: formData.scripts,
+      bgcolor: formData.bgcolor || "#ffffff",
+    };
+    onSave(controlData);
+    onClose();
+  };
 
-      if (response.data) {
-        onCreateGrid({
-          controlId: response.data.widgetid,
-          controlType: "TableGrid",
-          name: response.data.name,
-          label: response.data.label,
-          position: "[4,4,0,0]",
-          rows: rows,
-          columns: columns,
-          cells: response.data.parameters.find((p) => p.name === "cells")
-            .defaultvalue,
-        });
-      }
-    } catch (error) {
-      console.error("Error creating table grid:", error);
-    } finally {
-      setLoading(false);
-      onClose();
-    }
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        Create Table Grid
-        <IconButton
-          aria-label="close"
-          onClick={onClose}
-          sx={{
-            position: "absolute",
-            right: 8,
-            top: 8,
-          }}
-        >
-          <CloseIcon />
-        </IconButton>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle
+        sx={{
+          backgroundColor: "#3f51b5",
+          color: "#fff",
+          textAlign: "center",
+        }}
+      >
+        {existingControl ? "Edit" : "Create"} Table Grid
       </DialogTitle>
       <DialogContent>
         <Grid container spacing={2} sx={{ mt: 1 }}>
-          <Grid item xs={6}>
+          <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Rows"
-              type="number"
-              value={rows}
-              onChange={(e) => setRows(parseInt(e.target.value))}
-              InputProps={{ inputProps: { min: 1 } }}
+              label="Name"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              variant="outlined"
+              sx={{ mb: 2 }}
             />
           </Grid>
-          <Grid item xs={6}>
+          <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Columns"
-              type="number"
-              value={columns}
-              onChange={(e) => setColumns(parseInt(e.target.value))}
-              InputProps={{ inputProps: { min: 1 } }}
+              label="Label"
+              name="label"
+              value={formData.label}
+              onChange={handleInputChange}
+              variant="outlined"
+              sx={{ mb: 2 }}
             />
+          </Grid>
+          <Grid item xs={12}>
+            <Box
+              sx={{
+                p: 2,
+                bgcolor: "#e0f7fa", // Light cyan background
+                borderRadius: 1,
+                border: "1px solid #00796b", // Darker border color
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <Chip
+                icon={<InfoIcon />}
+                label="Note"
+                sx={{
+                  backgroundColor: "#00796b",
+                  color: "#fff",
+                  mr: 1,
+                }}
+              />
+              <Typography variant="body2" color="textPrimary">
+                All terminals and variables are pre-selected for the table grid
+                view by default.
+              </Typography>
+            </Box>
           </Grid>
         </Grid>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button
-          onClick={handleCreate}
-          variant="contained"
-          color="primary"
-          disabled={loading}
-        >
-          {loading ? "Creating..." : "Create Grid"}
+        <Button onClick={onClose} color="error">
+          Cancel
+        </Button>
+        <Button onClick={handleSave} variant="contained" color="primary">
+          {existingControl ? "Update" : "Create"}
         </Button>
       </DialogActions>
     </Dialog>

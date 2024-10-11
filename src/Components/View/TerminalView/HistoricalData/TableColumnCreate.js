@@ -9,10 +9,37 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Typography,
+  Box,
 } from "@mui/material";
-import axios from "axios";
-
+import { styled } from "@mui/material/styles";
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
+
+const StyledDialog = styled(Dialog)(({ theme }) => ({
+  "& .MuiDialogTitle-root": {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.primary.contrastText,
+    padding: theme.spacing(2),
+  },
+  "& .MuiDialogContent-root": {
+    padding: theme.spacing(3),
+  },
+  "& .MuiDialogActions-root": {
+    padding: theme.spacing(2),
+  },
+}));
+
+const StyledFormControl = styled(FormControl)(({ theme }) => ({
+  marginBottom: theme.spacing(2),
+  "& .MuiInputLabel-root": {
+    color: theme.palette.text.secondary,
+  },
+  "& .MuiSelect-select": {
+    "&:focus": {
+      backgroundColor: "transparent",
+    },
+  },
+}));
 
 const TableColumnCreate = ({
   open,
@@ -20,117 +47,122 @@ const TableColumnCreate = ({
   onCreateColumn,
   presetTerminal,
 }) => {
+  const [profiles] = useState([
+    { value: "trend", label: "Trend" },
+    { value: "block", label: "Block" },
+    { value: "daily", label: "Daily" },
+  ]);
   const [terminals, setTerminals] = useState([]);
-  const [scripts, setScripts] = useState([]);
+  const [variables, setVariables] = useState([]);
+  const [selectedProfile, setSelectedProfile] = useState("");
   const [selectedTerminal, setSelectedTerminal] = useState(
     presetTerminal || ""
   );
-  const [selectedScript, setSelectedScript] = useState("");
-  const [selectedProfile, setSelectedProfile] = useState("");
-
-  const profiles = [
-    { value: "trend", label: "Trend" },
-    { value: "1min", label: "1 min profile" },
-    { value: "1hr", label: "1 hrs profile" },
-    { value: "shift", label: "Shift profile" },
-    { value: "daily", label: "Daily" },
-    { value: "weekly", label: "Weekly profile" },
-    { value: "monthly", label: "Monthly profile" },
-    { value: "yearly", label: "Yearly" },
-  ];
+  const [selectedVariable, setSelectedVariable] = useState("");
 
   useEffect(() => {
-    fetchTerminals();
-  }, []);
-
-  useEffect(() => {
-    if (selectedTerminal) {
-      fetchScripts(selectedTerminal);
+    if (selectedProfile) {
+      fetchTerminals(selectedProfile);
     }
-  }, [selectedTerminal]);
+  }, [selectedProfile]);
 
-  // --------------- Fetching terminals ---------------
-  const fetchTerminals = async () => {
+  useEffect(() => {
+    if (selectedProfile && selectedTerminal) {
+      fetchVariables(selectedProfile, selectedTerminal);
+    }
+  }, [selectedProfile, selectedTerminal]);
+
+  const fetchTerminals = async (profile) => {
     try {
-      const response = await axios.get(`${apiKey}terminal/list`);
-      setTerminals(response.data);
+      const response = await fetch(apiKey + `terminals/${profile}`);
+      const data = await response.json();
+      setTerminals(data);
     } catch (error) {
       console.error("Error fetching terminals:", error);
     }
   };
 
-  // --------------- Fetching scripts ---------------
-  const fetchScripts = async (terminalId) => {
+  const fetchVariables = async (profile, terminalName) => {
     try {
-      const response = await axios.get(
-        `${apiKey}terminal/${terminalId}/scripts`
+      const response = await fetch(
+        apiKey + `variables/${profile}/${terminalName}`
       );
-      setScripts(response.data);
+      const data = await response.json();
+      setVariables(data);
     } catch (error) {
-      console.error("Error fetching scripts:", error);
+      console.error("Error fetching variables:", error);
     }
   };
 
-  // --------------- Creating column ---------------
   const handleCreate = () => {
-    if (selectedTerminal && selectedScript && selectedProfile) {
-      onCreateColumn(selectedTerminal, selectedScript, selectedProfile);
+    if (selectedProfile && selectedTerminal && selectedVariable) {
+      onCreateColumn(selectedTerminal, selectedVariable, selectedProfile);
       onClose();
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Add New Table Column</DialogTitle>
+    <StyledDialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        <Typography variant="h6">Add New Table</Typography>
+      </DialogTitle>
       <DialogContent>
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Select Device</InputLabel>
-          <Select
-            value={selectedTerminal}
-            onChange={(e) => setSelectedTerminal(e.target.value)}
-            disabled={!!presetTerminal}
-          >
-            {terminals.map((terminal) => (
-              <MenuItem key={terminal} value={terminal}>
-                {terminal}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Select Variable</InputLabel>
-          <Select
-            value={selectedScript}
-            onChange={(e) => setSelectedScript(e.target.value)}
-          >
-            {scripts.map((script) => (
-              <MenuItem key={script} value={script}>
-                {script}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl fullWidth margin="normal">
-          <InputLabel>Select Profile</InputLabel>
-          <Select
-            value={selectedProfile}
-            onChange={(e) => setSelectedProfile(e.target.value)}
-          >
-            {profiles.map((profile) => (
-              <MenuItem key={profile.value} value={profile.value}>
-                {profile.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Box sx={{ mt: 2 }}>
+          <StyledFormControl fullWidth>
+            <InputLabel>Select Profile</InputLabel>
+            <Select
+              value={selectedProfile}
+              onChange={(e) => setSelectedProfile(e.target.value)}
+              label="Select Profile"
+            >
+              {profiles.map((profile) => (
+                <MenuItem key={profile.value} value={profile.value}>
+                  {profile.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </StyledFormControl>
+          <StyledFormControl fullWidth>
+            <InputLabel>Select Device</InputLabel>
+            <Select
+              value={selectedTerminal}
+              onChange={(e) => setSelectedTerminal(e.target.value)}
+              disabled={!selectedProfile || !!presetTerminal}
+              label="Select Device"
+            >
+              {terminals.map((terminal) => (
+                <MenuItem key={terminal} value={terminal}>
+                  {terminal}
+                </MenuItem>
+              ))}
+            </Select>
+          </StyledFormControl>
+          <StyledFormControl fullWidth>
+            <InputLabel>Select Variable</InputLabel>
+            <Select
+              value={selectedVariable}
+              onChange={(e) => setSelectedVariable(e.target.value)}
+              disabled={!selectedTerminal}
+              label="Select Variable"
+            >
+              {variables.map((variable) => (
+                <MenuItem key={variable} value={variable}>
+                  {variable}
+                </MenuItem>
+              ))}
+            </Select>
+          </StyledFormControl>
+        </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleCreate} color="primary">
+        <Button onClick={onClose} color="secondary">
+          Cancel
+        </Button>
+        <Button onClick={handleCreate} color="primary" variant="contained">
           Create
         </Button>
       </DialogActions>
-    </Dialog>
+    </StyledDialog>
   );
 };
 
