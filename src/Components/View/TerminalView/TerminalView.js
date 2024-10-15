@@ -40,7 +40,6 @@ const TerminalView = () => {
         params: { page, limit: 20 },
       });
       setTerminals(response.data.widgets);
-      // You might want to store totalPages and currentPage in state as well
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Failed to load data. Please try again later.");
@@ -59,6 +58,7 @@ const TerminalView = () => {
     }
   };
 
+  // ----------- Create Widget -------------
   const handleCreateWidget = async (widgetData) => {
     try {
       const response = await axios.post(

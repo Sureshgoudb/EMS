@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
-
+import React, { useState, useEffect } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import axios from "axios";
-import { Card, Typography, Box, CircularProgress } from "@mui/material";
+import { Card, Typography, Box } from "@mui/material";
 import { styled } from "@mui/system";
-import io from "socket.io-client";
 
 const StyledCard = styled(Card)(({ theme }) => ({
   boxShadow: "0 15px 45px rgba(0, 0, 0, 0.2)",
@@ -25,11 +23,11 @@ const StyledCard = styled(Card)(({ theme }) => ({
 
 const StyledTypography = styled(Typography)(({ theme }) => ({
   textAlign: "center",
+  fontWeight: "bold",
   backgroundImage: "linear-gradient(45deg, #2196F3, #21CBF3)",
   backgroundClip: "text",
   WebkitBackgroundClip: "text",
   color: "transparent",
-  fontWeight: 700,
   fontSize: "1.5rem",
   textShadow: "3px 3px 5px rgba(0, 0, 0, 0.1)",
   top: "10px",
@@ -37,6 +35,7 @@ const StyledTypography = styled(Typography)(({ theme }) => ({
 
 const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   height: "100%",
+  fontWeight: "bold",
   "& .MuiDataGrid-root": {
     backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderRadius: "15px",
@@ -44,7 +43,6 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   },
   "& .MuiDataGrid-cell": {
     borderBottom: "1px solid rgba(224, 224, 224, 0.5)",
-
     color: "#333",
     fontFamily: "'Poppins', 'Arial', sans-serif",
     transition: "all 0.3s ease",
@@ -63,40 +61,30 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
     backgroundColor: "rgba(245, 245, 245, 0.8)",
   },
 
-  "& .ui-percentage-medium": {
+  "& .ui-percentage-green": {
+    color: "#50ef53",
+  },
+  "& .ui-percentage-light-red": {
     color: "#FFA726",
-    fontWeight: 700,
   },
-  "& .ui-percentage-negative": {
-    color: "#EF5350",
-    fontWeight: 700,
-  },
-  "& .ui-percentage-high": {
+  "& .ui-percentage-dark-red": {
     color: "#F44336",
-    fontWeight: 700,
   },
+  "& .row-critical": {
+    animation: "blink 1s infinite",
+    color: "#F44336",
+  },
+
   "@keyframes blink": {
     "0%": { backgroundColor: "rgba(244, 67, 54, 0.1)" },
     "50%": { backgroundColor: "rgba(244, 67, 54, 0.3)" },
     "100%": { backgroundColor: "rgba(244, 67, 54, 0.1)" },
   },
-  "& .row-critical": {
-    animation: "blink 1s infinite",
-  },
-  "& .cell-critical": {
-    animation: "blink 1s infinite",
-    backgroundColor: "rgba(244, 67, 54, 0.1)",
-    fontWeight: 700,
-  },
-  "& .ui-percentage-critical": {
-    animation: "blink 1s infinite",
-    backgroundColor: "rgba(244, 67, 54, 0.1)",
-    fontWeight: 700,
-  },
 }));
 
 const CurrentDateTime = styled(Typography)(({ theme }) => ({
   position: "absolute",
+  fontWeight: "bold",
   top: "10px",
   left: "20px",
   fontSize: "1.2rem",
@@ -104,11 +92,11 @@ const CurrentDateTime = styled(Typography)(({ theme }) => ({
   backgroundClip: "text",
   WebkitBackgroundClip: "text",
   color: "transparent",
-  fontWeight: 600,
 }));
 
 const BlkNoDisplay = styled(Typography)(({ theme }) => ({
   position: "absolute",
+  fontWeight: "bold",
   top: "10px",
   right: "20px",
   fontSize: "1.2rem",
@@ -116,7 +104,6 @@ const BlkNoDisplay = styled(Typography)(({ theme }) => ({
   backgroundClip: "text",
   WebkitBackgroundClip: "text",
   color: "transparent",
-  fontWeight: 600,
 }));
 
 const TableGrid = () => {
@@ -127,7 +114,6 @@ const TableGrid = () => {
   const [loading, setLoading] = useState(true);
   const [currentDateTime, setCurrentDateTime] = useState("");
   const [blkNo, setBlkNo] = useState("");
-  const socketRef = useRef({});
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
   const formatTimestamp = (timestamp) => {
@@ -144,7 +130,7 @@ const TableGrid = () => {
 
   useEffect(() => {
     fetchTerminals();
-    const timer = setInterval(() => {
+    const dateTimeTimer = setInterval(() => {
       setCurrentDateTime(
         new Date().toLocaleString("en-US", {
           year: "numeric",
@@ -157,9 +143,9 @@ const TableGrid = () => {
         })
       );
     }, 1000);
+
     return () => {
-      clearInterval(timer);
-      disconnectAllSockets();
+      clearInterval(dateTimeTimer);
     };
   }, []);
 
@@ -173,21 +159,14 @@ const TableGrid = () => {
     if (terminals.length > 0 && scripts.length > 0) {
       initializeGrid();
       fetchGridData();
+      const fetchInterval = setInterval(fetchGridData, 20000);
+      return () => {
+        clearInterval(fetchInterval);
+      };
     }
-    return () => {
-      disconnectAllSockets();
-    };
   }, [terminals, scripts]);
 
-  const disconnectAllSockets = () => {
-    Object.values(socketRef.current).forEach((socket) => {
-      if (socket && socket.connected) {
-        socket.disconnect();
-      }
-    });
-    socketRef.current = {};
-  };
-
+  // ----------------- Fetch Terminals -----------------
   const fetchTerminals = async () => {
     try {
       const response = await axios.get(`${apiKey}terminal/list`);
@@ -197,6 +176,7 @@ const TableGrid = () => {
     }
   };
 
+  // ----------------- Fetch Scripts -----------------
   const fetchScripts = async (terminalId) => {
     try {
       const response = await axios.get(
@@ -211,6 +191,7 @@ const TableGrid = () => {
     }
   };
 
+  // ----------------- Initialize Grid -----------------
   const initializeGrid = () => {
     const defaultColumns = [
       {
@@ -265,10 +246,11 @@ const TableGrid = () => {
         headerClassName: "header-cell",
         cellClassName: (params) => {
           const value = parseFloat(params.value);
-          if (value > 28) return "cell-critical";
-          if (value > 20) return "ui-percentage-high";
-          if (value > 12) return "ui-percentage-medium";
-          if (value < 0) return "ui-percentage-negative";
+          if (value >= 0) return "ui-percentage-green";
+          if (value < 0 && value >= -20) return "ui-percentage-light-red";
+          if (value < -20 && value >= -28) return "ui-percentage-dark-red";
+          if (value < -28) return "row-critical";
+
           return "ui-percentage-low";
         },
       },
@@ -283,6 +265,7 @@ const TableGrid = () => {
     setColumns([...defaultColumns, ...scriptColumns]);
   };
 
+  // ---------------- Fetch Grid Data ( Current Value ) -----------------
   const fetchGridData = async () => {
     setLoading(true);
     try {
@@ -320,37 +303,6 @@ const TableGrid = () => {
                     isCritical = true;
                   }
                 }
-
-                // Set up Socket.IO for live updates
-                const socketKey = `${terminal.terminalId}/${script}`;
-                if (!socketRef.current[socketKey]) {
-                  socketRef.current[socketKey] = io(`${apiKey}${socketKey}`);
-                  socketRef.current[socketKey].on("valueUpdate", (data) => {
-                    setRows((prevRows) => {
-                      const updatedRows = [...prevRows];
-                      const rowIndex = updatedRows.findIndex(
-                        (r) => r.id === index
-                      );
-                      if (rowIndex !== -1) {
-                        updatedRows[rowIndex] = {
-                          ...updatedRows[rowIndex],
-                          [script]:
-                            typeof data[script] === "number"
-                              ? data[script].toFixed(2)
-                              : data[script],
-                          timestamp: formatTimestamp(data.timestamp),
-                        };
-                        if (
-                          script === "UI Percentage" &&
-                          parseFloat(data[script]) > 28
-                        ) {
-                          updatedRows[rowIndex].isCritical = true;
-                        }
-                      }
-                      return updatedRows;
-                    });
-                  });
-                }
               } catch (error) {
                 console.error(
                   `Error fetching data for terminal ${terminal.terminalName} and script ${script}:`,
@@ -359,14 +311,11 @@ const TableGrid = () => {
               }
             })
           );
-
           row.timestamp = latestTimestamp || "N/A";
           row.isCritical = isCritical;
-
           return row;
         })
       );
-
       setRows(newRows);
     } catch (error) {
       console.error("Error fetching grid data:", error);
@@ -384,23 +333,24 @@ const TableGrid = () => {
         </StyledTypography>
         <BlkNoDisplay variant="body2">BLK No: {blkNo}</BlkNoDisplay>
       </Box>
-      {loading ? (
-        <CircularProgress sx={{ margin: "auto" }} />
-      ) : (
-        <Box sx={{ height: "calc(100vh - 100px)", padding: "0 20px 20px" }}>
-          <StyledDataGrid
-            rows={rows}
-            columns={columns}
-            pageSize={10}
-            rowsPerPageOptions={[10]}
-            disableSelectionOnClick
-            disableColumnMenu
-            getRowClassName={(params) =>
-              params.row.isCritical ? "row-critical" : ""
+
+      <Box sx={{ height: "calc(100vh - 100px)", padding: "0 20px 20px" }}>
+        <StyledDataGrid
+          rows={rows}
+          columns={columns}
+          pageSize={10}
+          rowsPerPageOptions={[10]}
+          disableSelectionOnClick
+          disableColumnMenu
+          getRowClassName={(params) => {
+            const uiPercentageValue = parseFloat(params.row["UI Percentage"]);
+            if (uiPercentageValue < -28) {
+              return "row-critical";
             }
-          />
-        </Box>
-      )}
+            return "";
+          }}
+        />
+      </Box>
     </StyledCard>
   );
 };

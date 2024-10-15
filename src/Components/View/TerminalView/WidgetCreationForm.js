@@ -100,14 +100,13 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
   const [xAxisValue, setXAxisValue] = useState(100);
   const [refreshInterval, setRefreshInterval] = useState(60);
 
-  // Fetch terminals
+  // -------------- Fetch terminals --------------
   useEffect(() => {
     const fetchTerminals = async () => {
       try {
         const response = await axios.get(`${apiKey}terminal/list`);
         setTerminals(response.data);
 
-        // If there's a presetTerminal, find its ID and set it
         if (presetTerminal) {
           const preset = response.data.find(
             (t) => t.terminalName === presetTerminal
@@ -124,7 +123,7 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
     fetchTerminals();
   }, [presetTerminal]);
 
-  // Fetch scripts
+  // ----------------- Fetch scripts --------------
   useEffect(() => {
     const fetchScripts = async () => {
       if (terminalId) {
@@ -145,7 +144,7 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
     fetchScripts();
   }, [terminalId]);
 
-  // Handle terminal selection
+  // ------------ Handle terminal selection --------------
   const handleTerminalSelection = (event) => {
     const selectedTerminal = terminals.find(
       (t) => t.terminalName === event.target.value

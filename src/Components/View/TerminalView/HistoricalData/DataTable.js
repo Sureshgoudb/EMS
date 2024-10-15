@@ -26,12 +26,9 @@ import {
   DialogActions,
   Switch,
   Tooltip,
-  IconButton,
   CircularProgress,
 } from "@mui/material";
 import dayjs from "dayjs";
-import CloseIcon from "@mui/icons-material/Close";
-import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
@@ -45,16 +42,6 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import TableColumnCreate from "./TableColumnCreate";
 import EnhancedGraph from "./EnhancedGraph";
-import {
-  AreaChart,
-  Area,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip as RechartsTooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
 import * as XLSX from "xlsx";
 import { toast, ToastContainer } from "react-toastify";
 
@@ -171,18 +158,20 @@ const DataTable = () => {
       fetchScripts(selectedTerminal);
     }
   }, [selectedTerminal]);
+
   useEffect(() => {
     if (selectedTerminal && selectedProfile) {
       fetchScripts(selectedTerminal);
     }
   }, [selectedTerminal, selectedProfile]);
+
   useEffect(() => {
     if (tableInfo) {
       fetchScriptData();
     }
   }, [tableInfo]);
 
-  // Function to set default dates based on profile
+  // ---------- Function to set default dates based on profile ----------
   const setDefaultDates = (profile) => {
     let newFromDate;
     const newToDate = dayjs().endOf("day");
@@ -249,7 +238,7 @@ const DataTable = () => {
       fetchScriptData();
     }
   }, [selectedTerminal, selectedScripts]);
-  // ---------- Fetch hdnuts data ----------
+
   useEffect(() => {
     if (selectedTerminal && selectedScripts.length > 0) {
       fetchScriptData();
@@ -299,6 +288,7 @@ const DataTable = () => {
     fetchTableInfo();
   }, [tableId]);
 
+  // ---------- Fetch table info ----------
   const fetchTableInfo = async () => {
     try {
       const response = await axios.get(`${apiKey}terminal/table/${tableId}`);
@@ -374,40 +364,30 @@ const DataTable = () => {
     setSelectedGraphScripts([]);
   };
 
+  // ------------ Graph Export to PDF ----------
   const graphexportToPdf = async () => {
     const input = document.getElementById("graph-container");
 
     try {
       const canvas = await html2canvas(input, { useCORS: true });
       const imgData = canvas.toDataURL("image/png");
-
-      const pdf = new jsPDF("l", "mm", "a4"); // Landscape orientation for A4 size
-      const imgWidth = pdf.internal.pageSize.getWidth(); // Get PDF width
-      const imgHeight = (canvas.height * imgWidth) / canvas.width; // Calculate the height to maintain aspect ratio
-
-      // If the image is taller than the PDF page, split into multiple pages
+      const pdf = new jsPDF("l", "mm", "a4");
+      const imgWidth = pdf.internal.pageSize.getWidth();
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
       let position = 0;
-
-      // Add title or header
       pdf.setFontSize(16);
       pdf.text("Multi-Variable Comparison", imgWidth / 2, 15, {
         align: "center",
       });
-
-      // Add the image to the PDF
       pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
       heightLeft -= pdf.internal.pageSize.getHeight();
-
-      // If the image is larger than one page, continue adding pages
       while (heightLeft >= 0) {
         pdf.addPage();
         position = heightLeft > 0 ? 0 : heightLeft;
         pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
         heightLeft -= pdf.internal.pageSize.getHeight();
       }
-
-      // Save the PDF
       pdf.save("multi_variable_comparison.pdf");
       toast.success("PDF exported successfully");
     } catch (error) {
@@ -446,17 +426,13 @@ const DataTable = () => {
       return { value: null, percentage: null };
     }
 
-    // Round the values to two decimal places, as displayed in the UI
     const roundedCurrent = Number(Number(currentValue).toFixed(2));
     const roundedPrevious = Number(Number(previousValue).toFixed(2));
 
     if (isNaN(roundedCurrent) || isNaN(roundedPrevious)) {
       return { value: null, percentage: null };
     }
-
     const valueDiff = roundedCurrent - roundedPrevious;
-
-    // Check if the difference is zero or very close to zero
     if (Math.abs(valueDiff) < 0.005) {
       return { value: 0, percentage: 0 };
     }
@@ -465,8 +441,6 @@ const DataTable = () => {
     if (roundedPrevious !== 0) {
       percentageDiff = (valueDiff / roundedPrevious) * 100;
     } else if (roundedCurrent !== 0) {
-      // If previous value is 0 and current is not, percentage change is essentially infinite
-      // We'll represent this as 100% or -100% based on the sign of the current value
       percentageDiff = roundedCurrent > 0 ? 100 : -100;
     }
 
@@ -477,7 +451,7 @@ const DataTable = () => {
   };
   const formatDifference = (difference, showPercentage) => {
     if (difference.value === null) return "-";
-    if (difference.value === 0) return "0"; // Return plain "0" for zero difference
+    if (difference.value === 0) return "0";
 
     const isPositive = difference.value > 0;
     const ArrowIcon = isPositive ? ArrowUpwardIcon : ArrowDownwardIcon;
@@ -564,19 +538,16 @@ const DataTable = () => {
     const newSelectedScripts =
       typeof value === "string" ? value.split(",") : value;
 
-    // Check for removed scripts
     const removedScripts = selectedScripts.filter(
       (script) => !newSelectedScripts.includes(script)
     );
 
-    // Check for added scripts
     const addedScripts = newSelectedScripts.filter(
       (script) => !selectedScripts.includes(script)
     );
 
     setSelectedScripts(newSelectedScripts);
 
-    // Remove data for unselected scripts
     if (removedScripts.length > 0) {
       setScriptData((prevData) => {
         const newData = { ...prevData };
@@ -588,28 +559,24 @@ const DataTable = () => {
       });
     }
 
-    // Fetch data for newly added scripts
     addedScripts.forEach((script) => {
       fetchScriptData(script);
     });
   };
 
   useEffect(() => {
-    // Update columns based on selectedScripts
     const newColumns = [
       { id: "timestamp", label: "Timestamp" },
       ...selectedScripts.map((script) => ({ id: script, label: script })),
     ];
     setColumns(newColumns);
 
-    // Fetch data for newly selected scripts
     selectedScripts.forEach((script) => {
       if (!columns.some((col) => col.id === script)) {
         fetchScriptData(script);
       }
     });
 
-    // Remove data for unselected scripts
     setRows((prevRows) =>
       prevRows.map((row) => {
         const newRow = { timestamp: row.timestamp };
@@ -683,7 +650,6 @@ const DataTable = () => {
   }, [selectedScripts, selectedTerminal, selectedProfile, fromDate, toDate]);
 
   useEffect(() => {
-    // Merge data from all scripts
     const mergedData = Object.values(scriptData).reduce((acc, scriptRows) => {
       Object.entries(scriptRows).forEach(([timestamp, rowData]) => {
         if (!acc[timestamp]) {
@@ -694,7 +660,6 @@ const DataTable = () => {
       return acc;
     }, {});
 
-    // Convert to array and sort
     const sortedNewRows = Object.values(mergedData).sort(
       (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
     );
@@ -705,7 +670,7 @@ const DataTable = () => {
     setVisibleRows(sortedNewRows.slice(0, 50));
     setHasMore(sortedNewRows.length > 50);
   }, [scriptData]);
-  // When fetching data for multiple scripts
+
   useEffect(() => {
     const fetchAllScriptData = async () => {
       const fetchPromises = selectedScripts.map((script) =>
@@ -716,6 +681,7 @@ const DataTable = () => {
 
     fetchAllScriptData();
   }, [selectedScripts, selectedTerminal, selectedProfile, fromDate, toDate]);
+
   useEffect(() => {
     // Merge data from all scripts
     const mergedData = Object.values(scriptData).reduce((acc, scriptRows) => {
@@ -728,7 +694,6 @@ const DataTable = () => {
       return acc;
     }, {});
 
-    // Convert to array and sort
     const sortedNewRows = Object.values(mergedData).sort(
       (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
     );
@@ -741,14 +706,12 @@ const DataTable = () => {
   }, [scriptData]);
 
   useEffect(() => {
-    // Update columns based on selectedScripts
     const newColumns = [
       { id: "timestamp", label: "Timestamp" },
       ...selectedScripts.map((script) => ({ id: script, label: script })),
     ];
     setColumns(newColumns);
 
-    // Fetch data for all selected scripts
     selectedScripts.forEach((script) => {
       if (!scriptData[script]) {
         fetchScriptData(script);
@@ -761,10 +724,8 @@ const DataTable = () => {
     setExporting(true);
     const doc = new jsPDF("l", "mm", "a4");
 
-    // Title for the PDF
     doc.text(tableName || "Filtered Data", 14, 15);
 
-    // Add the table to the PDF
     autoTable(doc, {
       head: [columns.map((column) => column.label)],
       body: filteredRows.map((row) =>
@@ -780,24 +741,21 @@ const DataTable = () => {
       columnStyles: { 0: { cellWidth: 30 } },
     });
 
-    // Capture the graph as an image using html2canvas
     const graphContainer = document.getElementById("graph-container");
 
-    // Ensure the graph container exists before capturing
     if (graphContainer) {
       const canvas = await html2canvas(graphContainer, {
-        useCORS: true, // Use this if the graph includes images from different origins
-        scale: 2, // Optional: Increase scale for better quality
+        useCORS: true,
+        scale: 2,
       });
 
       const imgData = canvas.toDataURL("image/png");
-      const imgWidth = 297; // A4 width in mm
+      const imgWidth = 297;
       const pageHeight = doc.internal.pageSize.height;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
 
-      // Add the image to the PDF
-      let position = 20 + (filteredRows.length > 0 ? 40 : 10); // Adjust position based on table height
+      let position = 20 + (filteredRows.length > 0 ? 40 : 10);
 
       if (heightLeft >= pageHeight) {
         doc.addImage(imgData, "PNG", 14, position, imgWidth, imgHeight);
@@ -813,7 +771,6 @@ const DataTable = () => {
       }
     }
 
-    // Save the PDF
     doc.save("filtered_data.pdf");
     toast.success("PDF exported successfully");
 
@@ -938,7 +895,6 @@ const DataTable = () => {
                 value={selectedProfile}
                 onChange={(e) => {
                   setSelectedProfile(e.target.value);
-                  // Fetch new data when profile changes
                   selectedScripts.forEach((script) => fetchScriptData(script));
                 }}
                 label="Profile"
@@ -1032,7 +988,7 @@ const DataTable = () => {
                     }}
                   />
                 )}
-                ampm={false} // Use 24-hour format
+                ampm={false}
               />
               <DateTimePicker
                 label="To Date"
@@ -1051,7 +1007,7 @@ const DataTable = () => {
                     }}
                   />
                 )}
-                ampm={false} // Use 24-hour format
+                ampm={false}
               />
             </Box>
 

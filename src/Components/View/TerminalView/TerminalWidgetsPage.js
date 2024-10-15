@@ -10,7 +10,6 @@ const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 const TerminalDetailView = () => {
   const { terminalID } = useParams();
-
   const [widgets, setWidgets] = useState([]);
   const [terminalName, setTerminalName] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -18,6 +17,8 @@ const TerminalDetailView = () => {
   const navigate = useNavigate();
   const [draggingWidgetId, setDraggingWidgetId] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // ---------- Fetching widget ---------------
   const fetchWidgetData = async (widgetId) => {
     try {
       const response = await axios.get(`${apiKey}terminal/widget/${widgetId}`);
@@ -28,6 +29,7 @@ const TerminalDetailView = () => {
     }
   };
 
+  // ---------- Fetching all widgets ---------------
   const fetchAllWidgets = async () => {
     setLoading(true);
     try {
@@ -38,7 +40,6 @@ const TerminalDetailView = () => {
       const [fetchedTerminalName] = Object.keys(data);
       setTerminalName(fetchedTerminalName);
 
-      // Fetch data for each widget
       const widgetsWithData = await Promise.all(
         data[fetchedTerminalName].map(async (widget) => {
           const widgetData = await fetchWidgetData(widget._id);
@@ -67,6 +68,7 @@ const TerminalDetailView = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // -------------- Create Widget ---------------
   const handleCreateWidget = async (widgetData) => {
     try {
       const response = await axios.post(`${apiKey}terminal/createWidget`, {
@@ -75,7 +77,6 @@ const TerminalDetailView = () => {
       });
       const newWidget = response.data;
 
-      // Fetch data for the new widget
       const widgetWithData = await fetchWidgetData(newWidget._id);
 
       setWidgets((prevWidgets) => [
@@ -91,6 +92,7 @@ const TerminalDetailView = () => {
     }
   };
 
+  // --------------- Resize Widget ---------------
   const handleResize = (widgetId, newSize) => {
     setWidgets((prevWidgets) =>
       prevWidgets.map((widget) =>
@@ -99,25 +101,22 @@ const TerminalDetailView = () => {
     );
   };
 
+  // --------------- Delete Widget ---------------
   const handleDeleteWidget = async (widgetId) => {
     try {
-      // Optimistically update the UI by removing the widget immediately
       setWidgets((prevWidgets) =>
         prevWidgets.filter((widget) => widget._id !== widgetId)
       );
-
       await axios.delete(`${apiKey}terminal/deleteWidget/${widgetId}`);
-
       toast.success("Widget deleted successfully!");
     } catch (error) {
       console.error("Error deleting widget:", error);
-
       fetchAllWidgets();
-
       toast.error("Failed to delete widget");
     }
   };
 
+  // --------------- Drag and Drop ---------------
   const handleDragStart = (e, widgetId) => {
     setDraggingWidgetId(widgetId);
   };

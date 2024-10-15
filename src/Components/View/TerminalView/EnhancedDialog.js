@@ -16,7 +16,6 @@ import {
 import { toast, ToastContainer } from "react-toastify";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
 import CloseIcon from "@mui/icons-material/Close";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
@@ -42,9 +41,9 @@ const EnhancedDialog = ({
   comparisonData,
 }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const chartRef = useRef(null);
   const containerRef = useRef(null);
 
+  // ---------- - Full Screen -------------
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
       containerRef.current.requestFullscreen();
@@ -55,6 +54,7 @@ const EnhancedDialog = ({
     }
   };
 
+  // ---------- - Export to PDF -------------
   const graphexportToPdf = async () => {
     const input = document.getElementById("graph-container");
 
@@ -62,25 +62,21 @@ const EnhancedDialog = ({
       const canvas = await html2canvas(input, { useCORS: true });
       const imgData = canvas.toDataURL("image/png");
 
-      const pdf = new jsPDF("l", "mm", "a4"); // Landscape orientation for A4 size
-      const imgWidth = pdf.internal.pageSize.getWidth(); // Get PDF width
-      const imgHeight = (canvas.height * imgWidth) / canvas.width; // Calculate the height to maintain aspect ratio
+      const pdf = new jsPDF("l", "mm", "a4");
+      const imgWidth = pdf.internal.pageSize.getWidth();
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      // If the image is taller than the PDF page, split into multiple pages
       let heightLeft = imgHeight;
       let position = 0;
 
-      // Add title or header
       pdf.setFontSize(16);
       pdf.text("Multi-Variable Comparison", imgWidth / 2, 15, {
         align: "center",
       });
 
-      // Add the image to the PDF
       pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
       heightLeft -= pdf.internal.pageSize.getHeight();
 
-      // If the image is larger than one page, continue adding pages
       while (heightLeft >= 0) {
         pdf.addPage();
         position = heightLeft > 0 ? 0 : heightLeft;
@@ -88,7 +84,6 @@ const EnhancedDialog = ({
         heightLeft -= pdf.internal.pageSize.getHeight();
       }
 
-      // Save the PDF
       pdf.save("graph.pdf");
       toast.success("PDF exported successfully");
     } catch (error) {

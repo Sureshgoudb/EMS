@@ -46,6 +46,7 @@ const EnhancedGraph = ({
   const chartRef = useRef(null);
   const containerRef = useRef(null);
 
+  // ---------- - Full Screen -------------
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
       containerRef.current.requestFullscreen();
@@ -56,6 +57,7 @@ const EnhancedGraph = ({
     }
   };
 
+  // ------------ Zoom In & Zoom Out -------------
   const handleWheel = useCallback(
     (e) => {
       e.preventDefault();
@@ -67,7 +69,6 @@ const EnhancedGraph = ({
         Math.min(reversedGraphData.length, range * zoomFactor)
       );
 
-      // Calculate zoom center based on mouse position
       const containerRect = containerRef.current.getBoundingClientRect();
       const mouseX = e.clientX - containerRect.left;
       const zoomCenter = start + (mouseX / containerRect.width) * range;
@@ -91,15 +92,6 @@ const EnhancedGraph = ({
     [zoomDomain, reversedGraphData.length]
   );
 
-  //   const formatXAxis = (timestamp) => {
-  //     const date = new Date(timestamp);
-  //     return date.toLocaleString("en-US", {
-  //       month: "short",
-  //       day: "numeric",
-  //       hour: "numeric",
-  //       minute: "numeric",
-  //     });
-  //   };
   const formatXAxis = (timestamp) => {
     if (!timestamp) return "";
     const date = new Date(timestamp);

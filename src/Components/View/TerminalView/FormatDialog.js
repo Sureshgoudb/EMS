@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-
 import {
   Dialog,
   DialogActions,
@@ -24,7 +23,6 @@ import ColorLensIcon from "@mui/icons-material/ColorLens";
 
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
-// Styled FormControl
 const StyledFormControl = styled(FormControl)(({ theme }) => ({
   margin: theme.spacing(0),
 }));
@@ -63,6 +61,7 @@ const FormatDialog = ({
     }));
   };
 
+  // ----------- Function to handle widget style -----------
   const handleApply = async () => {
     try {
       setError(null);

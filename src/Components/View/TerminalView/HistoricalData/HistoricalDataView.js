@@ -82,6 +82,7 @@ const HistoricalDataView = () => {
     navigate(`/data-table/${tableId}`);
   };
 
+  // --------------- Deleting table ---------------
   const handleDeleteTable = async () => {
     try {
       await axios.delete(`${apiKey}terminal/table/delete/${tableToDelete}`);
@@ -230,7 +231,6 @@ const HistoricalDataView = () => {
         onCreateColumn={handleCreateTable}
       />
 
-      {/* Confirmation Dialog for Deleting Table */}
       <Dialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}

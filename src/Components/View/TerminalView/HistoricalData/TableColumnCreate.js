@@ -72,6 +72,7 @@ const TableColumnCreate = ({
     }
   }, [selectedProfile, selectedTerminal]);
 
+  // -------------- Fetching terminals ---------------
   const fetchTerminals = async (profile) => {
     try {
       const response = await fetch(apiKey + `terminals/${profile}`);
@@ -82,6 +83,7 @@ const TableColumnCreate = ({
     }
   };
 
+  // -------------- Fetching variables ---------------
   const fetchVariables = async (profile, terminalName) => {
     try {
       const response = await fetch(

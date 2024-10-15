@@ -156,7 +156,6 @@ const LineGraph = ({
     zoomState.endIndex + 1
   );
 
-  // Reset zoom state when graph is expanded
   useEffect(() => {
     if (expanded) {
       setZoomState({

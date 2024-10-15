@@ -79,6 +79,7 @@ const Widget = ({
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
 
+  // ----------- Fetch scripts current & hisrory values -----------
   const fetchScriptData = async (terminalID, scriptName) => {
     try {
       const currentDataResponse = await fetch(
@@ -105,6 +106,8 @@ const Widget = ({
       };
     }
   };
+
+  // ----------- Drag and Drop -----------
   const handleDragStart = (e) => {
     onDragStart(e, terminalID);
   };
@@ -113,6 +116,8 @@ const Widget = ({
     e.preventDefault();
     onDrop(terminalID);
   };
+
+  // ----------- Fetch available scripts -----------
   const fetchScripts = async (terminalID) => {
     try {
       const response = await fetch(`${apiKey}terminal/widget/${terminalID}`);
@@ -124,6 +129,7 @@ const Widget = ({
     }
   };
 
+  // ------------ Trasform data for graph -----------
   const transformDataForGraph = (data) => {
     return data.map((item) => ({
       x: new Date(item.timestamp),
@@ -222,13 +228,14 @@ const Widget = ({
 
     const intervalId = setInterval(() => {
       fetchData();
-    }, 20000); // Fetch data every 20 seconds
+    }, 20000);
 
     return () => {
       clearInterval(intervalId);
     };
   }, [fetchData]);
 
+  // ------------ Delete Widget -----------
   const handleDeleteWidget = async () => {
     setIsDeleting(true);
     setDeleteError(null);
@@ -294,6 +301,7 @@ const Widget = ({
     onResize(terminalID, size);
   };
 
+  // ------------ Compare Widget -----------
   const handleComparisonScriptChange = (event) => {
     const {
       target: { value },

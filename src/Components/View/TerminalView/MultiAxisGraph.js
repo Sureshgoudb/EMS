@@ -157,7 +157,6 @@ const MultiAxisGraph = ({
     [zoomState, combinedData.length]
   );
 
-  // Reset zoom state when expanded changes
   useEffect(() => {
     if (expanded) {
       setZoomState({
