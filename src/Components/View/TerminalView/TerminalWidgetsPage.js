@@ -84,6 +84,7 @@ const TerminalDetailView = () => {
       ]);
       setShowForm(false);
       toast.success("Widget created successfully!");
+      fetchAllWidgets();
     } catch (error) {
       console.error("Error creating widget:", error);
       toast.error("Failed to create widget");

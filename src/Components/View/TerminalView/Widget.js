@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback, useReducer } from "react";
 import MultiAxisGraph from "./MultiAxisGraph";
 import EnhancedDialog from "./EnhancedDialog";
-import io from "socket.io-client";
-
 import {
   Box,
   Typography,
@@ -25,6 +23,7 @@ import FormatDialog from "./FormatDialog";
 import { useParams } from "react-router";
 
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
+
 const Widget = ({
   widgetData,
   onResize,
@@ -48,9 +47,7 @@ const Widget = ({
   const [deleteError, setDeleteError] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const properties = widgetData.properties || {};
-  const [socket, setSocket] = useState(null);
-  const [currentValueSocket, setCurrentValueSocket] = useState(null);
-  const [historySocket, setHistorySocket] = useState(null);
+
   const [backgroundColor, setBackgroundColor] = useState(
     properties.backgroundColor || "#ffffff"
   );
@@ -108,7 +105,14 @@ const Widget = ({
       };
     }
   };
+  const handleDragStart = (e) => {
+    onDragStart(e, terminalID);
+  };
 
+  const handleDrop = (e) => {
+    e.preventDefault();
+    onDrop(terminalID);
+  };
   const fetchScripts = async (terminalID) => {
     try {
       const response = await fetch(`${apiKey}terminal/widget/${terminalID}`);
@@ -172,15 +176,6 @@ const Widget = ({
     error: null,
   });
 
-  const handleDragStart = (e) => {
-    onDragStart(e, terminalID);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    onDrop(terminalID);
-  };
-
   const fetchData = useCallback(
     async (isExpanded = false) => {
       if (terminalName && scriptName) {
@@ -225,53 +220,14 @@ const Widget = ({
   useEffect(() => {
     fetchData();
 
-    const newSocket = io(`${apiKey}${terminalID}/${scriptName}`, {
-      transports: ["websocket"],
-      forceNew: true,
-    });
-
-    newSocket.on("connect", () => {
-      console.log("Socket connected");
-    });
-
-    newSocket.on("valueUpdate", (data) => {
-      dispatch({
-        type: actions.UPDATE_CURRENT_DATA,
-        payload: {
-          value: parseFloat(data[scriptName]),
-          timestamp: data.timestamp,
-        },
-      });
-    });
-
-    newSocket.on("disconnect", () => {
-      console.log("Socket disconnected");
-    });
-
-    setSocket(newSocket);
+    const intervalId = setInterval(() => {
+      fetchData();
+    }, 20000); // Fetch data every 20 seconds
 
     return () => {
-      if (newSocket) {
-        newSocket.disconnect();
-      }
+      clearInterval(intervalId);
     };
-  }, [fetchData, terminalID, scriptName]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && socket) {
-        socket.disconnect();
-      } else if (!document.hidden && socket) {
-        socket.connect();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [socket]);
+  }, [fetchData]);
 
   const handleDeleteWidget = async () => {
     setIsDeleting(true);

@@ -624,8 +624,6 @@ const DataTable = () => {
     );
   }, [selectedScripts]);
 
-  const [loadingScriptData, setLoadingScriptData] = useState(false);
-
   const fetchScriptData = async (script) => {
     if (!selectedTerminal || !selectedProfile) {
       console.error("Missing required parameters for fetchScriptData");
@@ -640,21 +638,20 @@ const DataTable = () => {
       const scriptData = response.data;
 
       if (!Array.isArray(scriptData) || scriptData.length === 0) {
-        toast.warning(`No data available for script: ${script}`);
         return;
       }
 
       const newData = scriptData.reduce((acc, item) => {
         if (item && item[script]) {
           const timestamp = item[script].timestamp;
-          const value = parseFloat(item[script].value);
+          const value = parseFloat(item[script].value.$numberDecimal);
           if (timestamp && !isNaN(value)) {
             const rowDate = dayjs(timestamp);
             if (rowDate.isAfter(fromDate) && rowDate.isBefore(toDate)) {
-              if (!acc[timestamp]) {
-                acc[timestamp] = { timestamp };
-              }
-              acc[timestamp][script] = value;
+              acc[timestamp] = {
+                timestamp,
+                [script]: value,
+              };
             }
           }
         }
@@ -670,6 +667,44 @@ const DataTable = () => {
     }
   };
 
+  useEffect(() => {
+    const fetchAllScriptData = async () => {
+      setLoading(true);
+      const fetchPromises = selectedScripts.map((script) =>
+        fetchScriptData(script)
+      );
+      await Promise.all(fetchPromises);
+      setLoading(false);
+    };
+
+    if (selectedTerminal && selectedProfile && selectedScripts.length > 0) {
+      fetchAllScriptData();
+    }
+  }, [selectedScripts, selectedTerminal, selectedProfile, fromDate, toDate]);
+
+  useEffect(() => {
+    // Merge data from all scripts
+    const mergedData = Object.values(scriptData).reduce((acc, scriptRows) => {
+      Object.entries(scriptRows).forEach(([timestamp, rowData]) => {
+        if (!acc[timestamp]) {
+          acc[timestamp] = { timestamp };
+        }
+        Object.assign(acc[timestamp], rowData);
+      });
+      return acc;
+    }, {});
+
+    // Convert to array and sort
+    const sortedNewRows = Object.values(mergedData).sort(
+      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+    );
+
+    setRows(sortedNewRows);
+    setFilteredRows(sortedNewRows);
+    setSortedRows(sortedNewRows);
+    setVisibleRows(sortedNewRows.slice(0, 50));
+    setHasMore(sortedNewRows.length > 50);
+  }, [scriptData]);
   // When fetching data for multiple scripts
   useEffect(() => {
     const fetchAllScriptData = async () => {
@@ -1232,7 +1267,7 @@ const DataTable = () => {
                                 : row[column.id] !== undefined &&
                                   row[column.id] !== null
                                 ? Number(row[column.id]).toFixed(2)
-                                : "-"}
+                                : "NA"}
                             </Typography>
                             {column.id !== "timestamp" &&
                               index < sortedRows.length - 1 && (

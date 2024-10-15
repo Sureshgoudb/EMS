@@ -382,7 +382,14 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
             </>
           )}
         </Box>
-        <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            mt: 4,
+            gap: 2,
+          }}
+        >
           <Button variant="contained" color="primary" onClick={handleCreate}>
             Create Widget
           </Button>
