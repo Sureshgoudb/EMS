@@ -71,7 +71,8 @@ function Header() {
         links.push({ id: 10, name: "Profile", to: "/profile" });
         links.push({ id: 11, name: "Logout", to: "/" });
       } else if (memoizedUser.user_Type === "User") {
-        links.push({ id: 1, name: "SLDC View", to: "/sldcview" });
+        links.push({ id: 1, name: "Device View", to: "/view/terminal",
+        });
         links.push({ id: 2, name: "Profile", to: "/profile" });
         links.push({ id: 3, name: "Logout", to: "/" });
       }
