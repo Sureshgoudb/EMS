@@ -71,8 +71,11 @@ const Login = () => {
           };
           localStorage.setItem("user", JSON.stringify(user));
           dispatch(addUser(user));
-
+          if(response.data.user_Type === "User")
+          navigate("/view/terminal");
+          else
           navigate("/sldcview");
+
         } else {
           setformError(true);
         }
