@@ -5,7 +5,7 @@ import {
   Outlet,
   useRoutes,
   useNavigate,
-  Navigate 
+  Navigate,
 } from "react-router-dom";
 import Footer from "./Components/Footer";
 import Header from "./Components/Header";
@@ -40,10 +40,9 @@ const Main = () => {
       );
     }
     let user = localStorage.getItem("user");
-    if(user == null || user == undefined)
-      {
-        return <Navigate to='/'></Navigate>
-      }
+    if (user == null || user == undefined) {
+      return <Navigate to="/"></Navigate>;
+    }
 
     return (
       <Provider store={appStore}>
@@ -74,7 +73,6 @@ const Main = () => {
           path: "/profile?",
           element: <Profile />,
         },
-
         {
           path: "/devicedata",
           element: <DeviceData />,
@@ -100,7 +98,7 @@ const Main = () => {
           element: <Customers />,
         },
         {
-          path: "/dashboard",
+          path: "/sldcview",
           element: <Dashboard />,
         },
         {
@@ -108,7 +106,7 @@ const Main = () => {
           element: <TerminalView />,
         },
         {
-          path: "/terminal/:terminalName",
+          path: "/terminal/:terminalID",
           element: <TerminalWidgetsPage />,
         },
         {
