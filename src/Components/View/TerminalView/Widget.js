@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useReducer } from "react";
 import MultiAxisGraph from "./MultiAxisGraph";
 import EnhancedDialog from "./EnhancedDialog";
+import io from "socket.io-client";
+
 import {
   Box,
   Typography,
@@ -20,127 +22,20 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
 import LineGraph from "./LineGraph";
 import FormatDialog from "./FormatDialog";
+import { useParams } from "react-router";
 
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
-
-const formatTimestamp = (timestamp) => {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const hours = String(date.getUTCHours()).padStart(2, "0");
-  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-};
-
-// -------------- Fetch Current Data and Historical Data --------------
-const fetchScriptData = async (terminalName, scriptName) => {
-  try {
-    const currentDataResponse = await fetch(
-      `${apiKey}terminal/${encodeURIComponent(
-        terminalName
-      )}/script/${encodeURIComponent(scriptName)}/currentValue`
-    );
-    const currentData = await currentDataResponse.json();
-
-    const historicalDataResponse = await fetch(
-      `${apiKey}terminal/${encodeURIComponent(
-        terminalName
-      )}/script/${encodeURIComponent(scriptName)}/history`
-    );
-    const historicalData = await historicalDataResponse.json();
-
-    return {
-      value: currentData[scriptName].value,
-      timestamp: currentData[scriptName].timestamp,
-      data: historicalData || [],
-    };
-  } catch (error) {
-    console.error("Error fetching script data:", error);
-    return {
-      value: null,
-      timestamp: "",
-      data: [],
-    };
-  }
-};
-
-// -------------- Fetch Scripts --------------
-const fetchScripts = async (terminalName) => {
-  try {
-    const response = await fetch(apiKey + `terminal/${terminalName}/scripts`);
-    const scripts = await response.json();
-    return scripts;
-  } catch (error) {
-    console.error("Error fetching scripts:", error);
-    return [];
-  }
-};
-
-// -------------- Expand graph plotting --------------
-const transformDataForGraph = (data) => {
-  return data
-    .map((item) => {
-      const scriptData = item[Object.keys(item)[0]];
-      if (
-        isNaN(scriptData.value) ||
-        scriptData.value === null ||
-        scriptData.value === undefined
-      ) {
-        return null;
-      }
-      return {
-        x: new Date(scriptData.timestamp),
-        y: parseFloat(scriptData.value),
-      };
-    })
-    .filter((item) => item !== null);
-};
-
-const actions = {
-  UPDATE_CURRENT_DATA: "UPDATE_CURRENT_DATA",
-  UPDATE_HISTORICAL_DATA: "UPDATE_HISTORICAL_DATA",
-  UPDATE_EXPANDED_DATA: "UPDATE_EXPANDED_DATA",
-  SET_ERROR: "SET_ERROR",
-};
-
-const dataReducer = (state, action) => {
-  switch (action.type) {
-    case actions.UPDATE_CURRENT_DATA:
-      return {
-        ...state,
-        value: action.payload.value,
-        timestamp: action.payload.timestamp,
-        error: null,
-      };
-    case actions.UPDATE_HISTORICAL_DATA:
-      return {
-        ...state,
-        scriptData: action.payload,
-        error: null,
-      };
-    case actions.UPDATE_EXPANDED_DATA:
-      return {
-        ...state,
-        detailedData: action.payload,
-        error: null,
-      };
-    case actions.SET_ERROR:
-      return {
-        ...state,
-        error: action.payload,
-      };
-    default:
-      return state;
-  }
-};
-
-const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
+const Widget = ({
+  widgetData,
+  onResize,
+  onDelete,
+  onDragStart,
+  onDrop,
+  terminalName,
+}) => {
+  const { terminalID } = useParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isFormatDialog, setIsFormatDialog] = useState(false);
-  const [selectedText, setSelectedText] = useState("");
   const [availableScripts, setAvailableScripts] = useState([]);
   const [selectedScript, setSelectedScript] = useState("");
   const [scriptName, setScriptName] = useState(widgetData.scriptName || "");
@@ -153,6 +48,9 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
   const [deleteError, setDeleteError] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const properties = widgetData.properties || {};
+  const [socket, setSocket] = useState(null);
+  const [currentValueSocket, setCurrentValueSocket] = useState(null);
+  const [historySocket, setHistorySocket] = useState(null);
   const [backgroundColor, setBackgroundColor] = useState(
     properties.backgroundColor || "#ffffff"
   );
@@ -162,30 +60,112 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
     fontColor: properties.fontColor || "#000000",
     fontStyle: properties.fontStyle || "normal",
   });
-  const [terminalName, setTerminalName] = useState(
-    widgetData.terminalName || ""
-  );
-  const [categoryStyle, setCategoryStyle] = useState({
-    fontFamily: widgetData.fontFamily || "Arial",
-    fontSize: "18px",
-    fontColor: "#000000",
-    fontStyle: "normal",
-  });
-  const [terminalStyle, setTerminalStyle] = useState({
-    fontFamily: widgetData.fontFamily || "Arial",
-    fontSize: "18px",
-    fontColor: "#000000",
-    fontStyle: "normal",
-  });
-  const [valueStyle, setValueStyle] = useState({
-    fontFamily: widgetData.fontFamily || "Arial",
-    fontSize: "30px",
-    fontColor: "#FF0000",
-    fontStyle: "normal",
+
+  const [currentStyles, setCurrentStyles] = useState({
+    fontFamily: widgetData.properties?.fontFamily || "Arial",
+    fontSize: widgetData.properties?.fontSize || "14px",
+    fontColor: widgetData.properties?.fontColor || "#000000",
+    fontStyle: widgetData.properties?.fontStyle || "normal",
+    fontWeight: widgetData.properties?.fontWeight || "normal",
+    backgroundColor: widgetData.properties?.backgroundColor || "#ffffff",
   });
 
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    const hours = String(date.getUTCHours()).padStart(2, "0");
+    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+    const seconds = String(date.getUTCSeconds()).padStart(2, "0");
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  };
+
+  const fetchScriptData = async (terminalID, scriptName) => {
+    try {
+      const currentDataResponse = await fetch(
+        `${apiKey}terminal/${terminalID}/script/${scriptName}/currentValue`
+      );
+      const currentData = await currentDataResponse.json();
+
+      const historicalDataResponse = await fetch(
+        `${apiKey}terminal/${terminalID}/script/${scriptName}/history`
+      );
+      const historicalData = await historicalDataResponse.json();
+
+      return {
+        value: currentData[scriptName],
+        timestamp: currentData.timestamp,
+        data: historicalData || [],
+      };
+    } catch (error) {
+      console.error("Error fetching script data:", error);
+      return {
+        value: null,
+        timestamp: "",
+        data: [],
+      };
+    }
+  };
+
+  const fetchScripts = async (terminalID) => {
+    try {
+      const response = await fetch(`${apiKey}terminal/widget/${terminalID}`);
+      const data = await response.json();
+      return data[Object.keys(data)[0]];
+    } catch (error) {
+      console.error("Error fetching scripts:", error);
+      return [];
+    }
+  };
+
+  const transformDataForGraph = (data) => {
+    return data.map((item) => ({
+      x: new Date(item.timestamp),
+      y: parseFloat(item[Object.keys(item)[0]]),
+    }));
+  };
+
+  const actions = {
+    UPDATE_CURRENT_DATA: "UPDATE_CURRENT_DATA",
+    UPDATE_HISTORICAL_DATA: "UPDATE_HISTORICAL_DATA",
+    UPDATE_EXPANDED_DATA: "UPDATE_EXPANDED_DATA",
+    SET_ERROR: "SET_ERROR",
+  };
+
+  const dataReducer = (state, action) => {
+    switch (action.type) {
+      case actions.UPDATE_CURRENT_DATA:
+        return {
+          ...state,
+          value: action.payload.value,
+          timestamp: action.payload.timestamp,
+          error: null,
+        };
+      case actions.UPDATE_HISTORICAL_DATA:
+        return {
+          ...state,
+          scriptData: action.payload,
+          error: null,
+        };
+      case actions.UPDATE_EXPANDED_DATA:
+        return {
+          ...state,
+          detailedData: action.payload,
+          error: null,
+        };
+      case actions.SET_ERROR:
+        return {
+          ...state,
+          error: action.payload,
+        };
+      default:
+        return state;
+    }
+  };
   const [state, dispatch] = useReducer(dataReducer, {
-    value: widgetData.value,
+    value: widgetData.currentValue,
     timestamp: "",
     scriptData: [],
     detailedData: [],
@@ -193,20 +173,19 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
   });
 
   const handleDragStart = (e) => {
-    onDragStart(e, widgetData._id);
+    onDragStart(e, terminalID);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    onDrop(widgetData._id);
+    onDrop(terminalID);
   };
 
-  // -------------- Fetch data with hook --------------
   const fetchData = useCallback(
     async (isExpanded = false) => {
       if (terminalName && scriptName) {
         try {
-          const data = await fetchScriptData(terminalName, scriptName);
+          const data = await fetchScriptData(terminalID, scriptName);
           dispatch({
             type: actions.UPDATE_CURRENT_DATA,
             payload: {
@@ -214,7 +193,13 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
               timestamp: data.timestamp,
             },
           });
-          const transformedData = transformDataForGraph(data.data);
+
+          const historicalDataResponse = await fetch(
+            `${apiKey}terminal/${terminalID}/script/${scriptName}/history?expanded=${isExpanded}`
+          );
+          const historicalData = await historicalDataResponse.json();
+
+          const transformedData = transformDataForGraph(historicalData);
           if (isExpanded) {
             dispatch({
               type: actions.UPDATE_EXPANDED_DATA,
@@ -234,14 +219,91 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
         }
       }
     },
-    [terminalName, scriptName]
+    [terminalName, scriptName, terminalID]
   );
 
   useEffect(() => {
     fetchData();
-    const intervalId = setInterval(() => fetchData(), 30000);
-    return () => clearInterval(intervalId);
-  }, [fetchData]);
+
+    const newSocket = io(`${apiKey}${terminalID}/${scriptName}`, {
+      transports: ["websocket"],
+      forceNew: true,
+    });
+
+    newSocket.on("connect", () => {
+      console.log("Socket connected");
+    });
+
+    newSocket.on("valueUpdate", (data) => {
+      dispatch({
+        type: actions.UPDATE_CURRENT_DATA,
+        payload: {
+          value: parseFloat(data[scriptName]),
+          timestamp: data.timestamp,
+        },
+      });
+    });
+
+    newSocket.on("disconnect", () => {
+      console.log("Socket disconnected");
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, [fetchData, terminalID, scriptName]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && socket) {
+        socket.disconnect();
+      } else if (!document.hidden && socket) {
+        socket.connect();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [socket]);
+
+  const handleDeleteWidget = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`${apiKey}terminal/widget/deletewidget`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          terminalID: terminalID,
+          scriptName: scriptName,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete widget");
+      }
+
+      onDelete(terminalID);
+    } catch (error) {
+      console.error("Error deleting widget:", error);
+      setDeleteError(
+        error.message || "Failed to delete widget. Please try again."
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleExpandClick = () => {
     setIsGraphExpanded(true);
@@ -257,48 +319,6 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
     setComparisonScripts([]);
   };
 
-  const handleEdit = (textType) => {
-    setSelectedText(textType);
-    setIsFormatDialog(true);
-  };
-
-  const handleDeleteWidget = async () => {
-    setIsDeleting(true);
-    setDeleteError(null);
-
-    // ---------- Delete widget ----------
-    const widgetId = widgetData._id;
-
-    if (!widgetId) {
-      setDeleteError("Invalid widget ID");
-      setIsDeleting(false);
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `${apiKey}terminal/deleteWidget/${widgetId}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete widget");
-      }
-
-      onDelete(widgetId);
-    } catch (error) {
-      console.error("Error deleting widget:", error);
-      setDeleteError(
-        error.message || "Failed to delete widget. Please try again."
-      );
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   const handleConfirmDelete = () => {
     handleDeleteWidget();
     setIsConfirmDialogOpen(false);
@@ -308,18 +328,16 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
     setIsConfirmDialogOpen(false);
   };
 
-  // -------------- Handle Resize --------------
   const defaultSize = widgetData.areaGraph
-    ? { width: 300, height: 300 }
+    ? { width: 310, height: 310 }
     : { width: 200, height: 125 };
-  const minConstraints = widgetData.areaGraph ? [300, 300] : [200, 125];
+  const minConstraints = widgetData.areaGraph ? [310, 310] : [200, 125];
   const maxConstraints = widgetData.areaGraph ? [620, 400] : [300, 200];
 
   const handleResize = (event, { size }) => {
-    onResize(widgetData.id, size);
+    onResize(terminalID, size);
   };
 
-  // -------------- Script Comparison --------------
   const handleComparisonScriptChange = (event) => {
     const {
       target: { value },
@@ -333,12 +351,11 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
     }
   };
 
-  // -------------- Script Comparison data --------------
   useEffect(() => {
     const fetchComparisonData = async () => {
       const newComparisonData = {};
       for (const script of comparisonScripts) {
-        const data = await fetchScriptData(terminalName, script);
+        const data = await fetchScriptData(terminalID, script);
         newComparisonData[script] = transformDataForGraph(data.data || []);
       }
       setComparisonData(newComparisonData);
@@ -349,16 +366,16 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
     } else {
       setComparisonData({});
     }
-  }, [comparisonScripts, terminalName]);
+  }, [comparisonScripts, terminalID]);
 
   useEffect(() => {
     if (isGraphExpanded) {
-      fetchScripts(terminalName).then((scripts) => {
+      fetchScripts(terminalID).then((scripts) => {
         setAvailableScripts(scripts);
         setSelectedScript(scriptName);
       });
     }
-  }, [isGraphExpanded, terminalName, scriptName]);
+  }, [isGraphExpanded, terminalID, scriptName]);
 
   const isBackgroundDark = (color = "#ffffff") => {
     if (!color || typeof color !== "string") {
@@ -412,31 +429,22 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
   const handleMouseLeave = () => {
     setIsHovered(false);
   };
-  const handleStylesUpdate = (newStyles) => {
-    setBackgroundColor(newStyles.backgroundColor || backgroundColor);
-    setTextStyle((prevStyle) => ({
-      ...prevStyle,
-      fontFamily: newStyles.fontFamily || prevStyle.fontFamily,
-      fontSize: newStyles.fontSize || prevStyle.fontSize,
-      fontColor: newStyles.fontColor || prevStyle.fontColor,
-      fontStyle: newStyles.fontStyle || prevStyle.fontStyle,
-    }));
-
-    setCategoryStyle((prevStyle) => ({
-      ...prevStyle,
-      fontFamily: newStyles.fontFamily || prevStyle.fontFamily,
-    }));
-
-    setTerminalStyle((prevStyle) => ({
-      ...prevStyle,
-      fontFamily: newStyles.fontFamily || prevStyle.fontFamily,
-    }));
-
-    setValueStyle((prevStyle) => ({
-      ...prevStyle,
-      fontFamily: newStyles.fontFamily || prevStyle.fontFamily,
-    }));
+  const handleEdit = () => {
+    setIsFormatDialog(true);
   };
+
+  const handleStylesUpdate = (newStyles) => {
+    setCurrentStyles(newStyles);
+    setBackgroundColor(newStyles.backgroundColor || backgroundColor);
+    setTextStyle({
+      fontFamily: newStyles.fontFamily || textStyle.fontFamily,
+      fontSize: newStyles.fontSize || textStyle.fontSize,
+      fontColor: newStyles.fontColor || textStyle.fontColor,
+      fontStyle: newStyles.fontStyle || textStyle.fontStyle,
+      fontWeight: newStyles.fontWeight || textStyle.fontWeight,
+    });
+  };
+
   return (
     <>
       <ResizableBox
@@ -484,25 +492,13 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
                   variant="h6"
                   sx={{
                     fontFamily: textStyle.fontFamily,
-                    fontSize: textStyle.fontSize,
-                    color: textStyle.fontColor || autoTextColor,
-                    fontStyle: textStyle.fontStyle,
-                  }}
-                  onClick={() => handleEdit("category")}
-                >
-                  {widgetData.primaryCategory}
-                </Typography>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontFamily: textStyle.fontFamily,
                     fontSize: 20,
                     color: autoTextColor,
                     fontStyle: textStyle.fontStyle,
                   }}
                   onClick={() => handleEdit("scriptName")}
                 >
-                  {scriptName || widgetData.scriptName}
+                  {scriptName}
                 </Typography>
                 <Typography
                   variant="h3"
@@ -629,27 +625,11 @@ const Widget = ({ widgetData, onResize, onDelete, onDragStart, onDrop }) => {
       <FormatDialog
         open={isFormatDialog}
         onClose={() => setIsFormatDialog(false)}
-        currentStyles={
-          selectedText === "category"
-            ? categoryStyle
-            : selectedText === "terminalName"
-            ? terminalStyle
-            : selectedText === "value"
-            ? valueStyle
-            : textStyle
-        }
-        setCurrentStyles={(styles) => {
-          if (selectedText === "category") {
-            setCategoryStyle(styles);
-          } else if (selectedText === "terminalName") {
-            setTerminalStyle(styles);
-          } else if (selectedText === "value") {
-            setValueStyle(styles);
-          } else {
-            setTextStyle(styles);
-          }
-        }}
-        widgetId={widgetData._id}
+        currentStyles={currentStyles}
+        setCurrentStyles={setCurrentStyles}
+        terminalID={terminalID}
+        scriptName={scriptName}
+        isNewWidget={false}
         onStylesUpdate={handleStylesUpdate}
       />
       <Dialog open={isConfirmDialogOpen} onClose={handleCancelDelete}>

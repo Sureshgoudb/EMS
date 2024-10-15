@@ -1,15 +1,123 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+
 import { DataGrid } from "@mui/x-data-grid";
 import axios from "axios";
-import {
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  CircularProgress,
-  IconButton,
-} from "@mui/material";
-import RefreshIcon from "@mui/icons-material/Refresh";
+import { Card, Typography, Box, CircularProgress } from "@mui/material";
+import { styled } from "@mui/system";
+import io from "socket.io-client";
+
+const StyledCard = styled(Card)(({ theme }) => ({
+  boxShadow: "0 15px 45px rgba(0, 0, 0, 0.2)",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
+  background:
+    "linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4))",
+  border: "1px solid rgba(255, 255, 255, 0.3)",
+  overflow: "hidden",
+  display: "flex",
+  flexDirection: "column",
+  height: "100vh",
+  transition: "all 0.5s ease-in-out",
+  "&:hover": {
+    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+  },
+}));
+
+const StyledTypography = styled(Typography)(({ theme }) => ({
+  textAlign: "center",
+  backgroundImage: "linear-gradient(45deg, #2196F3, #21CBF3)",
+  backgroundClip: "text",
+  WebkitBackgroundClip: "text",
+  color: "transparent",
+  fontWeight: 700,
+  fontSize: "1.5rem",
+  textShadow: "3px 3px 5px rgba(0, 0, 0, 0.1)",
+  top: "10px",
+}));
+
+const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
+  height: "100%",
+  "& .MuiDataGrid-root": {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: "15px",
+    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.1)",
+  },
+  "& .MuiDataGrid-cell": {
+    borderBottom: "1px solid rgba(224, 224, 224, 0.5)",
+
+    color: "#333",
+    fontFamily: "'Poppins', 'Arial', sans-serif",
+    transition: "all 0.3s ease",
+  },
+  "& .MuiDataGrid-columnHeaders": {
+    backgroundImage: "linear-gradient(135deg, #2196F3, #21CBF3)",
+    color: "#fff",
+    textShadow: "1px 1px 3px rgba(0, 0, 0, 0.2)",
+  },
+  "& .MuiDataGrid-cell:hover": {
+    backgroundColor: "rgba(227, 242, 253, 0.7)",
+    boxShadow: "inset 0 0 15px rgba(33, 150, 243, 0.6)",
+    transform: "scale(1.05)",
+  },
+  "& .MuiDataGrid-row:hover": {
+    backgroundColor: "rgba(245, 245, 245, 0.8)",
+  },
+
+  "& .ui-percentage-medium": {
+    color: "#FFA726",
+    fontWeight: 700,
+  },
+  "& .ui-percentage-negative": {
+    color: "#EF5350",
+    fontWeight: 700,
+  },
+  "& .ui-percentage-high": {
+    color: "#F44336",
+    fontWeight: 700,
+  },
+  "@keyframes blink": {
+    "0%": { backgroundColor: "rgba(244, 67, 54, 0.1)" },
+    "50%": { backgroundColor: "rgba(244, 67, 54, 0.3)" },
+    "100%": { backgroundColor: "rgba(244, 67, 54, 0.1)" },
+  },
+  "& .row-critical": {
+    animation: "blink 1s infinite",
+  },
+  "& .cell-critical": {
+    animation: "blink 1s infinite",
+    backgroundColor: "rgba(244, 67, 54, 0.1)",
+    fontWeight: 700,
+  },
+  "& .ui-percentage-critical": {
+    animation: "blink 1s infinite",
+    backgroundColor: "rgba(244, 67, 54, 0.1)",
+    fontWeight: 700,
+  },
+}));
+
+const CurrentDateTime = styled(Typography)(({ theme }) => ({
+  position: "absolute",
+  top: "10px",
+  left: "20px",
+  fontSize: "1.2rem",
+  backgroundImage: "linear-gradient(45deg, #FF9800, #FFC107)",
+  backgroundClip: "text",
+  WebkitBackgroundClip: "text",
+  color: "transparent",
+  fontWeight: 600,
+}));
+
+const BlkNoDisplay = styled(Typography)(({ theme }) => ({
+  position: "absolute",
+  top: "10px",
+  right: "20px",
+  fontSize: "1.2rem",
+  backgroundImage: "linear-gradient(45deg, #FF9800, #FFC107)",
+  backgroundClip: "text",
+  WebkitBackgroundClip: "text",
+  color: "transparent",
+  fontWeight: 600,
+}));
 
 const TableGrid = () => {
   const [terminals, setTerminals] = useState([]);
@@ -17,7 +125,9 @@ const TableGrid = () => {
   const [rows, setRows] = useState([]);
   const [columns, setColumns] = useState([]);
   const [loading, setLoading] = useState(true);
-
+  const [currentDateTime, setCurrentDateTime] = useState("");
+  const [blkNo, setBlkNo] = useState("");
+  const socketRef = useRef({});
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
   const formatTimestamp = (timestamp) => {
@@ -33,65 +143,146 @@ const TableGrid = () => {
   };
 
   useEffect(() => {
-    fetchTerminalsAndScripts();
+    fetchTerminals();
+    const timer = setInterval(() => {
+      setCurrentDateTime(
+        new Date().toLocaleString("en-US", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        })
+      );
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+      disconnectAllSockets();
+    };
   }, []);
+
+  useEffect(() => {
+    if (terminals.length > 0) {
+      fetchScripts(terminals[0].terminalId);
+    }
+  }, [terminals]);
 
   useEffect(() => {
     if (terminals.length > 0 && scripts.length > 0) {
       initializeGrid();
-      fetchGridData(); // Fetch data initially
-      const intervalId = setInterval(fetchGridData, 30000); // Fetch data every 30 seconds
-
-      return () => clearInterval(intervalId); // Clear the interval when the component is unmounted
+      fetchGridData();
     }
+    return () => {
+      disconnectAllSockets();
+    };
   }, [terminals, scripts]);
 
-  // Fetch terminals and scripts and automatically select all
-  const fetchTerminalsAndScripts = async () => {
-    setLoading(true);
-    try {
-      const terminalsResponse = await axios.get(`${apiKey}terminal/list`);
-      setTerminals(terminalsResponse.data);
-
-      if (terminalsResponse.data.length > 0) {
-        const scriptsResponse = await axios.get(
-          `${apiKey}terminal/${terminalsResponse.data[0]}/scripts`
-        );
-        setScripts(scriptsResponse.data);
+  const disconnectAllSockets = () => {
+    Object.values(socketRef.current).forEach((socket) => {
+      if (socket && socket.connected) {
+        socket.disconnect();
       }
+    });
+    socketRef.current = {};
+  };
+
+  const fetchTerminals = async () => {
+    try {
+      const response = await axios.get(`${apiKey}terminal/list`);
+      setTerminals(response.data);
     } catch (error) {
-      console.error("Error fetching terminals and scripts:", error);
+      console.error("Error fetching terminals:", error);
+    }
+  };
+
+  const fetchScripts = async (terminalId) => {
+    try {
+      const response = await axios.get(
+        `${apiKey}terminal/${terminalId}/scripts`
+      );
+      const scriptNames = Object.keys(response.data.scripts);
+      setScripts(scriptNames.filter((script) => script !== "BLK No"));
+    } catch (error) {
+      console.error("Error fetching scripts:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Initialize grid columns based on selected terminals and scripts
   const initializeGrid = () => {
-    const cols = [
+    const defaultColumns = [
       {
         field: "terminal",
-        headerName: "Terminal",
+        headerName: "Site Name",
         width: 200,
-        headerClassName: "header-cell", // Custom header class
+        headerClassName: "header-cell",
       },
       {
         field: "timestamp",
-        headerName: "Timestamp",
+        headerName: "Date Time",
         width: 200,
         headerClassName: "header-cell",
       },
-      ...scripts.map((script) => ({
-        field: script,
-        headerName: script,
-        width: 150,
-        headerClassName: "header-cell",
-      })),
     ];
-    setColumns(cols);
+
+    const scriptColumns = [
+      {
+        field: "AvC MW",
+        headerName: "AvC MW",
+        width: 100,
+        headerClassName: "header-cell",
+      },
+      {
+        field: "SG MW",
+        headerName: "SG MW",
+        width: 100,
+        headerClassName: "header-cell",
+      },
+      {
+        field: "Inst MW",
+        headerName: "Inst MW",
+        width: 100,
+        headerClassName: "header-cell",
+      },
+      {
+        field: "Avg MW",
+        headerName: "Avg MW",
+        width: 100,
+        headerClassName: "header-cell",
+      },
+      {
+        field: "UI MW",
+        headerName: "UI MW",
+        width: 100,
+        headerClassName: "header-cell",
+      },
+      {
+        field: "UI Percentage",
+        headerName: "UI Percentage",
+        width: 100,
+        headerClassName: "header-cell",
+        cellClassName: (params) => {
+          const value = parseFloat(params.value);
+          if (value > 28) return "cell-critical";
+          if (value > 20) return "ui-percentage-high";
+          if (value > 12) return "ui-percentage-medium";
+          if (value < 0) return "ui-percentage-negative";
+          return "ui-percentage-low";
+        },
+      },
+      {
+        field: "4thBLK SG MW",
+        headerName: "4thBLK SG MW",
+        width: 100,
+        headerClassName: "header-cell",
+      },
+    ];
+
+    setColumns([...defaultColumns, ...scriptColumns]);
   };
 
-  // Fetch grid data for all selected terminals and scripts
   const fetchGridData = async () => {
     setLoading(true);
     try {
@@ -99,39 +290,78 @@ const TableGrid = () => {
         terminals.map(async (terminal, index) => {
           const row = {
             id: index,
-            terminal: terminal,
+            terminal: terminal.terminalName,
           };
 
-          let latestTimestamp = ""; // Store the latest timestamp for the terminal
+          let latestTimestamp = "";
+          let isCritical = false;
 
           await Promise.all(
-            scripts.map(async (script) => {
+            [...scripts, "BLK No"].map(async (script) => {
               try {
                 const response = await axios.get(
-                  `${apiKey}terminal/${encodeURIComponent(
-                    terminal
-                  )}/script/${encodeURIComponent(script)}/currentValue`
+                  `${apiKey}terminal/${terminal.terminalId}/script/${script}/currentValue`
                 );
 
-                const key = Object.keys(response.data)[0];
-                const scriptData = response.data[key];
+                const scriptData = response.data[script];
+                latestTimestamp = formatTimestamp(response.data.timestamp);
 
-                // Store the latest timestamp from the API response
-                if (scriptData && scriptData.timestamp) {
-                  latestTimestamp = formatTimestamp(scriptData.timestamp);
+                if (script === "BLK No") {
+                  setBlkNo(scriptData);
+                } else {
+                  row[script] =
+                    typeof scriptData === "number"
+                      ? scriptData.toFixed(2)
+                      : scriptData;
+                  if (
+                    script === "UI Percentage" &&
+                    parseFloat(row[script]) > 28
+                  ) {
+                    isCritical = true;
+                  }
                 }
 
-                // Rounding to 2 decimal places for the script value
-                row[script] = scriptData ? scriptData.value.toFixed(2) : "N/A";
+                // Set up Socket.IO for live updates
+                const socketKey = `${terminal.terminalId}/${script}`;
+                if (!socketRef.current[socketKey]) {
+                  socketRef.current[socketKey] = io(`${apiKey}${socketKey}`);
+                  socketRef.current[socketKey].on("valueUpdate", (data) => {
+                    setRows((prevRows) => {
+                      const updatedRows = [...prevRows];
+                      const rowIndex = updatedRows.findIndex(
+                        (r) => r.id === index
+                      );
+                      if (rowIndex !== -1) {
+                        updatedRows[rowIndex] = {
+                          ...updatedRows[rowIndex],
+                          [script]:
+                            typeof data[script] === "number"
+                              ? data[script].toFixed(2)
+                              : data[script],
+                          timestamp: formatTimestamp(data.timestamp),
+                        };
+                        if (
+                          script === "UI Percentage" &&
+                          parseFloat(data[script]) > 28
+                        ) {
+                          updatedRows[rowIndex].isCritical = true;
+                        }
+                      }
+                      return updatedRows;
+                    });
+                  });
+                }
               } catch (error) {
-                console.error(`Error fetching ${terminal}/${script}:`, error);
-                row[script] = "Error";
+                console.error(
+                  `Error fetching data for terminal ${terminal.terminalName} and script ${script}:`,
+                  error
+                );
               }
             })
           );
 
-          // Set the timestamp for the row
-          row.timestamp = latestTimestamp || "N/A"; // Add timestamp to row
+          row.timestamp = latestTimestamp || "N/A";
+          row.isCritical = isCritical;
 
           return row;
         })
@@ -146,101 +376,32 @@ const TableGrid = () => {
   };
 
   return (
-    <Card
-      style={{
-        borderRadius: "10px",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-        overflow: "hidden",
-        backgroundColor: "#f9f9f9",
-        marginTop: "20px",
-        display: "flex", // Use flexbox for Card
-        flexDirection: "column", // Stack children vertically
-        height: "100vh", // Full height
-      }}
-    >
-      <CardContent style={{ padding: "20px", flex: "1 1 auto" }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography
-            variant="h4"
-            style={{
-              marginBottom: "16px",
-              textAlign: "center",
-              color: "#333",
-            }}
-          >
-            Current Terminal Data
-          </Typography>
-          <IconButton
-            onClick={fetchGridData}
-            color="primary"
-            style={{ marginLeft: "10px", transition: "transform 0.2s" }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.transform = "scale(1.1)")
-            }
-            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-          >
-            <RefreshIcon />
-          </IconButton>
-        </Box>
-        <div style={{ flex: "1 1 auto", width: "100%" }}>
-          <DataGrid
+    <StyledCard>
+      <Box sx={{ position: "relative", padding: "20px" }}>
+        <CurrentDateTime variant="body2">{currentDateTime}</CurrentDateTime>
+        <StyledTypography variant="h4">
+          Generation Live Monitoring
+        </StyledTypography>
+        <BlkNoDisplay variant="body2">BLK No: {blkNo}</BlkNoDisplay>
+      </Box>
+      {loading ? (
+        <CircularProgress sx={{ margin: "auto" }} />
+      ) : (
+        <Box sx={{ height: "calc(100vh - 100px)", padding: "0 20px 20px" }}>
+          <StyledDataGrid
             rows={rows}
             columns={columns}
-            loading={loading}
+            pageSize={10}
+            rowsPerPageOptions={[10]}
             disableSelectionOnClick
             disableColumnMenu
-            hideFooterPagination={rows.length <= 5}
-            sx={{
-              height: "100%", // Full height
-              "& .MuiDataGrid-root": {
-                backgroundColor: "#fff", // Set DataGrid background color
-              },
-              "& .MuiDataGrid-cell": {
-                borderBottom: "1px solid #e0e0e0", // Cell border styling
-                fontSize: "1rem", // Font size for cell text
-                color: "#333", // Cell text color
-                fontFamily: "Arial, sans-serif", // Updated font family
-                fontWeight: 400, // Normal font weight
-              },
-              "& .MuiDataGrid-columnHeaders": {
-                backgroundColor: "#3f51b5", // Header background color
-                color: "#fff", // Header text color
-                fontFamily: "Arial, sans-serif", // Updated font family
-                fontWeight: 400, // Normal font weight
-              },
-              "& .MuiDataGrid-cell:hover": {
-                backgroundColor: "#e3f2fd", // Hover effect on cells
-              },
-              "& .MuiDataGrid-footerCell": {
-                borderTop: "2px solid #3f51b5", // Footer cell border
-              },
-              "& .MuiDataGrid-row:hover": {
-                backgroundColor: "#f5f5f5", // Row hover effect
-              },
-              "& .header-cell": {
-                textAlign: "center", // Center align header text
-              },
-            }}
-            components={{
-              NoRowsOverlay: () => (
-                <Box
-                  display="flex"
-                  justifyContent="center"
-                  alignItems="center"
-                  height="100%"
-                >
-                  {loading ? (
-                    <CircularProgress />
-                  ) : (
-                    <Typography>No data found</Typography>
-                  )}
-                </Box>
-              ),
-            }}
+            getRowClassName={(params) =>
+              params.row.isCritical ? "row-critical" : ""
+            }
           />
-        </div>
-      </CardContent>
-    </Card>
+        </Box>
+      )}
+    </StyledCard>
   );
 };
 

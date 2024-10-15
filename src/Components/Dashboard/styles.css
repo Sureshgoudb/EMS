@@ -1,0 +1,20 @@
+@keyframes blink {
+      50% {
+            opacity: 0.8;
+      }
+}
+
+.blinking-row {
+      background-color: #ffcccc !important;
+      animation: blink 1s step-start 0s infinite;
+}
+
+.light-red-cell {
+      background-color: #ffcccc !important;
+      color: #000;
+}
+
+.dark-red-cell {
+      background-color: #ff0000 !important;
+      color: #fff;
+}

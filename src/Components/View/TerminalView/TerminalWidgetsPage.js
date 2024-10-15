@@ -9,31 +9,55 @@ import { toast, ToastContainer } from "react-toastify";
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 const TerminalDetailView = () => {
-  const { terminalName } = useParams();
-  const [terminals, setTerminals] = useState({});
+  const { terminalID } = useParams();
+
+  const [widgets, setWidgets] = useState([]);
+  const [terminalName, setTerminalName] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const [draggingWidgetId, setDraggingWidgetId] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const fetchWidgetData = async (widgetId) => {
+    try {
+      const response = await axios.get(`${apiKey}terminal/widget/${widgetId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching data for widget ${widgetId}:`, error);
+      return null;
+    }
+  };
+
+  const fetchAllWidgets = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `${apiKey}terminal/widget/${terminalID}`
+      );
+      const data = response.data;
+      const [fetchedTerminalName] = Object.keys(data);
+      setTerminalName(fetchedTerminalName);
+
+      // Fetch data for each widget
+      const widgetsWithData = await Promise.all(
+        data[fetchedTerminalName].map(async (widget) => {
+          const widgetData = await fetchWidgetData(widget._id);
+          return { ...widget, data: widgetData };
+        })
+      );
+
+      setWidgets(widgetsWithData);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      toast.error("Failed to fetch terminal data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [terminalsResponse] = await Promise.all([
-          axios.get(apiKey + "terminalwidgets"),
-        ]);
-
-        // Load terminals from API
-        const fetchedTerminals = terminalsResponse.data;
-
-        setTerminals(fetchedTerminals);
-      } catch (err) {
-        console.error("Error fetching data:", err);
-      }
-    };
-
-    fetchData();
-  }, []);
+    fetchAllWidgets();
+  }, [terminalID]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -45,19 +69,19 @@ const TerminalDetailView = () => {
 
   const handleCreateWidget = async (widgetData) => {
     try {
-      const response = await axios.post(
-        apiKey + "terminal/createWidget",
-        widgetData
-      );
-      const newWidget = response.data;
-      setTerminals((prevTerminals) => {
-        const updatedTerminals = { ...prevTerminals };
-        if (!updatedTerminals[newWidget.terminalName]) {
-          updatedTerminals[newWidget.terminalName] = [];
-        }
-        updatedTerminals[newWidget.terminalName].push(newWidget);
-        return updatedTerminals;
+      const response = await axios.post(`${apiKey}terminal/createWidget`, {
+        ...widgetData,
+        terminalID,
       });
+      const newWidget = response.data;
+
+      // Fetch data for the new widget
+      const widgetWithData = await fetchWidgetData(newWidget._id);
+
+      setWidgets((prevWidgets) => [
+        ...prevWidgets,
+        { ...newWidget, data: widgetWithData },
+      ]);
       setShowForm(false);
       toast.success("Widget created successfully!");
     } catch (error) {
@@ -67,27 +91,29 @@ const TerminalDetailView = () => {
   };
 
   const handleResize = (widgetId, newSize) => {
-    const updatedTerminals = { ...terminals };
-    const widgets = updatedTerminals[terminalName];
-    const widgetIndex = widgets.findIndex((widget) => widget.id === widgetId);
-
-    if (widgetIndex !== -1) {
-      widgets[widgetIndex] = { ...widgets[widgetIndex], ...newSize };
-      setTerminals(updatedTerminals);
-    }
+    setWidgets((prevWidgets) =>
+      prevWidgets.map((widget) =>
+        widget._id === widgetId ? { ...widget, ...newSize } : widget
+      )
+    );
   };
 
   const handleDeleteWidget = async (widgetId) => {
     try {
-      const updatedTerminals = { ...terminals };
-      updatedTerminals[terminalName] = updatedTerminals[terminalName].filter(
-        (widget) => widget._id !== widgetId
+      // Optimistically update the UI by removing the widget immediately
+      setWidgets((prevWidgets) =>
+        prevWidgets.filter((widget) => widget._id !== widgetId)
       );
-      setTerminals(updatedTerminals);
+
+      await axios.delete(`${apiKey}terminal/deleteWidget/${widgetId}`);
+
       toast.success("Widget deleted successfully!");
     } catch (error) {
-      console.error("Error updating UI after widget deletion:", error);
-      toast.error("Error updating display after widget deletion");
+      console.error("Error deleting widget:", error);
+
+      fetchAllWidgets();
+
+      toast.error("Failed to delete widget");
     }
   };
 
@@ -95,33 +121,29 @@ const TerminalDetailView = () => {
     setDraggingWidgetId(widgetId);
   };
 
-  const handleDragEnd = (e) => {
+  const handleDragEnd = () => {
     setDraggingWidgetId(null);
   };
 
   const handleDrop = (droppedWidgetId) => {
-    const widgetList = terminals[terminalName];
-    const draggingWidgetIndex = widgetList.findIndex(
+    const draggingWidgetIndex = widgets.findIndex(
       (widget) => widget._id === draggingWidgetId
     );
-    const droppedWidgetIndex = widgetList.findIndex(
+    const droppedWidgetIndex = widgets.findIndex(
       (widget) => widget._id === droppedWidgetId
     );
 
     if (draggingWidgetIndex !== -1 && droppedWidgetIndex !== -1) {
-      const updatedWidgets = [...widgetList];
+      const updatedWidgets = [...widgets];
       const [draggedWidget] = updatedWidgets.splice(draggingWidgetIndex, 1);
       updatedWidgets.splice(droppedWidgetIndex, 0, draggedWidget);
-
-      setTerminals((prevTerminals) => {
-        const newTerminals = {
-          ...prevTerminals,
-          [terminalName]: updatedWidgets,
-        };
-        return newTerminals;
-      });
+      setWidgets(updatedWidgets);
     }
   };
+
+  if (loading) {
+    return <Typography variant="h6">Loading...</Typography>;
+  }
 
   return (
     <Box sx={{ flexGrow: 1, padding: 1 }}>
@@ -172,17 +194,18 @@ const TerminalDetailView = () => {
       ) : (
         <>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-            {terminals[terminalName]?.map((widget) => (
+            {widgets.map((widgetData) => (
               <Widget
-                key={widget._id}
-                widgetData={widget}
+                key={widgetData._id}
+                widgetData={widgetData}
+                terminalName={terminalName}
                 onResize={handleResize}
                 onDelete={handleDeleteWidget}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onDrop={handleDrop}
                 className="widget"
-                data-id={widget._id}
+                data-id={widgetData._id}
               />
             ))}
           </Box>

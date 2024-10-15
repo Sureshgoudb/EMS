@@ -84,7 +84,7 @@ const HistoricalDataView = () => {
 
   const handleDeleteTable = async () => {
     try {
-      await axios.delete(`${apiKey}terminal/table/${tableToDelete}`);
+      await axios.delete(`${apiKey}terminal/table/delete/${tableToDelete}`);
 
       fetchTables();
       toast.success("Table deleted successfully");
@@ -165,10 +165,11 @@ const HistoricalDataView = () => {
                   <Typography variant="h6" sx={{ color: "#333", mb: 1 }}>
                     {table.name}
                   </Typography>
-                  {/* <Typography variant="body2" sx={{ color: "#666" }}>
+
+                  <Typography variant="body2" sx={{ color: "#666" }}>
                     <span style={{ fontWeight: "bold" }}>Profile:</span>{" "}
                     {table.profile}
-                  </Typography> */}
+                  </Typography>
 
                   <Box>
                     <Tooltip title="Delete Table">

@@ -34,10 +34,13 @@ const FormatDialog = ({
   onClose,
   currentStyles,
   setCurrentStyles,
-  widgetId,
+  terminalID,
+  scriptName,
+  isNewWidget,
   onStylesUpdate,
 }) => {
   const [styles, setStyles] = useState(currentStyles);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     setStyles(currentStyles);
@@ -62,27 +65,36 @@ const FormatDialog = ({
 
   const handleApply = async () => {
     try {
-      const response = await axios.put(
-        `${apiKey}terminal/updateWidgetProperties/${widgetId}`,
-        {
-          fontFamily: styles.fontFamily,
-          fontSize: styles.fontSize,
-          fontColor: styles.fontColor,
-          backgroundColor: styles.backgroundColor,
-          fontStyle: styles.fontStyle,
-          fontWeight: styles.fontWeight,
-        }
-      );
-
-      if (response.status === 200) {
+      setError(null);
+      if (isNewWidget) {
         setCurrentStyles(styles);
         onStylesUpdate(styles);
-        onClose();
       } else {
-        console.error("Failed to update widget properties");
+        const payload = {
+          terminalID,
+          scriptName,
+          properties: {
+            ...styles,
+            backgroundColor: styles.backgroundColor || "#FFFFFF",
+          },
+        };
+
+        const response = await axios.put(
+          `${apiKey}terminal/widget/configure`,
+          payload
+        );
+
+        if (response.status === 200) {
+          setCurrentStyles(styles);
+          onStylesUpdate(styles);
+        } else {
+          throw new Error("Failed to update widget properties");
+        }
       }
+      onClose();
     } catch (error) {
       console.error("Error updating widget properties:", error);
+      setError("Failed to update widget properties. Please try again.");
     }
   };
 
@@ -125,10 +137,10 @@ const FormatDialog = ({
             <StyledFormControl fullWidth>
               <InputLabel>Font Family</InputLabel>
               <Select
-                name="fontFamily "
+                name="fontFamily"
                 value={styles.fontFamily || ""}
                 onChange={handleChange}
-                label=" Font Family "
+                label="Font Family"
                 sx={{
                   backgroundColor: "#ffffff",
                   borderRadius: "8px",
@@ -169,7 +181,7 @@ const FormatDialog = ({
                   InputProps={{
                     endAdornment: <Typography variant="body1">px</Typography>,
                   }}
-                  label="font Size"
+                  label="Font Size"
                   sx={{
                     backgroundColor: "#ffffff",
                     borderRadius: "8px",
@@ -184,7 +196,6 @@ const FormatDialog = ({
                     ml: "5px",
                     mr: "5px",
                     borderRadius: "8px",
-
                     "&:hover": {
                       backgroundColor: "#e0e0e0",
                     },
@@ -278,6 +289,11 @@ const FormatDialog = ({
             />
           </Grid>
         </Grid>
+        {error && (
+          <Typography color="error" sx={{ mt: 2 }}>
+            {error}
+          </Typography>
+        )}
       </DialogContent>
       <DialogActions
         sx={{

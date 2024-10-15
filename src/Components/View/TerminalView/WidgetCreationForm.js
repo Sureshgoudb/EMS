@@ -80,64 +80,100 @@ const StyledFormControl = styled(FormControl)(({ theme }) => ({
 const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
   const [scriptName, setScriptName] = useState("");
   const [terminalName, setTerminalName] = useState(presetTerminal || "");
+  const [terminalId, setTerminalId] = useState("");
   const [areaGraph, setAreaGraph] = useState(false);
-  const [properties, setProperties] = useState("");
+  const [properties, setProperties] = useState({
+    fontFamily: "Arial",
+    fontSize: "20px",
+    fontColor: "#000000",
+    backgroundColor: "#ffffff",
+    fontStyle: "normal",
+    fontWeight: "normal",
+  });
   const [openFormatDialog, setOpenFormatDialog] = useState(false);
-  const [fontFamily, setFontFamily] = useState("Arial");
-  const [fontSize, setFontSize] = useState("14px");
-  const [fontColor, setFontColor] = useState("#000000");
-  const [backgroundColor, setBackgroundColor] = useState("#ffffff");
-  const [fontStyle, setFontStyle] = useState("normal");
   const [terminals, setTerminals] = useState([]);
-  const [scripts, setScripts] = useState([]);
+  const [scripts, setScripts] = useState({});
   const [scriptError, setScriptError] = useState(false);
   const [decimalPlaces, setDecimalPlaces] = useState(2);
   const [graphType, setGraphType] = useState("simple");
   const [xAxisType, setXAxisType] = useState("records");
-  const [xAxisValue, setXAxisValue] = useState(90);
+  const [xAxisValue, setXAxisValue] = useState(100);
   const [refreshInterval, setRefreshInterval] = useState(60);
 
-  // ---------- Fetch terminals ----------
+  // Fetch terminals
   useEffect(() => {
     const fetchTerminals = async () => {
       try {
-        const response = await axios.get(apiKey + "terminal/list");
+        const response = await axios.get(`${apiKey}terminal/list`);
         setTerminals(response.data);
+
+        // If there's a presetTerminal, find its ID and set it
+        if (presetTerminal) {
+          const preset = response.data.find(
+            (t) => t.terminalName === presetTerminal
+          );
+          if (preset) {
+            setTerminalId(preset.terminalId);
+          }
+        }
       } catch (error) {
         console.error("Error fetching terminals:", error);
+        toast.error("Failed to fetch terminals");
       }
     };
     fetchTerminals();
-  }, []);
+  }, [presetTerminal]);
 
-  // ---------- Fetch scripts ----------
+  // Fetch scripts
   useEffect(() => {
     const fetchScripts = async () => {
-      if (terminalName) {
+      if (terminalId) {
         try {
           const response = await axios.get(
-            apiKey + `terminal/${terminalName}/scripts`
+            `${apiKey}terminal/${terminalId}/scripts`
           );
-
-          setScripts(response.data);
+          setScripts(response.data.scripts);
           setScriptError(false);
         } catch (error) {
           console.error("Error fetching scripts:", error);
+          toast.error("Failed to fetch scripts");
         }
       } else {
-        setScripts([]);
+        setScripts({});
       }
     };
     fetchScripts();
-  }, [terminalName]);
+  }, [terminalId]);
 
-  // ---------- Handle decimal places change ----------
-  const handleDecimalPlacesChange = (event) => {
-    const value = parseInt(event.target.value);
-    setDecimalPlaces(value >= 0 ? value : 0);
+  // Handle terminal selection
+  const handleTerminalSelection = (event) => {
+    const selectedTerminal = terminals.find(
+      (t) => t.terminalName === event.target.value
+    );
+    if (selectedTerminal) {
+      setTerminalName(selectedTerminal.terminalName);
+      setTerminalId(selectedTerminal.terminalId);
+    } else {
+      setTerminalName("");
+      setTerminalId("");
+    }
+    setScriptName("");
+    console.log("Selected Terminal ID:", selectedTerminal.terminalId);
   };
 
-  // ---------- Handle create widget ----------
+  const handleOpenFormatDialog = () => {
+    setOpenFormatDialog(true);
+  };
+
+  const handleCloseFormatDialog = () => {
+    setOpenFormatDialog(false);
+  };
+
+  const handleApplyFormat = (newFormat) => {
+    setProperties(newFormat);
+    handleCloseFormatDialog();
+  };
+
   const handleCreate = () => {
     if (!terminalName) {
       toast.error("Please select a terminal.");
@@ -149,49 +185,27 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
     }
 
     const widgetData = {
-      scriptName,
-      terminalName,
-      areaGraph,
-      properties,
-      fontFamily,
-      fontSize,
-      fontColor,
-      backgroundColor,
-      fontStyle,
-      decimalPlaces,
+      terminal: {
+        terminalID: terminalId,
+        terminalName,
+      },
+      scripts: [
+        {
+          scriptName,
+          areaGraph,
+          properties,
+          decimalPlaces,
+          graphType,
+          xAxisConfiguration: {
+            type: xAxisType,
+            value: xAxisValue,
+          },
+          refreshInterval,
+        },
+      ],
     };
 
-    if (areaGraph) {
-      if (!graphType) {
-        toast.error("Please select a graph type.");
-        return;
-      }
-
-      widgetData.graphType = graphType;
-      widgetData.xAxisConfiguration = {
-        type: xAxisType,
-        value: xAxisValue,
-      };
-      widgetData.refreshInterval = refreshInterval;
-    }
-
     onCreate(widgetData);
-  };
-  const handleOpenFormatDialog = () => {
-    setOpenFormatDialog(true);
-  };
-
-  const handleCloseFormatDialog = () => {
-    setOpenFormatDialog(false);
-  };
-
-  const handleApplyFormat = (newFormat) => {
-    setFontFamily(newFormat.fontFamily);
-    setFontSize(newFormat.fontSize);
-    setFontColor(newFormat.fontColor);
-    setBackgroundColor(newFormat.backgroundColor);
-    setFontStyle(newFormat.fontStyle);
-    handleCloseFormatDialog();
   };
 
   const handleScriptSelection = (e) => {
@@ -223,12 +237,12 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
               }}
               value={terminalName}
-              onChange={(e) => setTerminalName(e.target.value)}
+              onChange={handleTerminalSelection}
               disabled={!!presetTerminal}
             >
               {terminals.map((terminal, index) => (
-                <MenuItem key={index} value={terminal}>
-                  {terminal}
+                <MenuItem key={index} value={terminal.terminalName}>
+                  {terminal.terminalName}
                 </MenuItem>
               ))}
             </Select>
@@ -244,9 +258,8 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
               }}
               value={scriptName}
               onChange={handleScriptSelection}
-              disabled={!terminalName}
             >
-              {scripts.map((script, index) => (
+              {Object.keys(scripts).map((script, index) => (
                 <MenuItem key={index} value={script}>
                   {script}
                 </MenuItem>
@@ -263,7 +276,9 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
               label="Decimal Places"
               type="number"
               value={decimalPlaces}
-              onChange={handleDecimalPlacesChange}
+              onChange={(e) =>
+                setDecimalPlaces(Math.max(0, parseInt(e.target.value) || 0))
+              }
               inputProps={{ min: 0 }}
               helperText={`Displayed value: ${(123.456789).toFixed(
                 decimalPlaces
@@ -349,61 +364,52 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
                 }
                 type="number"
                 value={xAxisValue}
-                onChange={(e) => setXAxisValue(parseInt(e.target.value))}
+                onChange={(e) =>
+                  setXAxisValue(Math.max(1, parseInt(e.target.value)))
+                }
                 inputProps={{ min: 1 }}
               />
 
               <TextField
-                label="Reset Interval (seconds)"
+                label="Refresh Interval (seconds)"
                 type="number"
                 value={refreshInterval}
-                onChange={(e) => setRefreshInterval(parseInt(e.target.value))}
+                onChange={(e) =>
+                  setRefreshInterval(Math.max(1, parseInt(e.target.value)))
+                }
                 inputProps={{ min: 1 }}
               />
             </>
           )}
         </Box>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            mt: 4,
-            gap: 2,
-          }}
-        >
-          <Button
-            variant="outlined"
-            onClick={handleOpenFormatDialog}
-            sx={{ flexGrow: 1 }}
-          >
-            Format Widget
+        <Box sx={{ display: "flex", justifyContent: "space-between", mt: 4 }}>
+          <Button variant="contained" color="primary" onClick={handleCreate}>
+            Create Widget
+          </Button>
+          <Button variant="outlined" onClick={onCancel}>
+            Cancel
           </Button>
           <Button
             variant="contained"
-            color="primary"
-            onClick={handleCreate}
-            sx={{ flexGrow: 1 }}
+            color="secondary"
+            onClick={handleOpenFormatDialog}
+            sx={{ alignSelf: "flex-start" }}
           >
-            Create
-          </Button>
-          <Button variant="outlined" onClick={onCancel} sx={{ flexGrow: 1 }}>
-            Cancel
+            Set Text Format
           </Button>
         </Box>
-        <ToastContainer />
-        <FormatDialog
-          open={openFormatDialog}
-          onClose={handleCloseFormatDialog}
-          onApply={handleApplyFormat}
-          currentStyles={{
-            fontFamily,
-            fontSize,
-            fontColor,
-            backgroundColor,
-            fontStyle,
-          }}
-        />
       </Paper>
+      <FormatDialog
+        open={openFormatDialog}
+        onClose={handleCloseFormatDialog}
+        currentStyles={properties}
+        setCurrentStyles={setProperties}
+        terminalID={terminalId}
+        scriptName={scriptName}
+        isNewWidget={true}
+        onStylesUpdate={handleApplyFormat}
+      />
+      <ToastContainer />
     </ThemeProvider>
   );
 };

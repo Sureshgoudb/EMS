@@ -54,7 +54,7 @@ function Header() {
         memoizedUser.user_Type === "Admin" ||
         memoizedUser.user_Type === "Super User"
       ) {
-        links.push({ id: 1, name: "Dashboard", to: "/dashboard" });
+        links.push({ id: 1, name: "SLDC View", to: "/sldcview" });
         links.push({
           id: 2,
           name: "Device View",
@@ -71,7 +71,7 @@ function Header() {
         links.push({ id: 10, name: "Profile", to: "/profile" });
         links.push({ id: 11, name: "Logout", to: "/" });
       } else if (memoizedUser.user_Type === "User") {
-        links.push({ id: 1, name: "Dashboard", to: "/dashboard" });
+        links.push({ id: 1, name: "SLDC View", to: "/sldcview" });
         links.push({ id: 2, name: "Profile", to: "/profile" });
         links.push({ id: 3, name: "Logout", to: "/" });
       }
@@ -143,7 +143,7 @@ function Header() {
       >
         <Toolbar style={{ paddingLeft: 0, paddingRight: 0 }}>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            <Link to={"/dashboard"}>
+            <Link to={"/sldcview"}>
               <img width={180} height={100} src={eslogo} alt="Logo" />
             </Link>
           </Typography>

@@ -44,7 +44,7 @@ import BarChartIcon from "@mui/icons-material/BarChart";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import TableColumnCreate from "./TableColumnCreate";
-
+import EnhancedGraph from "./EnhancedGraph";
 import {
   AreaChart,
   Area,
@@ -133,21 +133,19 @@ const DataTable = () => {
   const [columns, setColumns] = useState([
     { id: "timestamp", label: "Timestamp" },
   ]);
-  const [selectedTerminal, setSelectedTerminal] = useState("");
+  const [selectedTerminal, setSelectedTerminal] = useState([]);
   const [selectedScript, setSelectedScript] = useState("");
-  const [terminals, setTerminals] = useState([]);
   const [visibleRows, setVisibleRows] = useState([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const tableRef = useRef(null);
   const [scripts, setScripts] = useState([]);
-  const [page, setPage] = useState(0);
   const { tableId } = useParams();
   const [sortedRows, setSortedRows] = useState([]);
   const [selectedScripts, setSelectedScripts] = useState([]);
   const [tableName, setTableName] = useState("");
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [fromDate, setFromDate] = useState(dayjs().startOf("year"));
+  const [fromDate, setFromDate] = useState(dayjs().startOf("day"));
   const [toDate, setToDate] = useState(dayjs().endOf("day"));
   const [openGraph, setOpenGraph] = useState(false);
   const [graphData, setGraphData] = useState([]);
@@ -167,22 +165,57 @@ const DataTable = () => {
     { value: "block", label: "Block" },
     { value: "daily", label: "Daily" },
   ]);
-  useEffect(() => {
-    fetchTerminals();
-  }, []);
 
   useEffect(() => {
     if (selectedTerminal) {
       fetchScripts(selectedTerminal);
     }
   }, [selectedTerminal]);
-
+  useEffect(() => {
+    if (selectedTerminal && selectedProfile) {
+      fetchScripts(selectedTerminal);
+    }
+  }, [selectedTerminal, selectedProfile]);
   useEffect(() => {
     if (tableInfo) {
-      fetchInitialData();
+      fetchScriptData();
     }
   }, [tableInfo]);
 
+  // Function to set default dates based on profile
+  const setDefaultDates = (profile) => {
+    let newFromDate;
+    const newToDate = dayjs().endOf("day");
+
+    switch (profile) {
+      case "trend":
+      case "block":
+        newFromDate = dayjs().startOf("day");
+        break;
+      case "daily":
+        newFromDate = dayjs().startOf("month");
+        break;
+      default:
+        newFromDate = dayjs().startOf("day");
+    }
+
+    setFromDate(newFromDate);
+    setToDate(newToDate);
+  };
+
+  useEffect(() => {
+    if (selectedProfile) {
+      setDefaultDates(selectedProfile);
+      if (selectedTerminal && selectedScripts.length > 0) {
+        fetchScriptData();
+      }
+    }
+  }, [selectedProfile, selectedTerminal, selectedScripts]);
+  useEffect(() => {
+    if (selectedTerminal && selectedScripts.length > 0 && selectedProfile) {
+      fetchScriptData();
+    }
+  }, [selectedTerminal, selectedScripts, selectedProfile, fromDate, toDate]);
   useEffect(() => {
     if (selectedTerminal && selectedScript) {
       const newColumn = {
@@ -195,29 +228,15 @@ const DataTable = () => {
         }
         return prevColumns;
       });
-      fetchInitialData();
+      fetchScriptData();
     }
   }, [selectedScript]);
-
-  useEffect(() => {
-    filterData();
-  }, [rows, fromDate, toDate]);
-
-  // ---------- Fetch terminals ----------
-  const fetchTerminals = async () => {
-    try {
-      const response = await axios.get(`${apiKey}terminal/list`);
-      setTerminals(response.data);
-    } catch (error) {
-      console.error("Error fetching terminals:", error);
-    }
-  };
 
   // ---------- Fetch scripts ----------
   const fetchScripts = async (terminalId) => {
     try {
       const response = await axios.get(
-        `${apiKey}terminal/${terminalId}/scripts`
+        `${apiKey}variables/${selectedProfile}/${terminalId}`
       );
       setScripts(response.data);
     } catch (error) {
@@ -227,144 +246,15 @@ const DataTable = () => {
 
   useEffect(() => {
     if (selectedTerminal && selectedScripts.length > 0) {
-      fetchInitialData();
+      fetchScriptData();
     }
   }, [selectedTerminal, selectedScripts]);
   // ---------- Fetch hdnuts data ----------
   useEffect(() => {
     if (selectedTerminal && selectedScripts.length > 0) {
-      fetchInitialData();
+      fetchScriptData();
     }
   }, [selectedTerminal, selectedScripts]);
-
-  const fetchInitialData = async (scriptsToFetch = selectedScripts) => {
-    setLoading(true);
-    try {
-      if (scriptsToFetch.length === 0) {
-        setRows([]);
-        setFilteredRows([]);
-        setSortedRows([]);
-        setVisibleRows([]);
-        setLoading(false);
-        return;
-      }
-
-      const promises = scriptsToFetch.map((script) =>
-        axios.get(
-          `${apiKey}terminal/${selectedTerminal}/script/${script}/history`
-        )
-      );
-      const responses = await Promise.all(promises);
-
-      const newRows = {};
-      responses.forEach((response, index) => {
-        const script = scriptsToFetch[index];
-        response.data.forEach((item) => {
-          const timestamp = item[script].timestamp;
-          const value = parseFloat(item[script].value);
-
-          if (!newRows[timestamp]) {
-            newRows[timestamp] = { timestamp };
-          }
-          newRows[timestamp][script] = value;
-        });
-      });
-
-      const sortedRows = Object.values(newRows).sort(
-        (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-      );
-
-      setRows(sortedRows);
-      setFilteredRows(sortedRows);
-      setSortedRows(sortedRows);
-      setVisibleRows(sortedRows.slice(0, 50));
-    } catch (error) {
-      console.error("Error fetching initial data:", error);
-      toast.error("Failed to fetch initial data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ------------- Create new column ----------
-  const handleCreateColumn = async (terminal, script, profile) => {
-    setSelectedTerminal(terminal);
-    setSelectedScripts((prevScripts) => [...prevScripts, script]);
-
-    setColumns((prevColumns) => [
-      ...prevColumns,
-      { id: script, label: script },
-    ]);
-
-    setSelectedProfile(profile);
-
-    try {
-      const response = await axios.get(
-        `${apiKey}terminal/${terminal}/script/${script}/history`
-      );
-      const newData = response.data;
-
-      setRows((prevRows) => {
-        const updatedRows = [...prevRows];
-        newData.forEach((item) => {
-          const timestamp = item[script].timestamp;
-          const value = item[script].value;
-          const existingRow = updatedRows.find(
-            (row) => row.timestamp === timestamp
-          );
-          if (existingRow) {
-            existingRow[script] = value;
-          } else {
-            updatedRows.push({ timestamp, [script]: value });
-          }
-        });
-        return updatedRows.sort(
-          (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-        );
-      });
-
-      setFilteredRows((prevFilteredRows) => {
-        const updatedRows = [...prevFilteredRows];
-        newData.forEach((item) => {
-          const timestamp = item[script].timestamp;
-          const value = item[script].value;
-          const existingRow = updatedRows.find(
-            (row) => row.timestamp === timestamp
-          );
-          if (existingRow) {
-            existingRow[script] = value;
-          } else {
-            updatedRows.push({ timestamp, [script]: value });
-          }
-        });
-        return updatedRows.sort(
-          (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-        );
-      });
-
-      setSortedRows((prevSortedRows) => {
-        const updatedRows = [...prevSortedRows];
-        newData.forEach((item) => {
-          const timestamp = item[script].timestamp;
-          const value = item[script].value;
-          const existingRow = updatedRows.find(
-            (row) => row.timestamp === timestamp
-          );
-          if (existingRow) {
-            existingRow[script] = value;
-          } else {
-            updatedRows.push({ timestamp, [script]: value });
-          }
-        });
-        return updatedRows.sort(
-          (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-        );
-      });
-    } catch (error) {
-      console.error("Error fetching data for new column:", error);
-      toast.error("Failed to fetch data for the new column");
-    }
-  };
 
   // ---------- Save table ----------
   const handleSaveTable = () => {
@@ -378,6 +268,7 @@ const DataTable = () => {
         name: tableName,
         terminal: selectedTerminal,
         columns: columns.map((col) => col.id),
+        profile: selectedProfile,
       };
 
       let response;
@@ -395,7 +286,6 @@ const DataTable = () => {
       }
       setSaveDialogOpen(false);
 
-      //------------ Update tableInfo with the latest data -------------
       setTableInfo(response.data);
     } catch (error) {
       console.error("Error saving/updating table:", error);
@@ -414,8 +304,7 @@ const DataTable = () => {
       const response = await axios.get(`${apiKey}terminal/table/${tableId}`);
       setTableInfo(response.data);
       setTableName(response.data.name);
-      // setSelectedProfile(response.data.profile);
-
+      setSelectedProfile(response.data.profile);
       setSelectedTerminal(response.data.terminal);
       setSelectedScripts(
         response.data.columns.filter((col) => col !== "timestamp")
@@ -423,11 +312,22 @@ const DataTable = () => {
       setColumns(response.data.columns.map((col) => ({ id: col, label: col })));
     } catch (error) {
       console.error("Error fetching table info:", error);
+    } finally {
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (tableInfo && selectedTerminal && selectedProfile) {
+      fetchScripts(selectedTerminal);
+      selectedScripts.forEach((script) => fetchScriptData(script));
+    }
+  }, [tableInfo, selectedTerminal, selectedProfile]);
+
   useEffect(() => {
     if (tableInfo) {
       setSelectedTerminal(tableInfo.terminal);
+      console.log("fsfsgsg", tableInfo.terminal);
       setSelectedScripts(
         tableInfo.columns.filter((col) => col !== "timestamp")
       );
@@ -437,49 +337,10 @@ const DataTable = () => {
           .filter((col) => col !== "timestamp")
           .map((col) => ({ id: col, label: col })),
       ]);
-      fetchInitialData();
+      fetchScriptData();
     }
   }, [tableInfo]);
 
-  const filterData = () => {
-    let filteredData = rows;
-
-    if (selectedProfile) {
-      const now = dayjs();
-      let startDate;
-
-      switch (selectedProfile) {
-        case "trend":
-        case "1min":
-        case "1hr":
-        case "shift":
-          startDate = now.startOf("day");
-          break;
-        case "daily":
-        case "weekly":
-        case "monthly":
-        case "yearly":
-          startDate = now.startOf("month");
-          break;
-        default:
-          startDate = now.startOf("day");
-      }
-
-      filteredData = filteredData.filter((row) => {
-        const rowDate = dayjs(row.timestamp);
-        return rowDate.isAfter(startDate) && rowDate.isBefore(now);
-      });
-    }
-
-    // Apply date range filtering
-    filteredData = filteredData.filter((row) => {
-      const rowDate = dayjs(row.timestamp);
-      return rowDate.isAfter(fromDate) && rowDate.isBefore(toDate);
-    });
-
-    setFilteredRows(filteredData);
-    setPage(0);
-  };
   const handleGraphIconClick = (script) => {
     setSelectedGraphScripts([script]);
     updateGraphData([script]);
@@ -576,27 +437,48 @@ const DataTable = () => {
 
   // ---------- Function to calculate the difference between two values ----------
   const calculateDifference = (currentValue, previousValue) => {
-    if (previousValue === null || currentValue === null)
+    if (
+      currentValue === undefined ||
+      previousValue === undefined ||
+      currentValue === null ||
+      previousValue === null
+    ) {
       return { value: null, percentage: null };
-    if (previousValue === 0) {
-      // Handle division by zero error
-      return { value: currentValue, percentage: null };
     }
-    const valueDiff = currentValue - previousValue;
-    const percentageDiff = (valueDiff / previousValue) * 100;
-    return { value: valueDiff, percentage: percentageDiff };
-  };
 
+    // Round the values to two decimal places, as displayed in the UI
+    const roundedCurrent = Number(Number(currentValue).toFixed(2));
+    const roundedPrevious = Number(Number(previousValue).toFixed(2));
+
+    if (isNaN(roundedCurrent) || isNaN(roundedPrevious)) {
+      return { value: null, percentage: null };
+    }
+
+    const valueDiff = roundedCurrent - roundedPrevious;
+
+    // Check if the difference is zero or very close to zero
+    if (Math.abs(valueDiff) < 0.005) {
+      return { value: 0, percentage: 0 };
+    }
+
+    let percentageDiff = 0;
+    if (roundedPrevious !== 0) {
+      percentageDiff = (valueDiff / roundedPrevious) * 100;
+    } else if (roundedCurrent !== 0) {
+      // If previous value is 0 and current is not, percentage change is essentially infinite
+      // We'll represent this as 100% or -100% based on the sign of the current value
+      percentageDiff = roundedCurrent > 0 ? 100 : -100;
+    }
+
+    return {
+      value: Number(valueDiff.toFixed(2)),
+      percentage: Number(percentageDiff.toFixed(2)),
+    };
+  };
   const formatDifference = (difference, showPercentage) => {
     if (difference.value === null) return "-";
-    // if (difference.value === 0 || difference.value === -0.0) {
-    //   // Return a plain "0" without the arrow icon
-    //   return (
-    //     <Typography variant="body2" component="span">
-    //       0
-    //     </Typography>
-    //   );
-    // }
+    if (difference.value === 0) return "0"; // Return plain "0" for zero difference
+
     const isPositive = difference.value > 0;
     const ArrowIcon = isPositive ? ArrowUpwardIcon : ArrowDownwardIcon;
     const formattedValue = showPercentage
@@ -617,7 +499,6 @@ const DataTable = () => {
       </Tooltip>
     );
   };
-
   const handleTogglePercentage = (columnId) => {
     setShowPercentage((prev) => ({
       ...prev,
@@ -629,7 +510,12 @@ const DataTable = () => {
   const calculateInsights = (data, columnId) => {
     const values = data
       .map((row) => parseFloat(row[columnId]))
-      .filter((v) => !isNaN(v));
+      .filter((v) => !isNaN(v) && v !== null && v !== undefined);
+
+    if (values.length === 0) {
+      return { max: "-", min: "-", avg: "-" };
+    }
+
     return {
       max: Math.max(...values),
       min: Math.min(...values),
@@ -654,6 +540,7 @@ const DataTable = () => {
 
     if (terminalParam && scriptParam) {
       setSelectedTerminal(terminalParam);
+      console.log("param", terminalParam);
       setSelectedScript(scriptParam);
     }
   }, [location]);
@@ -663,8 +550,12 @@ const DataTable = () => {
   };
 
   const handleGoBack = () => {
-    navigate("/view/terminal");
+    navigate("/view/terminal", {
+      state: { activeTab: "Historical Data Display" },
+    });
   };
+
+  const [scriptData, setScriptData] = useState({});
 
   const handleScriptChange = (event) => {
     const {
@@ -673,17 +564,34 @@ const DataTable = () => {
     const newSelectedScripts =
       typeof value === "string" ? value.split(",") : value;
 
-    // Check if the new selection is a subset of the previous selection
-    if (newSelectedScripts.length < selectedScripts.length) {
-      const removedScripts = selectedScripts.filter(
-        (script) => !newSelectedScripts.includes(script)
-      );
-      removedScripts.forEach((script) => {
-        toast.info(`Script ${script} has been removed from the table.`);
+    // Check for removed scripts
+    const removedScripts = selectedScripts.filter(
+      (script) => !newSelectedScripts.includes(script)
+    );
+
+    // Check for added scripts
+    const addedScripts = newSelectedScripts.filter(
+      (script) => !selectedScripts.includes(script)
+    );
+
+    setSelectedScripts(newSelectedScripts);
+
+    // Remove data for unselected scripts
+    if (removedScripts.length > 0) {
+      setScriptData((prevData) => {
+        const newData = { ...prevData };
+        removedScripts.forEach((script) => {
+          delete newData[script];
+          toast.info(`Script ${script} has been removed from the table.`);
+        });
+        return newData;
       });
     }
 
-    setSelectedScripts(newSelectedScripts);
+    // Fetch data for newly added scripts
+    addedScripts.forEach((script) => {
+      fetchScriptData(script);
+    });
   };
 
   useEffect(() => {
@@ -719,70 +627,99 @@ const DataTable = () => {
   const [loadingScriptData, setLoadingScriptData] = useState(false);
 
   const fetchScriptData = async (script) => {
-    setLoadingScriptData(true);
+    if (!selectedTerminal || !selectedProfile) {
+      console.error("Missing required parameters for fetchScriptData");
+      return;
+    }
+
     try {
       const response = await axios.get(
-        `${apiKey}terminal/${selectedTerminal}/script/${script}/history`
+        `${apiKey}terminal/${selectedTerminal}/script/${script}/history/${selectedProfile}`
       );
-      const newData = response.data;
 
-      if (!Array.isArray(newData) || newData.length === 0) {
+      const scriptData = response.data;
+
+      if (!Array.isArray(scriptData) || scriptData.length === 0) {
         toast.warning(`No data available for script: ${script}`);
-        setLoadingScriptData(false);
         return;
       }
 
-      const updateRowsLogic = (prevRows) => {
-        const updatedRows = [...prevRows];
-        newData.forEach((item) => {
-          if (item && item[script]) {
-            const timestamp = item[script].timestamp;
-            const value = parseFloat(item[script].value);
-            if (timestamp && !isNaN(value)) {
-              const existingRowIndex = updatedRows.findIndex(
-                (row) => row.timestamp === timestamp
-              );
-              if (existingRowIndex !== -1) {
-                updatedRows[existingRowIndex] = {
-                  ...updatedRows[existingRowIndex],
-                  [script]: value,
-                };
-              } else {
-                updatedRows.push({ timestamp, [script]: value });
+      const newData = scriptData.reduce((acc, item) => {
+        if (item && item[script]) {
+          const timestamp = item[script].timestamp;
+          const value = parseFloat(item[script].value);
+          if (timestamp && !isNaN(value)) {
+            const rowDate = dayjs(timestamp);
+            if (rowDate.isAfter(fromDate) && rowDate.isBefore(toDate)) {
+              if (!acc[timestamp]) {
+                acc[timestamp] = { timestamp };
               }
+              acc[timestamp][script] = value;
             }
           }
-        });
-        return updatedRows.sort(
-          (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-        );
-      };
+        }
+        return acc;
+      }, {});
 
-      setRows(updateRowsLogic);
-      setFilteredRows(updateRowsLogic);
-      setSortedRows(updateRowsLogic);
-      setFilteredRows((prevFilteredRows) => {
-        return prevFilteredRows.filter((row) => {
-          const rowDate = dayjs(row.timestamp);
-          return rowDate.isAfter(fromDate) && rowDate.isBefore(toDate);
-        });
-      });
-
-      setSortedRows((prevSortedRows) => {
-        const newSortedRows = [...prevSortedRows];
-        setVisibleRows(newSortedRows.slice(0, 50));
-        setHasMore(newSortedRows.length > 50);
-        return newSortedRows;
-      });
-
-      toast.success(`Data for ${script} loaded successfully`);
+      setScriptData((prevData) => ({
+        ...prevData,
+        [script]: newData,
+      }));
     } catch (error) {
-      console.error("Error fetching data for new script:", error);
-      toast.error(`Failed to fetch data for the script: ${script}`);
-    } finally {
-      setLoadingScriptData(false);
+      console.error(`Error fetching data for script ${script}:`, error);
     }
   };
+
+  // When fetching data for multiple scripts
+  useEffect(() => {
+    const fetchAllScriptData = async () => {
+      const fetchPromises = selectedScripts.map((script) =>
+        fetchScriptData(script)
+      );
+      await Promise.all(fetchPromises);
+    };
+
+    fetchAllScriptData();
+  }, [selectedScripts, selectedTerminal, selectedProfile, fromDate, toDate]);
+  useEffect(() => {
+    // Merge data from all scripts
+    const mergedData = Object.values(scriptData).reduce((acc, scriptRows) => {
+      Object.entries(scriptRows).forEach(([timestamp, rowData]) => {
+        if (!acc[timestamp]) {
+          acc[timestamp] = { timestamp };
+        }
+        Object.assign(acc[timestamp], rowData);
+      });
+      return acc;
+    }, {});
+
+    // Convert to array and sort
+    const sortedNewRows = Object.values(mergedData).sort(
+      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+    );
+
+    setRows(sortedNewRows);
+    setFilteredRows(sortedNewRows);
+    setSortedRows(sortedNewRows);
+    setVisibleRows(sortedNewRows.slice(0, 50));
+    setHasMore(sortedNewRows.length > 50);
+  }, [scriptData]);
+
+  useEffect(() => {
+    // Update columns based on selectedScripts
+    const newColumns = [
+      { id: "timestamp", label: "Timestamp" },
+      ...selectedScripts.map((script) => ({ id: script, label: script })),
+    ];
+    setColumns(newColumns);
+
+    // Fetch data for all selected scripts
+    selectedScripts.forEach((script) => {
+      if (!scriptData[script]) {
+        fetchScriptData(script);
+      }
+    });
+  }, [selectedScripts]);
 
   // ---------- Function to export To Pdf ----------
   const exportToPdf = async () => {
@@ -920,175 +857,17 @@ const DataTable = () => {
 
   // ---------- Function to handle the Graph ----------
   const renderGraph = () => (
-    <Dialog
-      open={openGraph}
-      onClose={handleCloseGraph}
-      maxWidth="lg"
-      fullWidth
-      PaperProps={{
-        style: {
-          backgroundColor: "#f5f5f5",
-          borderRadius: "16px",
-          boxShadow: "0 14px 45px rgba(0, 0, 0, 0.15)",
-        },
-      }}
-    >
-      <DialogTitle
-        style={{
-          background: "linear-gradient(135deg, #3f51b5 30%, #5c6bc0 90%)",
-          color: "white",
-          textAlign: "center",
-          position: "relative", // Set position to relative for icon positioning
-        }}
-      >
-        Multi-Variable Comparison
-        {/* Icon Button for Export to PDF */}
-        <Tooltip title="Export to PDF" arrow>
-          <IconButton
-            style={{
-              position: "absolute",
-              right: "50px",
-              top: "10px",
-              color: "white",
-            }} // Adjust position as needed
-            onClick={graphexportToPdf}
-          >
-            <PictureAsPdfIcon />
-          </IconButton>
-        </Tooltip>
-        {/* Icon Button for Close */}
-        <Tooltip title="Close" arrow>
-          <IconButton
-            style={{
-              position: "absolute",
-              right: "10px",
-              top: "10px",
-              color: "white",
-            }} // Adjust position as needed
-            onClick={handleCloseGraph}
-          >
-            <CloseIcon />
-          </IconButton>
-        </Tooltip>
-      </DialogTitle>
-      <DialogContent>
-        <Box mb={3} mt={2}>
-          <FormControl fullWidth variant="outlined">
-            <InputLabel id="script-select-label">Select Variable</InputLabel>
-            <Select
-              labelId="script-select-label"
-              multiple
-              value={selectedGraphScripts}
-              onChange={handleScriptSelect}
-              renderValue={(selected) => selected.join(", ")}
-              style={{
-                backgroundColor: "white",
-                borderRadius: "8px",
-                boxShadow: "0 3px 10px rgba(0, 0, 0, 0.1)",
-                fontSize: "16px",
-                height: "40px",
-                padding: "0 12px",
-              }}
-              MenuProps={{
-                PaperProps: {
-                  style: {
-                    borderRadius: "10px",
-                    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.25)",
-                  },
-                },
-              }}
-            >
-              {columns
-                .filter((col) => col.id !== "timestamp")
-                .map((col) => (
-                  <MenuItem key={col.id} value={col.id}>
-                    <Checkbox
-                      checked={selectedGraphScripts.indexOf(col.id) > -1}
-                    />
-                    <ListItemText primary={col.label} />
-                  </MenuItem>
-                ))}
-            </Select>
-          </FormControl>
-        </Box>
-
-        <div
-          id="graph-container"
-          style={{
-            background: "linear-gradient(white, #e3f2fd)",
-            padding: "25px",
-            borderRadius: "12px",
-            boxShadow: "0 6px 20px rgba(0, 0, 0, 0.1)",
-          }}
-        >
-          <ResponsiveContainer width="100%" height={400}>
-            <AreaChart
-              data={reversedGraphData}
-              margin={{ top: 30, right: 40, left: 20, bottom: 20 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-              <XAxis
-                dataKey="timestamp"
-                stroke="#555"
-                style={{ fontSize: "13px" }}
-                tickFormatter={(value) => new Date(value).toLocaleDateString()}
-              />
-              <YAxis stroke="#555" style={{ fontSize: "13px" }} />
-              <RechartsTooltip
-                contentStyle={{
-                  backgroundColor: "rgba(255, 255, 255, 0.95)",
-                  borderRadius: "8px",
-                  boxShadow: "0 3px 10px rgba(0, 0, 0, 0.15)",
-                  padding: "10px",
-                }}
-                labelStyle={{ fontWeight: "bold" }}
-              />
-              <Legend verticalAlign="top" height={36} />
-              {selectedGraphScripts.map((script, index) => (
-                <Area
-                  key={script}
-                  type="monotone"
-                  dataKey={script}
-                  stroke={`hsl(${(index * 137) % 360}, 60%, 50%)`}
-                  fill={`url(#gradient${index})`}
-                  strokeWidth={2}
-                  fillOpacity={0.6}
-                />
-              ))}
-              {selectedGraphScripts.map((script, index) => (
-                <defs key={`defs${index}`}>
-                  <linearGradient
-                    id={`gradient${index}`}
-                    x1="0%"
-                    y1="0%"
-                    x2="0%"
-                    y2="100%"
-                  >
-                    <stop
-                      offset="0%"
-                      style={{
-                        stopColor: `hsl(${(index * 137) % 360}, 60%, 50%)`,
-                        stopOpacity: 1,
-                      }}
-                    />
-                    <stop
-                      offset="100%"
-                      style={{
-                        stopColor: `hsl(${(index * 137) % 360}, 60%, 80%)`,
-                        stopOpacity: 0.5,
-                      }}
-                    />
-                  </linearGradient>
-                </defs>
-              ))}
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </DialogContent>
-      {/* Removed DialogActions section */}
-    </Dialog>
+    <EnhancedGraph
+      openGraph={openGraph}
+      handleCloseGraph={handleCloseGraph}
+      selectedTerminal={selectedTerminal}
+      columns={columns}
+      selectedGraphScripts={selectedGraphScripts}
+      handleScriptSelect={handleScriptSelect}
+      reversedGraphData={reversedGraphData}
+      graphexportToPdf={graphexportToPdf}
+    />
   );
-
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <Grid container spacing={3}>
@@ -1124,8 +903,8 @@ const DataTable = () => {
                 value={selectedProfile}
                 onChange={(e) => {
                   setSelectedProfile(e.target.value);
-                  setSelectedTerminal("");
-                  setSelectedScripts([]);
+                  // Fetch new data when profile changes
+                  selectedScripts.forEach((script) => fetchScriptData(script));
                 }}
                 label="Profile"
               >
@@ -1142,20 +921,20 @@ const DataTable = () => {
               <Select
                 value={selectedTerminal}
                 disabled
-                label="Terminal"
+                label="Device"
                 sx={{
                   backgroundColor: "#ffffff",
                   borderRadius: "8px",
                   boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
                   "& .MuiSelect-select": {
                     color: "#1565c0",
-                    fontWeight: "bold",
                   },
                 }}
               >
                 <MenuItem value={selectedTerminal}>{selectedTerminal}</MenuItem>
               </Select>
             </StyledFormControl>
+
             <StyledFormControl fullWidth sx={{ mb: 3 }}>
               <InputLabel sx={{ color: "#424242" }}>Select Variable</InputLabel>
               <Select
@@ -1178,7 +957,6 @@ const DataTable = () => {
                 ))}
               </Select>
             </StyledFormControl>
-
             <Box
               sx={{
                 mt: 3,
@@ -1219,6 +997,7 @@ const DataTable = () => {
                     }}
                   />
                 )}
+                ampm={false} // Use 24-hour format
               />
               <DateTimePicker
                 label="To Date"
@@ -1237,6 +1016,7 @@ const DataTable = () => {
                     }}
                   />
                 )}
+                ampm={false} // Use 24-hour format
               />
             </Box>
 
@@ -1449,8 +1229,9 @@ const DataTable = () => {
                             <Typography variant="body2">
                               {column.id === "timestamp"
                                 ? formatTimestamp(row.timestamp)
-                                : row[column.id] !== undefined
-                                ? row[column.id].toFixed(2)
+                                : row[column.id] !== undefined &&
+                                  row[column.id] !== null
+                                ? Number(row[column.id]).toFixed(2)
                                 : "-"}
                             </Typography>
                             {column.id !== "timestamp" &&
@@ -1542,19 +1323,34 @@ const DataTable = () => {
                         variant="body2"
                         sx={{ color: "text.secondary", mb: 0.5 }}
                       >
-                        Max: <strong>{columnInsights.max.toFixed(2)}</strong>
+                        Max:{" "}
+                        <strong>
+                          {typeof columnInsights.max === "number"
+                            ? columnInsights.max.toFixed(2)
+                            : columnInsights.max}
+                        </strong>
                       </Typography>
                       <Typography
                         variant="body2"
                         sx={{ color: "text.secondary", mb: 0.5 }}
                       >
-                        Min: <strong>{columnInsights.min.toFixed(2)}</strong>
+                        Min:{" "}
+                        <strong>
+                          {typeof columnInsights.min === "number"
+                            ? columnInsights.min.toFixed(2)
+                            : columnInsights.min}
+                        </strong>
                       </Typography>
                       <Typography
                         variant="body2"
                         sx={{ color: "text.secondary" }}
                       >
-                        Avg: <strong>{columnInsights.avg.toFixed(2)}</strong>
+                        Avg:{" "}
+                        <strong>
+                          {typeof columnInsights.avg === "number"
+                            ? columnInsights.avg.toFixed(2)
+                            : columnInsights.avg}
+                        </strong>
                       </Typography>
                     </Card>
                   </Grid>
@@ -1567,9 +1363,10 @@ const DataTable = () => {
       <TableColumnCreate
         open={openDialog}
         onClose={handleCloseDialog}
-        onCreateColumn={handleCreateColumn}
         presetTerminal={selectedTerminal}
+        profile={selectedProfile}
       />
+
       {renderGraph()}
 
       <ToastContainer />

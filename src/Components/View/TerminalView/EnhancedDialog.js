@@ -42,26 +42,15 @@ const EnhancedDialog = ({
   comparisonData,
 }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const chartRef = useRef(null);
+  const containerRef = useRef(null);
 
-  const handleFullScreen = () => {
-    const dialogElement = document.querySelector(".MuiDialog-paper");
-    if (!isFullScreen) {
-      if (dialogElement.requestFullscreen) {
-        dialogElement.requestFullscreen();
-      } else if (dialogElement.webkitRequestFullscreen) {
-        dialogElement.webkitRequestFullscreen();
-      } else if (dialogElement.msRequestFullscreen) {
-        dialogElement.msRequestFullscreen();
-      }
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen();
       setIsFullScreen(true);
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      } else if (document.msExitFullscreen) {
-        document.msExitFullscreen();
-      }
+      document.exitFullscreen();
       setIsFullScreen(false);
     }
   };
@@ -113,70 +102,58 @@ const EnhancedDialog = ({
       open={isDialogOpen && isGraphExpanded}
       onClose={handleCloseDialog}
       fullWidth
-      maxWidth={isFullScreen ? "xl" : "md"}
-      fullScreen={isFullScreen}
-      sx={{
-        "& .MuiDialog-paper": {
-          background: "linear-gradient(135deg, #f8f9fa, #eef2f7)",
-          boxShadow: "0px 8px 16px rgba(0,0,0,0.2)",
+      maxWidth="lg"
+      PaperProps={{
+        style: {
+          backgroundColor: "#f5f5f5",
           borderRadius: "16px",
-          transition: "transform 0.3s ease-in-out",
+          boxShadow: "0 14px 45px rgba(0, 0, 0, 0.15)",
         },
       }}
     >
       <DialogTitle
-        sx={{
-          background: "linear-gradient(135deg, #3f51b5, #5c6bc0)",
-          color: "#fff",
-          padding: "24px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          borderBottom: "1px solid rgba(255,255,255,0.2)",
+        style={{
+          background: "linear-gradient(135deg, #3f51b5 30%, #5c6bc0 90%)",
+          color: "white",
+          textAlign: "center",
+          position: "relative",
         }}
       >
         <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
           {terminalName} - {selectedScript}
         </Typography>
-        <Box>
-          <Tooltip title={isFullScreen ? "Exit Full Screen" : "Full Screen"}>
+        <Box sx={{ position: "absolute", right: "10px", top: "10px" }}>
+          <Tooltip
+            title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"}
+            arrow
+          >
             <IconButton
-              onClick={handleFullScreen}
-              sx={{
+              style={{
                 color: "white",
-                "&:hover": {
-                  backgroundColor: "rgba(255, 255, 255, 0.2)",
-                  transform: "scale(1.1)",
-                },
-                transition: "transform 0.2s ease",
               }}
+              onClick={toggleFullScreen}
             >
               {isFullScreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
             </IconButton>
           </Tooltip>
           <Tooltip title="Export to PDF" arrow>
             <IconButton
-              sx={{
+              style={{
                 color: "white",
-                "&:hover": {
-                  backgroundColor: "rgba(255, 255, 255, 0.2)",
-                  transform: "scale(1.1)",
-                },
-                transition: "transform 0.2s ease",
               }}
               onClick={graphexportToPdf}
             >
               <PictureAsPdfIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Close">
-            <IconButton onClick={handleCloseDialog} sx={{ color: "#fff" }}>
+          <Tooltip title="Close" arrow>
+            <IconButton onClick={handleCloseDialog} style={{ color: "white" }}>
               <CloseIcon />
             </IconButton>
           </Tooltip>
         </Box>
       </DialogTitle>
-      <DialogContent sx={{ padding: "24px", position: "relative" }}>
+      <DialogContent>
         <Box sx={{ marginBottom: "20px" }}>
           <FormControl
             fullWidth
@@ -227,13 +204,11 @@ const EnhancedDialog = ({
                 PaperProps: {
                   sx: {
                     maxHeight: 300,
-                    zIndex: isFullScreen ? 1300 : "auto",
                   },
                 },
               }}
               sx={{
                 borderRadius: "8px",
-                zIndex: isFullScreen ? 1300 : "auto",
                 "&:hover": {
                   backgroundColor: "#f1f1f1",
                 },
@@ -244,20 +219,21 @@ const EnhancedDialog = ({
               </MenuItem>
               {availableScripts.map((script) => (
                 <MenuItem
-                  key={script}
-                  value={script}
+                  key={script.scriptName}
+                  value={script.scriptName}
                   sx={{
                     backgroundColor:
-                      script === selectedScript
+                      script.scriptName === selectedScript
                         ? "rgba(76, 175, 80, 0.1)"
                         : "inherit",
-                    fontWeight: script === selectedScript ? "bold" : "normal",
+                    fontWeight:
+                      script.scriptName === selectedScript ? "bold" : "normal",
                     "&:hover": {
                       backgroundColor: "#e3f2fd",
                     },
                   }}
                 >
-                  {script}
+                  {script.scriptName}
                 </MenuItem>
               ))}
             </Select>
@@ -265,8 +241,9 @@ const EnhancedDialog = ({
         </Box>
         <Box
           id="graph-container"
+          ref={containerRef}
           sx={{
-            height: 420,
+            height: isFullScreen ? "100vh" : "420px",
             marginBottom: 2,
             border: "1px solid rgba(0, 0, 0, 0.1)",
             borderRadius: "12px",
