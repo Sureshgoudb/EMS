@@ -292,9 +292,16 @@ const DeviceDetails = () => {
           const currentTodoIndex = variable.findIndex((item) => item.variableid === selectedVariable.variableid);
           // 2. Mark the todo as complete
           const updatedTodo = Object.assign({}, variable[currentTodoIndex]);
-          updatedTodo.variablename = e.target.form.name.value;
-          updatedTodo.variabletype = e.target.form.variabletype.value;
-          updatedTodo.scale = e.target.form.scale.value;
+          updatedTodo.variablename = response.data.variablename;
+          updatedTodo.variabletype = response.data.variabletype;
+          updatedTodo.scale = response.data.scale;
+          updatedTodo.description = response.data.description;
+          updatedTodo.calcavg = response.data.calcavg;
+          updatedTodo.formula = response.data.formula;
+          updatedTodo.active = response.data.active;
+          updatedTodo.updatedAt = response.data.updatedAt;
+          updatedTodo.createdAt = response.data.createdAt;
+
           // 3. Update the todo list with the updated todo
           const newTodos = variable.slice();
           newTodos[currentTodoIndex] = updatedTodo;
