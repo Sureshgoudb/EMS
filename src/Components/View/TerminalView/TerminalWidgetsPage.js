@@ -33,8 +33,17 @@ const TerminalDetailView = () => {
   const fetchAllWidgets = async () => {
     setLoading(true);
     try {
+      // Get customerID from localStorage
+      const userDataString = localStorage.getItem("user");
+      const userData = JSON.parse(userDataString);
+      const customerID = userData?.customerID;
+
+      if (!customerID) {
+        throw new Error("Customer ID not found in local storage");
+      }
+
       const response = await axios.get(
-        `${apiKey}terminal/widget/${terminalID}`
+        `${apiKey}terminal/widget/${terminalID}?customerID=${customerID}`
       );
       const data = response.data;
       const [fetchedTerminalName] = Object.keys(data);
@@ -71,9 +80,19 @@ const TerminalDetailView = () => {
   // -------------- Create Widget ---------------
   const handleCreateWidget = async (widgetData) => {
     try {
+      // Get customerID from localStorage
+      const userDataString = localStorage.getItem("user");
+      const userData = JSON.parse(userDataString);
+      const customerID = userData?.customerID;
+
+      if (!customerID) {
+        throw new Error("Customer ID not found in local storage");
+      }
+
       const response = await axios.post(`${apiKey}terminal/createWidget`, {
         ...widgetData,
         terminalID,
+        customerID,
       });
       const newWidget = response.data;
 
@@ -88,10 +107,9 @@ const TerminalDetailView = () => {
       fetchAllWidgets();
     } catch (error) {
       console.error("Error creating widget:", error);
-      toast.error("Failed to create widget");
+      toast.error(error.message || "Failed to create widget");
     }
   };
-
   // --------------- Resize Widget ---------------
   const handleResize = (widgetId, newSize) => {
     setWidgets((prevWidgets) =>

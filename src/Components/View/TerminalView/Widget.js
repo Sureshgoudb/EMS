@@ -118,17 +118,25 @@ const Widget = ({
   };
 
   // ----------- Fetch available scripts -----------
+  // ----------- Fetch available scripts -----------
   const fetchScripts = async (terminalID) => {
     try {
-      const response = await fetch(`${apiKey}terminal/widget/${terminalID}`);
+      const response = await fetch(`${apiKey}terminal/${terminalID}/scripts`);
       const data = await response.json();
-      return data[Object.keys(data)[0]];
+
+      // Check if 'scripts' property exists in the response
+      if (data && data.scripts) {
+        // Return an array of script names (object keys)
+        return Object.keys(data.scripts);
+      } else {
+        console.error("Unexpected response structure:", data);
+        return [];
+      }
     } catch (error) {
       console.error("Error fetching scripts:", error);
       return [];
     }
   };
-
   // ------------ Trasform data for graph -----------
   const transformDataForGraph = (data) => {
     return data.map((item) => ({

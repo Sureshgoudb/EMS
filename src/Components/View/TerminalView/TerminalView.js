@@ -23,30 +23,44 @@ const TerminalView = () => {
   const [showForm, setShowForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem("user"));
+    setUser(storedUser);
+
     if (location.state?.activeTab) {
       setValue(location.state.activeTab === "Historical Data Display" ? 1 : 0);
     }
   }, [location.state]);
 
-  const fetchData = useCallback(async (page = 1) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await axios.get(`${apiKey}terminal/widget/allWidgets`, {
-        params: { page, limit: 20 },
-      });
-      setTerminals(response.data.widgets);
-    } catch (err) {
-      console.error("Error fetching data:", err);
-      setError("Failed to load data. Please try again later.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const fetchData = useCallback(
+    async (page = 1) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const customerID = user
+          ? user.customerID
+          : JSON.parse(localStorage.getItem("user")).customerID;
+
+        const url = `${apiKey}terminal/widget/allWidgets/${customerID}`;
+
+        const response = await axios.get(url, {
+          params: { page, limit: 20 },
+        });
+        setTerminals(response.data.widgets || []);
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        setError("Failed to load data. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [user]
+  );
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -58,13 +72,35 @@ const TerminalView = () => {
     }
   };
 
-  // ----------- Create Widget -------------
   const handleCreateWidget = async (widgetData) => {
     try {
+      // Retrieve customerID from local storage
+      const user = JSON.parse(localStorage.getItem("user"));
+      const customerID = user ? user.customerID : null;
+
+      if (!customerID) {
+        toast.error("Customer ID not found. Please log in again.");
+        return;
+      }
+
+      console.log(
+        "Sending widget creation request with customerID:",
+        customerID
+      );
+
+      // Include customerID in the request body
       const response = await axios.post(
         `${apiKey}terminal/createWidget`,
-        widgetData
+        { ...widgetData, customerID },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
       );
+
+      console.log("Server response:", response.data);
+
       const { message, newWidget, updatedWidget } = response.data;
 
       setTerminals((prevTerminals) => {
@@ -150,6 +186,8 @@ const TerminalView = () => {
     [handleTerminalClick]
   );
 
+  const isUserTypeUser = user && user.user_Type === "User";
+
   return (
     <Box sx={{ flexGrow: 1, bgcolor: "#e3f2fd" }}>
       <Box
@@ -208,11 +246,16 @@ const TerminalView = () => {
                 <Button
                   variant="contained"
                   onClick={() => setShowForm(true)}
+                  disabled={isUserTypeUser}
                   sx={{
                     backgroundColor: "#007c89",
                     color: "white",
                     mt: 2,
                     "&:hover": { backgroundColor: "#005f6a" },
+                    "&:disabled": {
+                      backgroundColor: "#cccccc",
+                      color: "#666666",
+                    },
                   }}
                 >
                   Create New Display
