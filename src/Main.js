@@ -4,7 +4,6 @@ import {
   createBrowserRouter,
   Outlet,
   useRoutes,
-  useNavigate,
   Navigate,
 } from "react-router-dom";
 import Footer from "./Components/Footer";
@@ -25,7 +24,7 @@ import Schedule from "./Components/Schedule";
 import Reports from "./Components/Reports";
 import TerminalView from "./Components/View/TerminalView/TerminalView";
 import TerminalWidgetsPage from "./Components/View/TerminalView/TerminalWidgetsPage";
-import DataTable from "./Components/View/TerminalView/HistoricalData/DataTable"; // Import the DataTable component
+import DataTable from "./Components/View/TerminalView/HistoricalData/DataTable";
 
 const Main = () => {
   const HeaderLayout = () => {

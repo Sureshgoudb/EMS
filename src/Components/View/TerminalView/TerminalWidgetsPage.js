@@ -5,6 +5,7 @@ import Widget from "./Widget";
 import WidgetCreationForm from "./WidgetCreationForm";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
@@ -21,7 +22,17 @@ const TerminalDetailView = () => {
   // ---------- Fetching widget ---------------
   const fetchWidgetData = async (widgetId) => {
     try {
-      const response = await axios.get(`${apiKey}terminal/widget/${widgetId}`);
+      const userDataString = localStorage.getItem("user");
+      const userData = JSON.parse(userDataString);
+      const customerID = userData?.customerID;
+
+      if (!customerID) {
+        throw new Error("Customer ID not found in local storage");
+      }
+
+      const response = await axios.get(
+        `${apiKey}terminal/widget/${widgetId}?customerID=${customerID}`
+      );
       return response.data;
     } catch (error) {
       console.error(`Error fetching data for widget ${widgetId}:`, error);
@@ -33,7 +44,6 @@ const TerminalDetailView = () => {
   const fetchAllWidgets = async () => {
     setLoading(true);
     try {
-      // Get customerID from localStorage
       const userDataString = localStorage.getItem("user");
       const userData = JSON.parse(userDataString);
       const customerID = userData?.customerID;
@@ -46,17 +56,22 @@ const TerminalDetailView = () => {
         `${apiKey}terminal/widget/${terminalID}?customerID=${customerID}`
       );
       const data = response.data;
-      const [fetchedTerminalName] = Object.keys(data);
+      const [fetchedTerminalName] = Object.keys(data).filter(
+        (key) => key !== "terminalID"
+      );
       setTerminalName(fetchedTerminalName);
 
-      const widgetsWithData = await Promise.all(
-        data[fetchedTerminalName].map(async (widget) => {
-          const widgetData = await fetchWidgetData(widget._id);
-          return { ...widget, data: widgetData };
-        })
-      );
+      const widgetsData = data[fetchedTerminalName].map((widget) => ({
+        _id: widget.widgetID,
+        scriptId: widget._id,
+        scriptName: widget.scriptName,
+        properties: widget.properties,
+        areaGraph: widget.areaGraph,
+        decimalPlaces: widget.decimalPlaces,
+        graphType: widget.graphType,
+      }));
 
-      setWidgets(widgetsWithData);
+      setWidgets(widgetsData);
     } catch (err) {
       console.error("Error fetching data:", err);
       toast.error("Failed to fetch terminal data");
@@ -78,38 +93,37 @@ const TerminalDetailView = () => {
   }, []);
 
   // -------------- Create Widget ---------------
-  const handleCreateWidget = async (widgetData) => {
+  const handleCreateWidget = async (newWidget) => {
     try {
-      // Get customerID from localStorage
-      const userDataString = localStorage.getItem("user");
-      const userData = JSON.parse(userDataString);
-      const customerID = userData?.customerID;
+      const widgetData = await fetchWidgetData(newWidget._id);
 
-      if (!customerID) {
-        throw new Error("Customer ID not found in local storage");
+      if (widgetData) {
+        const [terminalName] = Object.keys(widgetData).filter(
+          (key) => key !== "terminalID"
+        );
+        const newWidgetData = widgetData[terminalName][0];
+
+        setWidgets((prevWidgets) => [
+          ...prevWidgets,
+          {
+            _id: newWidgetData.widgetID,
+            scriptId: newWidgetData._id,
+            scriptName: newWidgetData.scriptName,
+            properties: newWidgetData.properties,
+            areaGraph: newWidgetData.areaGraph,
+            decimalPlaces: newWidgetData.decimalPlaces,
+          },
+        ]);
       }
 
-      const response = await axios.post(`${apiKey}terminal/createWidget`, {
-        ...widgetData,
-        terminalID,
-        customerID,
-      });
-      const newWidget = response.data;
-
-      const widgetWithData = await fetchWidgetData(newWidget._id);
-
-      setWidgets((prevWidgets) => [
-        ...prevWidgets,
-        { ...newWidget, data: widgetWithData },
-      ]);
       setShowForm(false);
-      toast.success("Widget created successfully!");
       fetchAllWidgets();
     } catch (error) {
-      console.error("Error creating widget:", error);
-      toast.error(error.message || "Failed to create widget");
+      console.error("Error handling new widget:", error);
+      toast.error("Error loading widget data");
     }
   };
+
   // --------------- Resize Widget ---------------
   const handleResize = (widgetId, newSize) => {
     setWidgets((prevWidgets) =>
@@ -120,17 +134,41 @@ const TerminalDetailView = () => {
   };
 
   // --------------- Delete Widget ---------------
-  const handleDeleteWidget = async (widgetId) => {
+  const handleDeleteWidget = async (scriptId) => {
     try {
-      setWidgets((prevWidgets) =>
-        prevWidgets.filter((widget) => widget._id !== widgetId)
+      const userDataString = localStorage.getItem("user");
+      const userData = JSON.parse(userDataString);
+      const customerID = userData?.customerID;
+
+      if (!customerID) {
+        throw new Error("Customer ID not found in local storage");
+      }
+
+      const deleteResponse = await axios.delete(
+        `${apiKey}widget/script/${scriptId}`,
+        {
+          data: {
+            customerID: customerID,
+            terminalID: terminalID,
+          },
+        }
       );
-      await axios.delete(`${apiKey}terminal/deleteWidget/${widgetId}`);
-      toast.success("Widget deleted successfully!");
+
+      if (deleteResponse.data.success) {
+        setWidgets((prevWidgets) =>
+          prevWidgets.filter((widget) => widget.scriptId !== scriptId)
+        );
+        toast.success("Widget deleted successfully!");
+        fetchAllWidgets();
+      } else {
+        throw new Error(
+          deleteResponse.data.message || "Failed to delete widget"
+        );
+      }
     } catch (error) {
       console.error("Error deleting widget:", error);
+      toast.error(error.message || "Failed to delete widget");
       fetchAllWidgets();
-      toast.error("Failed to delete widget");
     }
   };
 
@@ -198,7 +236,9 @@ const TerminalDetailView = () => {
               color: "rgba(255, 255, 255, 0.8)",
             }}
           >
-            {currentTime.toLocaleString()}{" "}
+            {`${currentTime.toLocaleDateString(
+              "en-GB"
+            )} ${currentTime.toLocaleTimeString("en-GB", { hour12: false })}`}
           </Typography>
         </Typography>
       </Paper>

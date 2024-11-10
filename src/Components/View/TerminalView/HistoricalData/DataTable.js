@@ -200,11 +200,13 @@ const DataTable = () => {
       }
     }
   }, [selectedProfile, selectedTerminal, selectedScripts]);
+
   useEffect(() => {
     if (selectedTerminal && selectedScripts.length > 0 && selectedProfile) {
       fetchScriptData();
     }
   }, [selectedTerminal, selectedScripts, selectedProfile, fromDate, toDate]);
+
   useEffect(() => {
     if (selectedTerminal && selectedScript) {
       const newColumn = {
@@ -232,12 +234,6 @@ const DataTable = () => {
       console.error("Error fetching scripts:", error);
     }
   };
-
-  useEffect(() => {
-    if (selectedTerminal && selectedScripts.length > 0) {
-      fetchScriptData();
-    }
-  }, [selectedTerminal, selectedScripts]);
 
   useEffect(() => {
     if (selectedTerminal && selectedScripts.length > 0) {
@@ -317,7 +313,6 @@ const DataTable = () => {
   useEffect(() => {
     if (tableInfo) {
       setSelectedTerminal(tableInfo.terminal);
-      console.log("fsfsgsg", tableInfo.terminal);
       setSelectedScripts(
         tableInfo.columns.filter((col) => col !== "timestamp")
       );
@@ -531,6 +526,7 @@ const DataTable = () => {
 
   const [scriptData, setScriptData] = useState({});
 
+  // ---------- Function to handle script change ----------
   const handleScriptChange = (event) => {
     const {
       target: { value },
@@ -683,7 +679,6 @@ const DataTable = () => {
   }, [selectedScripts, selectedTerminal, selectedProfile, fromDate, toDate]);
 
   useEffect(() => {
-    // Merge data from all scripts
     const mergedData = Object.values(scriptData).reduce((acc, scriptRows) => {
       Object.entries(scriptRows).forEach(([timestamp, rowData]) => {
         if (!acc[timestamp]) {

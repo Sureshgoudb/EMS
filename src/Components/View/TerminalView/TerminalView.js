@@ -41,11 +41,12 @@ const TerminalView = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const customerID = user
-          ? user.customerID
-          : JSON.parse(localStorage.getItem("user")).customerID;
+        const storedUser = user || JSON.parse(localStorage.getItem("user"));
 
-        const url = `${apiKey}terminal/widget/allWidgets/${customerID}`;
+        const url =
+          storedUser.user_Type === "Admin"
+            ? `${apiKey}terminal/widget/allWidgetsAdmin`
+            : `${apiKey}terminal/widget/allWidgets/${storedUser.customerID}`;
 
         const response = await axios.get(url, {
           params: { page, limit: 20 },
@@ -54,6 +55,7 @@ const TerminalView = () => {
       } catch (err) {
         console.error("Error fetching data:", err);
         setError("Failed to load data. Please try again later.");
+        toast.error("Error loading terminals. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -72,61 +74,29 @@ const TerminalView = () => {
     }
   };
 
-  const handleCreateWidget = async (widgetData) => {
-    try {
-      // Retrieve customerID from local storage
-      const user = JSON.parse(localStorage.getItem("user"));
-      const customerID = user ? user.customerID : null;
-
-      if (!customerID) {
-        toast.error("Customer ID not found. Please log in again.");
-        return;
-      }
-
-      console.log(
-        "Sending widget creation request with customerID:",
-        customerID
-      );
-
-      // Include customerID in the request body
-      const response = await axios.post(
-        `${apiKey}terminal/createWidget`,
-        { ...widgetData, customerID },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      console.log("Server response:", response.data);
-
-      const { message, newWidget, updatedWidget } = response.data;
-
+  const handleCreateWidget = (widgetData) => {
+    if (widgetData.newWidget || widgetData.updatedWidget) {
+      const widget = widgetData.newWidget || widgetData.updatedWidget;
       setTerminals((prevTerminals) => {
         const updatedTerminals = [...prevTerminals];
         const terminalIndex = updatedTerminals.findIndex(
-          (t) =>
-            t.terminalID === (newWidget || updatedWidget).terminal.terminalID
+          (t) => t.terminalID === widget.terminal.terminalID
         );
+
         if (terminalIndex !== -1) {
-          updatedTerminals[terminalIndex].widgetCount += 1;
+          updatedTerminals[terminalIndex].widgetCount =
+            (updatedTerminals[terminalIndex].widgetCount || 0) + 1;
         } else {
           updatedTerminals.push({
-            terminalID: (newWidget || updatedWidget).terminal.terminalID,
-            terminalName: (newWidget || updatedWidget).terminal.terminalName,
+            terminalID: widget.terminal.terminalID,
+            terminalName: widget.terminal.terminalName,
             widgetCount: 1,
           });
         }
         return updatedTerminals;
       });
-
-      setShowForm(false);
-      toast.success(message);
-    } catch (error) {
-      console.error("Error creating widget:", error);
-      toast.error("Failed to create widget");
     }
+    setShowForm(false);
   };
 
   const handleTerminalClick = useCallback(
@@ -183,10 +153,8 @@ const TerminalView = () => {
         ))}
       </Grid>
     ),
-    [handleTerminalClick]
+    [handleTerminalClick, user]
   );
-
-  const isUserTypeUser = user && user.user_Type === "User";
 
   return (
     <Box sx={{ flexGrow: 1, bgcolor: "#e3f2fd" }}>
@@ -246,16 +214,11 @@ const TerminalView = () => {
                 <Button
                   variant="contained"
                   onClick={() => setShowForm(true)}
-                  disabled={isUserTypeUser}
                   sx={{
                     backgroundColor: "#007c89",
                     color: "white",
                     mt: 2,
                     "&:hover": { backgroundColor: "#005f6a" },
-                    "&:disabled": {
-                      backgroundColor: "#cccccc",
-                      color: "#666666",
-                    },
                   }}
                 >
                   Create New Display

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 import {
   Box,
   Button,
@@ -84,8 +85,8 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
   const [areaGraph, setAreaGraph] = useState(false);
   const [properties, setProperties] = useState({
     fontFamily: "Arial",
-    fontSize: "20px",
-    fontColor: "#000000",
+    fontSize: "40px",
+    fontColor: "#FF0000",
     backgroundColor: "#ffffff",
     fontStyle: "normal",
     fontWeight: "normal",
@@ -99,94 +100,124 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
   const [xAxisType, setXAxisType] = useState("records");
   const [xAxisValue, setXAxisValue] = useState(100);
   const [refreshInterval, setRefreshInterval] = useState(60);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
+  const [historyFetchTimer, setHistoryFetchTimer] = useState(null);
+  const [userType, setUserType] = useState(null);
+  const [selectedTerminalData, setSelectedTerminalData] = useState(null);
 
-  // -------------- Fetch terminals --------------
+  useEffect(() => {
+    if (selectedTerminalData) {
+      console.log("Selected terminal data:", selectedTerminalData);
+    }
+  }, [selectedTerminalData]);
+
+  useEffect(() => {
+    try {
+      const userData = localStorage.getItem("user");
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        setUserType(parsedUser.user_Type);
+      } else {
+        toast.error("User data not found");
+      }
+    } catch (error) {
+      console.error("Error parsing user data from localStorage:", error);
+      toast.error("Error loading user data");
+    }
+  }, []);
+
+  // ------------- Fetch terminals -------------
   useEffect(() => {
     const fetchTerminals = async () => {
+      if (!userType) return;
+      setLoading(true);
+      setError(null);
+
       try {
-        const response = await axios.get(`${apiKey}terminal/list`);
-        setTerminals(response.data);
+        let response;
+        const userData = JSON.parse(localStorage.getItem("user"));
+
+        if (userType === "Admin") {
+          response = await axios.get(`${apiKey}terminal/list`);
+          setTerminals(response.data || []);
+        } else {
+          response = await axios.get(
+            `${apiKey}terminal/list/${userData.customerID}`
+          );
+          setTerminals(response.data.terminals || []);
+        }
 
         if (presetTerminal) {
-          const preset = response.data.find(
+          const terminalList =
+            userType === "Admin" ? response.data : response.data.terminals;
+          const preset = terminalList.find(
             (t) => t.terminalName === presetTerminal
           );
           if (preset) {
             setTerminalId(preset.terminalId);
+            setTerminalName(preset.terminalName);
+            setSelectedTerminalData(preset);
           }
         }
       } catch (error) {
         console.error("Error fetching terminals:", error);
-        toast.error("Failed to fetch terminals");
+        setError(error.response?.data?.message || "Failed to fetch terminals");
+        toast.error(
+          error.response?.data?.message || "Failed to fetch terminals"
+        );
+        setTerminals([]);
+      } finally {
+        setLoading(false);
       }
     };
-    fetchTerminals();
-  }, [presetTerminal]);
 
-  // ----------------- Fetch scripts --------------
+    fetchTerminals();
+  }, [userType, presetTerminal]);
+
+  // ------------- Fetch scripts -------------
   useEffect(() => {
     const fetchScripts = async () => {
-      if (terminalId) {
-        try {
-          const response = await axios.get(
-            `${apiKey}terminal/${terminalId}/scripts`
-          );
-          setScripts(response.data.scripts);
-          setScriptError(false);
-        } catch (error) {
-          console.error("Error fetching scripts:", error);
-          toast.error("Failed to fetch scripts");
-        }
-      } else {
+      if (!terminalId) {
+        setScripts({});
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `${apiKey}terminal/${terminalId}/scripts`
+        );
+        setScripts(response.data.scripts || {});
+        setScriptError(false);
+      } catch (error) {
+        console.error("Error fetching scripts:", error);
+        toast.error("Failed to fetch scripts");
         setScripts({});
       }
     };
+
     fetchScripts();
   }, [terminalId]);
 
-  // ------------ Handle terminal selection --------------
-  const handleTerminalSelection = (event) => {
-    const selectedTerminal = terminals.find(
-      (t) => t.terminalName === event.target.value
-    );
-    if (selectedTerminal) {
-      setTerminalName(selectedTerminal.terminalName);
-      setTerminalId(selectedTerminal.terminalId);
-    } else {
-      setTerminalName("");
-      setTerminalId("");
-    }
-    setScriptName("");
-    console.log("Selected Terminal ID:", selectedTerminal.terminalId);
-  };
-
-  const handleOpenFormatDialog = () => {
-    setOpenFormatDialog(true);
-  };
-
-  const handleCloseFormatDialog = () => {
-    setOpenFormatDialog(false);
-  };
-
+  const handleOpenFormatDialog = () => setOpenFormatDialog(true);
+  const handleCloseFormatDialog = () => setOpenFormatDialog(false);
   const handleApplyFormat = (newFormat) => {
     setProperties(newFormat);
     handleCloseFormatDialog();
   };
 
-  const handleCreate = () => {
-    if (!terminalName) {
-      toast.error("Please select a terminal.");
-      return;
-    }
-    if (!scriptName) {
-      toast.error("Please select a script.");
+  // ------------- Create widget -------------
+  const handleCreate = async () => {
+    if (!terminalName || !scriptName || !selectedTerminalData) {
+      toast.error("Please fill in all required fields.");
       return;
     }
 
     const widgetData = {
       terminal: {
-        terminalID: terminalId,
-        terminalName,
+        terminalID: selectedTerminalData.terminalId,
+        terminalName: selectedTerminalData.terminalName,
       },
       scripts: [
         {
@@ -194,17 +225,59 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
           areaGraph,
           properties,
           decimalPlaces,
-          graphType,
-          xAxisConfiguration: {
-            type: xAxisType,
-            value: xAxisValue,
-          },
-          refreshInterval,
+          graphType: areaGraph ? graphType : undefined,
+          xAxisConfiguration: areaGraph
+            ? {
+                type: xAxisType,
+                value: xAxisValue,
+              }
+            : undefined,
+          refreshInterval: areaGraph ? refreshInterval : undefined,
         },
       ],
     };
 
-    onCreate(widgetData);
+    try {
+      const response = await axios.post(
+        `${apiKey}terminal/createWidget`,
+        widgetData
+      );
+
+      if (response.data && areaGraph) {
+        response.data.initialHistory = historyData;
+      }
+
+      toast.success(response.data.message);
+      onCreate(response.data);
+    } catch (error) {
+      console.error("Error creating widget:", error);
+      toast.error(error.response?.data?.message || "Failed to create widget");
+    }
+  };
+
+  const handleTerminalSelection = (event) => {
+    const selectedTerminal = terminals.find(
+      (t) => t.terminalName === event.target.value
+    );
+
+    if (selectedTerminal) {
+      setTerminalName(selectedTerminal.terminalName);
+      setTerminalId(selectedTerminal.terminalId);
+      setSelectedTerminalData(selectedTerminal);
+
+      setHistoryData([]);
+      if (historyFetchTimer) {
+        clearInterval(historyFetchTimer);
+        setHistoryFetchTimer(null);
+      }
+    } else {
+      setTerminalName("");
+      setTerminalId("");
+      setSelectedTerminalData(null);
+    }
+
+    setScriptName("");
+    setScriptError(false);
   };
 
   const handleScriptSelection = (e) => {
@@ -213,6 +286,12 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
     } else {
       setScriptName(e.target.value);
       setScriptError(false);
+
+      setHistoryData([]);
+      if (historyFetchTimer) {
+        clearInterval(historyFetchTimer);
+        setHistoryFetchTimer(null);
+      }
     }
   };
 
@@ -225,8 +304,16 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
         >
           Create New Widget
         </Typography>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <StyledFormControl fullWidth>
+          {/* Terminal Selection */}
+          <StyledFormControl fullWidth disabled={loading}>
             <InputLabel sx={{ color: "#424242" }}>Device</InputLabel>
             <Select
               label="Device"
@@ -237,19 +324,24 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
               }}
               value={terminalName}
               onChange={handleTerminalSelection}
-              disabled={!!presetTerminal}
+              disabled={!!presetTerminal || loading}
             >
-              {terminals.map((terminal, index) => (
-                <MenuItem key={index} value={terminal.terminalName}>
+              {terminals.map((terminal) => (
+                <MenuItem
+                  key={terminal.terminalId}
+                  value={terminal.terminalName}
+                >
                   {terminal.terminalName}
                 </MenuItem>
               ))}
             </Select>
           </StyledFormControl>
-          <StyledFormControl fullWidth>
+
+          {/* Script Selection */}
+          <StyledFormControl fullWidth disabled={!terminalId || loading}>
             <InputLabel>Variable Name</InputLabel>
             <Select
-              label="VariableName"
+              label="Variable Name"
               sx={{
                 backgroundColor: "#ffffff",
                 borderRadius: "8px",
@@ -258,8 +350,8 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
               value={scriptName}
               onChange={handleScriptSelection}
             >
-              {Object.keys(scripts).map((script, index) => (
-                <MenuItem key={index} value={script}>
+              {Object.keys(scripts).map((script) => (
+                <MenuItem key={script} value={script}>
                   {script}
                 </MenuItem>
               ))}
@@ -270,6 +362,8 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
               </Alert>
             )}
           </StyledFormControl>
+
+          {/* Decimal Places */}
           <StyledFormControl fullWidth>
             <TextField
               label="Decimal Places"
@@ -284,6 +378,8 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
               )}`}
             />
           </StyledFormControl>
+
+          {/* Area Graph Checkbox */}
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <FormControlLabel
               control={
@@ -311,6 +407,7 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
             </Tooltip>
           </Box>
 
+          {/* Graph Options (visible only when Area Graph is selected) */}
           {areaGraph && (
             <>
               <FormControl component="fieldset">
@@ -364,7 +461,7 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
                 type="number"
                 value={xAxisValue}
                 onChange={(e) =>
-                  setXAxisValue(Math.max(1, parseInt(e.target.value)))
+                  setXAxisValue(Math.max(1, parseInt(e.target.value) || 1))
                 }
                 inputProps={{ min: 1 }}
               />
@@ -374,13 +471,15 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
                 type="number"
                 value={refreshInterval}
                 onChange={(e) =>
-                  setRefreshInterval(Math.max(1, parseInt(e.target.value)))
+                  setRefreshInterval(Math.max(1, parseInt(e.target.value) || 1))
                 }
                 inputProps={{ min: 1 }}
               />
             </>
           )}
         </Box>
+
+        {/* Action Buttons */}
         <Box
           sx={{
             display: "flex",
@@ -389,22 +488,29 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
             gap: 2,
           }}
         >
-          <Button variant="contained" color="primary" onClick={handleCreate}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleCreate}
+            disabled={loading || !terminalName || !scriptName}
+          >
             Create Widget
           </Button>
-          <Button variant="outlined" onClick={onCancel}>
+          <Button variant="outlined" onClick={onCancel} disabled={loading}>
             Cancel
           </Button>
           <Button
             variant="contained"
             color="secondary"
             onClick={handleOpenFormatDialog}
-            sx={{ alignSelf: "flex-start" }}
+            disabled={loading}
           >
             Set Text Format
           </Button>
         </Box>
       </Paper>
+
+      {/* Format Dialog */}
       <FormatDialog
         open={openFormatDialog}
         onClose={handleCloseFormatDialog}
@@ -415,9 +521,16 @@ const WidgetCreationForm = ({ onCreate, onCancel, presetTerminal }) => {
         isNewWidget={true}
         onStylesUpdate={handleApplyFormat}
       />
+
       <ToastContainer />
     </ThemeProvider>
   );
+};
+
+WidgetCreationForm.propTypes = {
+  onCreate: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+  presetTerminal: PropTypes.string,
 };
 
 export default WidgetCreationForm;

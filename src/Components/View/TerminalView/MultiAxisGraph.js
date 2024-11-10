@@ -19,16 +19,14 @@ import {
 import { keyframes } from "@emotion/react";
 
 const colors = [
-  "#ffc658",
-  "#ff7300",
-  "#1976d2",
-  "#00C49F",
-  "#FFBB28",
-  "#FF8042",
-  "#8884d8",
-  "#82ca9d",
-  "#ffc658",
-  "#ff7300",
+  "#f50057", // Error pink
+  "#673ab7", // Deep purple
+  "#ff9800", // Warning orange
+  "#00bcd4", // Cyan
+  "#795548", // Brown
+  "#00c853", // Success green
+  "#2196f3", // Primary blue
+  "#ff5722", // Deep orange
 ];
 
 const blinkAnimation = keyframes`
@@ -131,7 +129,6 @@ const MultiAxisGraph = ({
 
   const handleWheel = useCallback(
     (event) => {
-      event.preventDefault();
       const zoomFactor = event.deltaY > 0 ? 1.1 : 0.9;
       const dataLength = combinedData.length;
       const currentRange = zoomState.endIndex - zoomState.startIndex;
@@ -140,7 +137,7 @@ const MultiAxisGraph = ({
         Math.min(dataLength, Math.round(currentRange * zoomFactor))
       );
 
-      const mouseX = event.nativeEvent.offsetX;
+      const mouseX = event.offsetX;
       const chartWidth = chartRef.current.offsetWidth;
       const zoomCenter =
         zoomState.startIndex + (mouseX / chartWidth) * currentRange;
@@ -158,6 +155,27 @@ const MultiAxisGraph = ({
   );
 
   useEffect(() => {
+    const chartNode = chartRef.current;
+    if (!chartNode) return;
+
+    const wheelHandler = (event) => {
+      event.preventDefault();
+      handleWheel(event);
+    };
+
+    chartNode.addEventListener("wheel", wheelHandler, {
+      passive: false,
+      capture: true,
+    });
+
+    return () => {
+      chartNode.removeEventListener("wheel", wheelHandler, {
+        capture: true,
+      });
+    };
+  }, [handleWheel]);
+
+  useEffect(() => {
     if (expanded) {
       setZoomState({
         startIndex: 0,
@@ -172,8 +190,8 @@ const MultiAxisGraph = ({
   );
 
   return (
-    <div className="w-full" ref={chartRef} onWheel={handleWheel}>
-      <ResponsiveContainer width="100%" height={expanded ? 400 : 200}>
+    <div className="w-full" ref={chartRef}>
+      <ResponsiveContainer width="100%" height={expanded ? 300 : 200}>
         <ComposedChart
           data={zoomedData}
           margin={{

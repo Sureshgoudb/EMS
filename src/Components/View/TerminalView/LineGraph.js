@@ -20,14 +20,14 @@ import {
 import { keyframes } from "@emotion/react";
 
 const colors = [
-  "#1976d2",
-  "#00C49F",
-  "#0088FE",
-  "#FFBB28",
-  "#FF8042",
-  "#8884d8",
-  "#82ca9d",
-  "#ffc658",
+  "#00bcd4", // Cyan
+  "#795548", // Brown
+  "#00c853", // Success green
+  "#ff9800", // Warning orange
+  "#f50057", // Error pink
+  "#673ab7", // Deep purple
+  "#2196f3", // Primary blue
+  "#ff5722", // Deep orange
 ];
 
 const blinkAnimation = keyframes`
@@ -77,7 +77,6 @@ const LineGraph = ({
   data = [],
   comparisonData = {},
   expanded = false,
-  backgroundColor = "#f5f5f5",
   scriptName = "Script",
 }) => {
   const [zoomState, setZoomState] = useState({
@@ -96,6 +95,7 @@ const LineGraph = ({
       .map((item, index) => {
         const newItem = { ...item, [scriptName]: item.y };
         delete newItem.y;
+
         Object.keys(comparisonData).forEach((compScript) => {
           if (comparisonData[compScript] && comparisonData[compScript][index]) {
             newItem[compScript] = comparisonData[compScript][index].y;
@@ -113,11 +113,7 @@ const LineGraph = ({
           script === scriptName
             ? data[data.length - 1]
             : comparisonData[script]?.[comparisonData[script].length - 1];
-        acc[script] = latestData
-          ? script === scriptName
-            ? latestData.y
-            : latestData.y
-          : null;
+        acc[script] = latestData ? latestData.y : null;
         return acc;
       }, {}),
     [allScripts, data, comparisonData, scriptName]
@@ -125,8 +121,10 @@ const LineGraph = ({
 
   const handleWheel = useCallback(
     (event) => {
-      event.preventDefault();
-      const zoomFactor = event.deltaY > 0 ? 1.1 : 0.9; // Zoom out (>1) or in (<1)
+      const nativeEvent = event;
+      if (!nativeEvent || typeof nativeEvent.offsetX === "undefined") return;
+
+      const zoomFactor = event.deltaY > 0 ? 1.1 : 0.9;
       const dataLength = combinedData.length;
       const currentRange = zoomState.endIndex - zoomState.startIndex;
       const newRange = Math.max(
@@ -134,8 +132,8 @@ const LineGraph = ({
         Math.min(dataLength, Math.round(currentRange * zoomFactor))
       );
 
-      const mouseX = event.nativeEvent.offsetX;
-      const chartWidth = chartRef.current.offsetWidth;
+      const mouseX = nativeEvent.offsetX;
+      const chartWidth = chartRef.current ? chartRef.current.offsetWidth : 1;
       const zoomCenter =
         zoomState.startIndex + (mouseX / chartWidth) * currentRange;
 
@@ -151,6 +149,26 @@ const LineGraph = ({
     [zoomState, combinedData.length]
   );
 
+  useEffect(() => {
+    const chartNode = chartRef.current;
+    if (!chartNode) return;
+
+    const wheelHandler = (event) => {
+      event.preventDefault();
+      handleWheel(event);
+    };
+
+    chartNode.addEventListener("wheel", wheelHandler, {
+      passive: false,
+      capture: true,
+    });
+
+    return () => {
+      chartNode.removeEventListener("wheel", wheelHandler, {
+        capture: true,
+      });
+    };
+  }, [handleWheel]);
   const zoomedData = combinedData.slice(
     zoomState.startIndex,
     zoomState.endIndex + 1
@@ -165,9 +183,32 @@ const LineGraph = ({
     }
   }, [expanded, combinedData.length]);
 
+  useEffect(() => {
+    const chartNode = chartRef.current;
+    if (!chartNode) return;
+
+    const handleNonPassiveWheel = (event) => {
+      event.preventDefault();
+      const nativeEvent = event.nativeEvent;
+      if (!nativeEvent || typeof nativeEvent.offsetX === "undefined") {
+        return;
+      }
+
+      handleWheel(event);
+    };
+
+    chartNode.addEventListener("wheel", handleNonPassiveWheel, {
+      passive: false,
+    });
+
+    return () => {
+      chartNode.removeEventListener("wheel", handleNonPassiveWheel);
+    };
+  }, [handleWheel]);
+
   return (
     <div className="w-full" ref={chartRef} onWheel={handleWheel}>
-      <ResponsiveContainer width="100%" height={expanded ? 400 : 200}>
+      <ResponsiveContainer width="100%" height={expanded ? 300 : 175}>
         <AreaChart
           data={zoomedData}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
@@ -211,7 +252,7 @@ const LineGraph = ({
             <React.Fragment key={script}>
               <Area
                 type="monotone"
-                dataKey={script === scriptName ? scriptName : script}
+                dataKey={script}
                 name={script}
                 stroke={colors[index % colors.length]}
                 fillOpacity={1}

@@ -103,6 +103,7 @@ const EnhancedGraph = ({
     const seconds = String(date.getUTCSeconds()).padStart(2, "0");
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
+
   return (
     <Dialog
       open={openGraph}
@@ -234,7 +235,6 @@ const EnhancedGraph = ({
                 stroke="#555"
                 style={{ fontSize: "12px" }}
                 tickFormatter={formatXAxis}
-                angle={-45}
                 textAnchor="end"
                 height={70}
               />

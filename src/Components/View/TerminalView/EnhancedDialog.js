@@ -24,6 +24,7 @@ import LineGraph from "./LineGraph";
 import MultiAxisGraph from "./MultiAxisGraph";
 import { Chart } from "chart.js";
 import zoomPlugin from "chartjs-plugin-zoom";
+import CountdownTimer from "./CountdownTimer";
 
 Chart.register(zoomPlugin);
 
@@ -39,9 +40,15 @@ const EnhancedDialog = ({
   graphType,
   state,
   comparisonData,
+  refreshInterval,
 }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const containerRef = useRef(null);
+
+  // Filter out the currently selected script from available comparison options
+  const filteredScripts = availableScripts.filter(
+    (script) => script !== selectedScript
+  );
 
   // ---------- - Full Screen -------------
   const toggleFullScreen = () => {
@@ -92,6 +99,15 @@ const EnhancedDialog = ({
     }
   };
 
+  const handleScriptChange = (event) => {
+    const value = event.target.value;
+    if (value.includes("none")) {
+      handleComparisonScriptChange({ target: { value: [] } });
+    } else {
+      handleComparisonScriptChange(event);
+    }
+  };
+
   return (
     <Dialog
       open={isDialogOpen && isGraphExpanded}
@@ -122,22 +138,12 @@ const EnhancedDialog = ({
             title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"}
             arrow
           >
-            <IconButton
-              style={{
-                color: "white",
-              }}
-              onClick={toggleFullScreen}
-            >
+            <IconButton style={{ color: "white" }} onClick={toggleFullScreen}>
               {isFullScreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
             </IconButton>
           </Tooltip>
           <Tooltip title="Export to PDF" arrow>
-            <IconButton
-              style={{
-                color: "white",
-              }}
-              onClick={graphexportToPdf}
-            >
+            <IconButton style={{ color: "white" }} onClick={graphexportToPdf}>
               <PictureAsPdfIcon />
             </IconButton>
           </Tooltip>
@@ -175,7 +181,7 @@ const EnhancedDialog = ({
               labelId="compare-scripts-label"
               multiple
               value={comparisonScripts}
-              onChange={handleComparisonScriptChange}
+              onChange={handleScriptChange}
               renderValue={(selected) => (
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                   {selected.map((value) => (
@@ -183,8 +189,7 @@ const EnhancedDialog = ({
                       key={value}
                       label={value}
                       sx={{
-                        backgroundColor:
-                          value === selectedScript ? "#4caf50" : "#2196f3",
+                        backgroundColor: "#2196f3",
                         color: "white",
                         fontWeight: 500,
                         "&:hover": {
@@ -196,11 +201,7 @@ const EnhancedDialog = ({
                 </Box>
               )}
               MenuProps={{
-                PaperProps: {
-                  sx: {
-                    maxHeight: 300,
-                  },
-                },
+                PaperProps: {},
               }}
               sx={{
                 borderRadius: "8px",
@@ -212,33 +213,32 @@ const EnhancedDialog = ({
               <MenuItem value="none">
                 <em>None</em>
               </MenuItem>
-              {availableScripts.map((script) => (
+              {filteredScripts.map((script) => (
                 <MenuItem
-                  key={script.scriptName}
-                  value={script.scriptName}
+                  key={script}
+                  value={script}
                   sx={{
-                    backgroundColor:
-                      script.scriptName === selectedScript
-                        ? "rgba(76, 175, 80, 0.1)"
-                        : "inherit",
-                    fontWeight:
-                      script.scriptName === selectedScript ? "bold" : "normal",
                     "&:hover": {
                       backgroundColor: "#e3f2fd",
                     },
                   }}
                 >
-                  {script.scriptName}
+                  {script}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-        </Box>
+        </Box>{" "}
+        {refreshInterval && (
+          <Box sx={{ mt: 2 }}>
+            <CountdownTimer refreshInterval={refreshInterval} />
+          </Box>
+        )}
         <Box
           id="graph-container"
           ref={containerRef}
           sx={{
-            height: isFullScreen ? "100vh" : "420px",
+            height: isFullScreen ? "100vh" : "400px",
             marginBottom: 2,
             border: "1px solid rgba(0, 0, 0, 0.1)",
             borderRadius: "12px",
@@ -266,6 +266,7 @@ const EnhancedDialog = ({
             />
           )}
         </Box>
+        <ToastContainer />
       </DialogContent>
     </Dialog>
   );

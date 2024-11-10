@@ -32,24 +32,64 @@ const HistoricalDataView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tableToDelete, setTableToDelete] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     fetchTables();
   }, []);
 
-  // --------------- Fetching tables ---------------
   const fetchTables = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${apiKey}terminal/table/list`);
-      setTables(response.data);
+
+      const userDataString = localStorage.getItem("user");
+      if (!userDataString) {
+        throw new Error("User data not found in localStorage");
+      }
+
+      const userData = JSON.parse(userDataString);
+      const { user_Type, customerID } = userData;
+      setIsAdmin(user_Type === "Admin");
+
+      let response;
+      if (user_Type === "Admin") {
+        response = await axios.get(`${apiKey}terminal/table/list`);
+      } else {
+        if (!customerID) {
+          throw new Error("Customer ID not found");
+        }
+        response = await axios.get(
+          `${apiKey}terminal/table/allTables/${customerID}`
+        );
+      }
+
+      const tableData = response.data;
+      if (!Array.isArray(tableData)) {
+        console.error("Received non-array data:", tableData);
+        setTables([]);
+        setError("Invalid data format received from server");
+        return;
+      }
+
+      setTables(tableData);
       setError(null);
     } catch (err) {
       console.error("Error fetching tables:", err);
-      setError("Failed to load tables. Please try again later.");
+      const errorMessage =
+        err.message === "User data not found in localStorage"
+          ? "Please log in to view tables"
+          : err.message === "Customer ID not found"
+          ? "Customer ID not found. Please contact support"
+          : "Failed to load tables. Please try again later.";
+      setError(errorMessage);
+      setTables([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTableClick = (tableId) => {
+    navigate(`/data-table/${tableId}`);
   };
 
   const handleAddTable = () => {
@@ -60,33 +100,32 @@ const HistoricalDataView = () => {
     setOpenDialog(false);
   };
 
-  // --------------- Creating table ---------------
-  const handleCreateTable = async (terminal, variable, profile) => {
+  const handleCreateTable = async (tableData) => {
     try {
-      const response = await axios.post(`${apiKey}terminal/createTable`, {
-        name: `${profile} - ${terminal} - ${variable}`,
-        terminal,
-        columns: ["timestamp", variable],
-        profile,
-      });
+      const userData = JSON.parse(localStorage.getItem("user"));
+      if (!isAdmin && userData?.customerID) {
+        tableData.customerID = userData.customerID;
+      }
 
+      const response = await axios.post(
+        `${apiKey}terminal/createTable`,
+        tableData
+      );
+
+      toast.success("Table created successfully");
       await fetchTables();
       navigate(`/data-table/${response.data._id}`);
     } catch (error) {
       console.error("Error creating table:", error);
-      toast.error("Failed to create table");
+      toast.error(error.response?.data?.error || "Failed to create table");
+    } finally {
+      setOpenDialog(false);
     }
   };
 
-  const handleTableClick = (tableId) => {
-    navigate(`/data-table/${tableId}`);
-  };
-
-  // --------------- Deleting table ---------------
   const handleDeleteTable = async () => {
     try {
       await axios.delete(`${apiKey}terminal/table/delete/${tableToDelete}`);
-
       fetchTables();
       toast.success("Table deleted successfully");
       setDeleteDialogOpen(false);
@@ -97,7 +136,8 @@ const HistoricalDataView = () => {
     }
   };
 
-  const openDeleteConfirmation = (tableId) => {
+  const openDeleteConfirmation = (tableId, event) => {
+    event.stopPropagation();
     setTableToDelete(tableId);
     setDeleteDialogOpen(true);
   };
@@ -134,68 +174,77 @@ const HistoricalDataView = () => {
       <Grid container spacing={3} justifyContent="center">
         <Grid item xs={12} md={8}>
           <Grid container spacing={3}>
-            {tables.map((table) => (
-              <Grid
-                item
-                xs={12}
-                sm={6}
-                md={4}
-                key={table._id}
-                sx={{ minWidth: "250px" }}
-              >
-                <Paper
-                  sx={{
-                    p: 3,
-                    borderRadius: "12px",
-                    cursor: "pointer",
-                    backgroundColor: "#ffffff",
-                    boxShadow: 3,
-                    width: "100%",
-                    height: "100%",
-                    transition: "transform 0.3s, box-shadow 0.3s",
-                    "&:hover": {
-                      background:
-                        "linear-gradient(to bottom right, rgba(0, 124, 137, 0.3), rgba(77, 208, 225, 0.3))",
-                      transform: "translateY(-4px)",
-                      boxShadow: 6,
-                    },
-                    position: "relative",
-                  }}
-                  onClick={() => handleTableClick(table._id)}
+            {Array.isArray(tables) && tables.length > 0 ? (
+              tables.map((table) => (
+                <Grid
+                  item
+                  xs={12}
+                  sm={6}
+                  md={4}
+                  key={table._id}
+                  sx={{ minWidth: "250px" }}
                 >
-                  <Typography variant="h6" sx={{ color: "#333", mb: 1 }}>
-                    {table.name}
-                  </Typography>
+                  <Paper
+                    sx={{
+                      p: 3,
+                      borderRadius: "12px",
+                      cursor: "pointer",
+                      backgroundColor: "#ffffff",
+                      boxShadow: 3,
+                      width: "100%",
+                      height: "100%",
+                      transition: "transform 0.3s, box-shadow 0.3s",
+                      "&:hover": {
+                        background:
+                          "linear-gradient(to bottom right, rgba(0, 124, 137, 0.3), rgba(77, 208, 225, 0.3))",
+                        transform: "translateY(-4px)",
+                        boxShadow: 6,
+                      },
+                      position: "relative",
+                    }}
+                    onClick={() => handleTableClick(table._id)}
+                  >
+                    <Typography variant="h6" sx={{ color: "#333", mb: 1 }}>
+                      {table.name}
+                    </Typography>
 
-                  <Typography variant="body2" sx={{ color: "#666" }}>
-                    <span style={{ fontWeight: "bold" }}>Profile:</span>{" "}
-                    {table.profile}
-                  </Typography>
+                    <Typography variant="body2" sx={{ color: "#666" }}>
+                      <span style={{ fontWeight: "bold" }}>Profile:</span>{" "}
+                      {table.profile}
+                    </Typography>
 
-                  <Box>
-                    <Tooltip title="Delete Table">
-                      <IconButton
-                        sx={{
-                          position: "absolute",
-                          top: 8,
-                          right: 8,
-                          transition: "opacity 0.3s",
-                          "&:hover": {
-                            opacity: 1,
-                          },
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDeleteConfirmation(table._id);
-                        }}
-                      >
-                        <DeleteIcon sx={{ color: "#e57373" }} />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                </Paper>
+                    {(isAdmin || !isAdmin) && (
+                      <Box>
+                        <Tooltip title="Delete Table">
+                          <IconButton
+                            sx={{
+                              position: "absolute",
+                              top: 8,
+                              right: 8,
+                              transition: "opacity 0.3s",
+                              "&:hover": {
+                                opacity: 1,
+                              },
+                            }}
+                            onClick={(e) =>
+                              openDeleteConfirmation(table._id, e)
+                            }
+                          >
+                            <DeleteIcon sx={{ color: "#e57373" }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    )}
+                  </Paper>
+                </Grid>
+              ))
+            ) : (
+              <Grid item xs={12}>
+                <Typography variant="body1" textAlign="center">
+                  No tables found
+                </Typography>
               </Grid>
-            ))}
+            )}
           </Grid>
         </Grid>
 
@@ -225,12 +274,6 @@ const HistoricalDataView = () => {
         </Grid>
       </Grid>
 
-      <TableColumnCreate
-        open={openDialog}
-        onClose={handleCloseDialog}
-        onCreateColumn={handleCreateTable}
-      />
-
       <Dialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
@@ -251,6 +294,11 @@ const HistoricalDataView = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <TableColumnCreate
+        open={openDialog}
+        onClose={handleCloseDialog}
+        onCreateColumn={handleCreateTable}
+      />
     </Box>
   );
 };

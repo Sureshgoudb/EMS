@@ -53,15 +53,15 @@ const Widget = ({
   );
   const [textStyle, setTextStyle] = useState({
     fontFamily: properties.fontFamily || "Arial",
-    fontSize: properties.fontSize || "14px",
-    fontColor: properties.fontColor || "#000000",
+    fontSize: properties.fontSize || "40px",
+    fontColor: properties.fontColor || "#FF0000",
     fontStyle: properties.fontStyle || "normal",
   });
 
   const [currentStyles, setCurrentStyles] = useState({
     fontFamily: widgetData.properties?.fontFamily || "Arial",
-    fontSize: widgetData.properties?.fontSize || "14px",
-    fontColor: widgetData.properties?.fontColor || "#000000",
+    fontSize: widgetData.properties?.fontSize || "40px",
+    fontColor: widgetData.properties?.fontColor || "#FF0000",
     fontStyle: widgetData.properties?.fontStyle || "normal",
     fontWeight: widgetData.properties?.fontWeight || "normal",
     backgroundColor: widgetData.properties?.backgroundColor || "#ffffff",
@@ -118,15 +118,12 @@ const Widget = ({
   };
 
   // ----------- Fetch available scripts -----------
-  // ----------- Fetch available scripts -----------
   const fetchScripts = async (terminalID) => {
     try {
       const response = await fetch(`${apiKey}terminal/${terminalID}/scripts`);
       const data = await response.json();
 
-      // Check if 'scripts' property exists in the response
       if (data && data.scripts) {
-        // Return an array of script names (object keys)
         return Object.keys(data.scripts);
       } else {
         console.error("Unexpected response structure:", data);
@@ -150,6 +147,7 @@ const Widget = ({
     UPDATE_HISTORICAL_DATA: "UPDATE_HISTORICAL_DATA",
     UPDATE_EXPANDED_DATA: "UPDATE_EXPANDED_DATA",
     SET_ERROR: "SET_ERROR",
+    CLEAR_HISTORICAL_DATA: "CLEAR_HISTORICAL_DATA",
   };
 
   const dataReducer = (state, action) => {
@@ -178,10 +176,17 @@ const Widget = ({
           ...state,
           error: action.payload,
         };
+      case actions.CLEAR_HISTORICAL_DATA:
+        return {
+          ...state,
+          scriptData: [],
+          detailedData: [],
+        };
       default:
         return state;
     }
   };
+
   const [state, dispatch] = useReducer(dataReducer, {
     value: widgetData.currentValue,
     timestamp: "",
@@ -190,37 +195,59 @@ const Widget = ({
     error: null,
   });
 
+  const EXPANDED_LIMIT = 900;
+  const LIVE_UPDATE_INTERVAL = 20000;
+
   const fetchData = useCallback(
     async (isExpanded = false) => {
       if (terminalName && scriptName) {
         try {
-          const data = await fetchScriptData(terminalID, scriptName);
+          // Fetch current value
+          const currentDataResponse = await fetch(
+            `${apiKey}terminal/${terminalID}/script/${scriptName}/currentValue`
+          );
+          const currentData = await currentDataResponse.json();
+
           dispatch({
             type: actions.UPDATE_CURRENT_DATA,
             payload: {
-              value: parseFloat(data.value),
-              timestamp: data.timestamp,
+              value: parseFloat(currentData[scriptName]),
+              timestamp: currentData.timestamp,
             },
           });
 
+          // Fetch historical data
           const historicalDataResponse = await fetch(
-            `${apiKey}terminal/${terminalID}/script/${scriptName}/history?expanded=${isExpanded}`
+            `${apiKey}terminal/${terminalID}/script/${scriptName}/history`
           );
           const historicalData = await historicalDataResponse.json();
 
-          const transformedData = transformDataForGraph(historicalData);
-          if (isExpanded) {
-            dispatch({
-              type: actions.UPDATE_EXPANDED_DATA,
-              payload: transformedData,
-            });
-          } else {
-            dispatch({
-              type: actions.UPDATE_HISTORICAL_DATA,
-              payload: transformedData,
-            });
-          }
+          // Sort data by timestamp
+          const sortedData = historicalData.sort(
+            (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+          );
+
+          // Transform and update both expanded and regular views
+          const expandedData = getLatestData(sortedData, EXPANDED_LIMIT);
+          const regularData = getLatestData(
+            sortedData,
+            widgetData.xAxisConfiguration?.value || 100
+          );
+
+          const transformedExpandedData = transformDataForGraph(expandedData);
+          const transformedRegularData = transformDataForGraph(regularData);
+
+          // Always update both datasets
+          dispatch({
+            type: actions.UPDATE_EXPANDED_DATA,
+            payload: transformedExpandedData,
+          });
+          dispatch({
+            type: actions.UPDATE_HISTORICAL_DATA,
+            payload: transformedRegularData,
+          });
         } catch (error) {
+          console.error("Error fetching data:", error);
           dispatch({
             type: actions.SET_ERROR,
             payload: "Failed to fetch data",
@@ -228,20 +255,71 @@ const Widget = ({
         }
       }
     },
-    [terminalName, scriptName, terminalID]
+    [terminalName, scriptName, terminalID, widgetData.xAxisConfiguration]
   );
 
   useEffect(() => {
     fetchData();
 
-    const intervalId = setInterval(() => {
+    const liveUpdateInterval = setInterval(() => {
       fetchData();
-    }, 20000);
+    }, LIVE_UPDATE_INTERVAL);
 
-    return () => {
-      clearInterval(intervalId);
-    };
+    return () => clearInterval(liveUpdateInterval);
   }, [fetchData]);
+
+  // Effect for handling refresh interval (complete data refresh)
+  useEffect(() => {
+    if (widgetData.refreshInterval && widgetData.refreshInterval > 0) {
+      const refreshInterval = setInterval(() => {
+        dispatch({ type: actions.CLEAR_HISTORICAL_DATA });
+        fetchData();
+      }, widgetData.refreshInterval * 1000);
+
+      return () => clearInterval(refreshInterval);
+    }
+  }, [widgetData.refreshInterval, fetchData]);
+  const limitDataPoints = (data, limit) => {
+    if (!Array.isArray(data) || data.length <= limit) return data;
+
+    const step = Math.ceil(data.length / limit);
+    return data.filter((_, index) => index % step === 0).slice(0, limit);
+  };
+
+  const getLatestData = (data, limit) => {
+    if (!Array.isArray(data) || data.length === 0) return [];
+    return data
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, limit);
+  };
+
+  useEffect(() => {
+    if (isGraphExpanded && comparisonScripts.length > 0) {
+      const updateComparisonData = async () => {
+        const newComparisonData = {};
+        for (const script of comparisonScripts) {
+          const data = await fetchScriptData(terminalID, script);
+          const transformedData = transformDataForGraph(data.data || []);
+          const limitedData = limitDataPoints(transformedData, EXPANDED_LIMIT);
+          newComparisonData[script] = limitedData;
+        }
+        setComparisonData(newComparisonData);
+      };
+
+      updateComparisonData();
+
+      const comparisonUpdateInterval = setInterval(() => {
+        updateComparisonData();
+      }, LIVE_UPDATE_INTERVAL);
+
+      return () => clearInterval(comparisonUpdateInterval);
+    }
+  }, [isGraphExpanded, comparisonScripts, terminalID]);
+  const handleExpandClick = () => {
+    setIsGraphExpanded(true);
+    setIsDialogOpen(true);
+    fetchData(true);
+  };
 
   // ------------ Delete Widget -----------
   const handleDeleteWidget = async () => {
@@ -249,23 +327,13 @@ const Widget = ({
     setDeleteError(null);
 
     try {
-      const response = await fetch(`${apiKey}terminal/widget/deletewidget`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          terminalID: terminalID,
-          scriptName: scriptName,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to delete widget");
+      if (!widgetData.scriptId) {
+        throw new Error("Script ID not found");
       }
 
-      onDelete(terminalID);
+      // Call the parent component's delete function with scriptId
+      await onDelete(widgetData.scriptId);
+      setIsConfirmDialogOpen(false);
     } catch (error) {
       console.error("Error deleting widget:", error);
       setDeleteError(
@@ -274,12 +342,6 @@ const Widget = ({
     } finally {
       setIsDeleting(false);
     }
-  };
-
-  const handleExpandClick = () => {
-    setIsGraphExpanded(true);
-    setIsDialogOpen(true);
-    fetchData(true);
   };
 
   const handleCloseDialog = () => {
@@ -328,7 +390,10 @@ const Widget = ({
       const newComparisonData = {};
       for (const script of comparisonScripts) {
         const data = await fetchScriptData(terminalID, script);
-        newComparisonData[script] = transformDataForGraph(data.data || []);
+        const transformedData = transformDataForGraph(data.data || []);
+        // Apply the same limiting logic to comparison data
+        const limitedData = limitDataPoints(transformedData, EXPANDED_LIMIT);
+        newComparisonData[script] = limitedData;
       }
       setComparisonData(newComparisonData);
     };
@@ -339,7 +404,6 @@ const Widget = ({
       setComparisonData({});
     }
   }, [comparisonScripts, terminalID]);
-
   useEffect(() => {
     if (isGraphExpanded) {
       fetchScripts(terminalID).then((scripts) => {
@@ -565,9 +629,11 @@ const Widget = ({
               }}
             >
               {widgetData.areaGraph && (
-                <Typography color={autoTextColor}>
-                  Last Sync {formatTimestamp(state.timestamp)}
-                </Typography>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  <Typography color={autoTextColor} fontSize="small">
+                    Last Sync {formatTimestamp(state.timestamp)}
+                  </Typography>
+                </Box>
               )}
 
               {widgetData.areaGraph && (
@@ -637,6 +703,7 @@ const Widget = ({
         graphType={graphType}
         state={state}
         comparisonData={comparisonData}
+        refreshInterval={widgetData.refreshInterval} // Pass refreshInterval to EnhancedDialog
       />
     </>
   );
