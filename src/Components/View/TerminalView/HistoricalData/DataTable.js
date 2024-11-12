@@ -152,6 +152,7 @@ const DataTable = () => {
     { value: "block", label: "Block" },
     { value: "daily", label: "Daily" },
   ]);
+  const requestCache = useRef(new Map());
 
   useEffect(() => {
     if (selectedTerminal) {
@@ -588,47 +589,99 @@ const DataTable = () => {
   }, [selectedScripts]);
 
   const fetchScriptData = async (script) => {
-    if (!selectedTerminal || !selectedProfile) {
-      console.error("Missing required parameters for fetchScriptData");
+    if (!selectedTerminal || !selectedProfile) return;
+
+    const cacheKey = `${selectedTerminal}-${script}-${selectedProfile}-${fromDate}-${toDate}`;
+
+    // Check cache first
+    if (requestCache.current.has(cacheKey)) {
+      const cachedData = requestCache.current.get(cacheKey);
+      setScriptData((prev) => ({
+        ...prev,
+        [script]: cachedData,
+      }));
       return;
     }
 
     try {
       const response = await axios.get(
-        `${apiKey}terminal/${selectedTerminal}/script/${script}/history/${selectedProfile}`
+        `${apiKey}terminal/${selectedTerminal}/script/${script}/history/${selectedProfile}`,
+        {
+          params: {
+            fromDate: fromDate.toISOString(),
+            toDate: toDate.toISOString(),
+          },
+        }
       );
 
-      const scriptData = response.data;
-
-      if (!Array.isArray(scriptData) || scriptData.length === 0) {
-        return;
-      }
-
-      const newData = scriptData.reduce((acc, item) => {
-        if (item && item[script]) {
-          const timestamp = item[script].timestamp;
-          const value = parseFloat(item[script].value.$numberDecimal);
-          if (timestamp && !isNaN(value)) {
-            const rowDate = dayjs(timestamp);
-            if (rowDate.isAfter(fromDate) && rowDate.isBefore(toDate)) {
-              acc[timestamp] = {
-                timestamp,
-                [script]: value,
-              };
-            }
+      const processedData = {};
+      response.data.forEach((item) => {
+        if (item[script]) {
+          const { timestamp, value } = item[script];
+          if (timestamp && !isNaN(value.$numberDecimal)) {
+            processedData[timestamp] = {
+              timestamp,
+              [script]: parseFloat(value.$numberDecimal),
+            };
           }
         }
-        return acc;
-      }, {});
+      });
 
-      setScriptData((prevData) => ({
-        ...prevData,
-        [script]: newData,
+      // Store in cache
+      requestCache.current.set(cacheKey, processedData);
+
+      setScriptData((prev) => ({
+        ...prev,
+        [script]: processedData,
       }));
     } catch (error) {
       console.error(`Error fetching data for script ${script}:`, error);
     }
   };
+
+  // Optimize data loading
+  const loadData = useCallback(async () => {
+    if (!selectedTerminal || !selectedProfile || selectedScripts.length === 0)
+      return;
+
+    setLoading(true);
+
+    // Use Promise.all for parallel requests
+    const fetchPromises = selectedScripts.map((script) =>
+      fetchScriptData(script)
+    );
+    await Promise.all(fetchPromises);
+
+    setLoading(false);
+  }, [selectedTerminal, selectedProfile, selectedScripts, fromDate, toDate]);
+
+  // Optimize useEffect hooks
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Optimize row processing
+  useEffect(() => {
+    const mergedData = {};
+    Object.values(scriptData).forEach((scriptRows) => {
+      Object.entries(scriptRows).forEach(([timestamp, rowData]) => {
+        if (!mergedData[timestamp]) {
+          mergedData[timestamp] = { timestamp };
+        }
+        Object.assign(mergedData[timestamp], rowData);
+      });
+    });
+
+    const sortedNewRows = Object.values(mergedData).sort(
+      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+    );
+
+    setRows(sortedNewRows);
+    setFilteredRows(sortedNewRows);
+    setSortedRows(sortedNewRows);
+    setVisibleRows(sortedNewRows.slice(0, 50));
+    setHasMore(sortedNewRows.length > 50);
+  }, [scriptData]);
 
   useEffect(() => {
     const fetchAllScriptData = async () => {
