@@ -1,0 +1,30 @@
+
+    
+    /* Widget on hover */
+    .resizable-box:hover {
+      box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.542), inset 0px -6px 12px rgba(255, 255, 255, 0.378);
+      border-color: #009688; /* Change border color to a cool teal */
+      animation: ease-in 2s infinite;
+    }
+    
+
+
+    /* Timestamp */
+    .timestamp {
+      color: #666; /* Timestamp color */
+    }
+    
+   
+    /* Graph section */
+    .graph-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 16px;
+    }
+    
+    /* Expand/Collapse icon */
+    .expand-icon {
+      color: #007c89;
+    }
+    

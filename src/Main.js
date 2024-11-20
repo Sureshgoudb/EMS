@@ -4,8 +4,7 @@ import {
   createBrowserRouter,
   Outlet,
   useRoutes,
-  useNavigate,
-  Navigate 
+  Navigate,
 } from "react-router-dom";
 import Footer from "./Components/Footer";
 import Header from "./Components/Header";
@@ -36,6 +35,9 @@ axios.interceptors.response.use(
       return Promise.reject(error);
   }
 );
+import TerminalView from "./Components/View/TerminalView/TerminalView";
+import TerminalWidgetsPage from "./Components/View/TerminalView/TerminalWidgetsPage";
+import DataTable from "./Components/View/TerminalView/HistoricalData/DataTable";
 
 const Main = () => {
   const HeaderLayout = () => {
@@ -50,10 +52,9 @@ const Main = () => {
       );
     }
     let user = localStorage.getItem("user");
-    if(user == null || user == undefined)
-      {
-        return <Navigate to='/'></Navigate>
-      }
+    if (user == null || user == undefined) {
+      return <Navigate to="/"></Navigate>;
+    }
 
     return (
       <Provider store={appStore}>
@@ -84,7 +85,6 @@ const Main = () => {
           path: "/profile?",
           element: <Profile />,
         },
-
         {
           path: "/devicedata",
           element: <DeviceData />,
@@ -110,8 +110,16 @@ const Main = () => {
           element: <Customers />,
         },
         {
-          path: "/dashboard",
+          path: "/sldcview",
           element: <Dashboard />,
+        },
+        {
+          path: "/view/terminal",
+          element: <TerminalView />,
+        },
+        {
+          path: "/terminal/:terminalID",
+          element: <TerminalWidgetsPage />,
         },
         {
           path: "/schedule",
@@ -124,6 +132,10 @@ const Main = () => {
         {
           path: "/profile",
           element: <Profile />,
+        },
+        {
+          path: "/data-table/:tableId",
+          element: <DataTable />,
         },
         {
           path: "*",

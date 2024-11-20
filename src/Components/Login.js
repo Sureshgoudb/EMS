@@ -47,12 +47,15 @@ const Login = () => {
       try {
         const response = await axios.post(apiKey + "auth/login", loginData);
         if (response.data && response.data.status !== "invalid user") {
-          let parentId =null;
-          const customer = await axios.get(apiKey + "customer/item/" + response.data.customerID);
-          if (customer.data) 
-          {     
-            if(customer.data.parentId != null || customer.data.parentId != undefined)
-            {
+          let parentId = null;
+          const customer = await axios.get(
+            apiKey + "customer/item/" + response.data.customerID
+          );
+          if (customer.data) {
+            if (
+              customer.data.parentId != null ||
+              customer.data.parentId != undefined
+            ) {
               parentId = customer.data.parentId;
             }
             localStorage.setItem("organization", JSON.stringify(customer.data));
@@ -64,14 +67,15 @@ const Login = () => {
             customerID: response.data.customerID,
             phoneNo: response.data.phoneNo,
             userId: response.data.userId,
-            parentId: parentId
-          }
+            parentId: parentId,
+          };
           localStorage.setItem("user", JSON.stringify(user));
-          dispatch(
-            addUser(user)
-          );
+          dispatch(addUser(user));
+          if(response.data.user_Type === "User")
+          navigate("/view/terminal");
+          else
+          navigate("/sldcview");
 
-          navigate("/dashboard");
         } else {
           setformError(true);
         }
