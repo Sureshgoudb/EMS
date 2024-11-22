@@ -22,6 +22,19 @@ import Customers from "./Components/Customers";
 import Dashboard from "./Components/Dashboard";
 import Schedule from "./Components/Schedule";
 import Reports from "./Components/Reports";
+import axios from 'axios';
+
+axios.defaults.withCredentials = true;
+axios.interceptors.response.use(
+  response => response,
+  error => {
+      if (error.response && error.response.status === 401) {
+          alert('Session has expired. Please log in again.');
+          window.location.href = '/';
+      }
+      return Promise.reject(error);
+  }
+);
 import TerminalView from "./Components/View/TerminalView/TerminalView";
 import TerminalDetailPage from "./Components/View/TerminalView/TerminalDetailPage";
 import DataTable from "./Components/View/TerminalView/HistoricalData/DataTable";
