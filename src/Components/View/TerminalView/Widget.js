@@ -1,710 +1,786 @@
-import React, { useState, useEffect, useCallback, useReducer } from "react";
-import MultiAxisGraph from "./MultiAxisGraph";
-import EnhancedDialog from "./EnhancedDialog";
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  Box,
+  Card,
   Typography,
   IconButton,
-  Tooltip,
+  Box,
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-  Button,
+  DialogTitle,
+  Tooltip,
+  Snackbar,
+  Alert,
 } from "@mui/material";
-import { ResizableBox } from "react-resizable";
-import "react-resizable/css/styles.css";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
-import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
-import LineGraph from "./LineGraph";
-import FormatDialog from "./FormatDialog";
-import { useParams } from "react-router";
+import {
+  Settings,
+  DragIndicator,
+  OpenInFull,
+  Fullscreen,
+  ZoomIn,
+  ZoomOut,
+  FileDownload,
+  Close,
+  FullscreenExit,
+} from "@mui/icons-material";
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+import TextFormatDialog from "./TextFormatDialog";
+import SimpleGraph from "./SimpleGraph";
+import MultiAxisGraph from "./MultiAxisGraph";
+import html2canvas from "html2canvas";
+import jsPdf from "jspdf";
+import ConfirmationDialog from "./ConfirmationDialog";
 
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(date.getUTCDate()).padStart(2, "0")} ${String(
+    date.getUTCHours()
+  ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(
+    date.getUTCSeconds()
+  ).padStart(2, "0")}`;
+};
+
 const Widget = ({
   widgetData,
-  onResize,
   onDelete,
-  onDragStart,
-  onDrop,
-  terminalName,
+  style,
+  className,
+  isLayoutChanging,
 }) => {
-  const { terminalID } = useParams();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isFormatDialog, setIsFormatDialog] = useState(false);
-  const [availableScripts, setAvailableScripts] = useState([]);
-  const [selectedScript, setSelectedScript] = useState("");
-  const [scriptName, setScriptName] = useState(widgetData.scriptName || "");
-  const [comparisonScriptName, setComparisonScriptName] = useState("");
+  const [currentValue, setCurrentValue] = useState(null);
+  const [historicalData, setHistoricalData] = useState([]);
+  const [textFormatOpen, setTextFormatOpen] = useState(false);
+  const [timestamp, setTimestamp] = useState(null);
+  const [error, setError] = useState(null);
+  const [selectedScripts, setSelectedScripts] = useState([]);
+  const [availableComparisonScripts, setAvailableComparisonScripts] = useState(
+    []
+  );
+  const [selectedComparisonScripts, setSelectedComparisonScripts] = useState(
+    []
+  );
   const [comparisonData, setComparisonData] = useState([]);
-  const [comparisonScripts, setComparisonScripts] = useState([]);
-  const [isGraphExpanded, setIsGraphExpanded] = useState(false);
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-  const [graphType, setGraphType] = useState(widgetData.graphType || "simple");
-  const [deleteError, setDeleteError] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const properties = widgetData.properties || {};
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const graphContainerRef = React.useRef(null);
+  const [confirmationDialog, setConfirmationDialog] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const MAX_DATA_POINTS = isExpanded ? 30 : 10;
+  const REFRESH_INTERVAL = 30000; // 30 seconds
 
-  const [backgroundColor, setBackgroundColor] = useState(
-    properties.backgroundColor || "#ffffff"
-  );
-  const [textStyle, setTextStyle] = useState({
-    fontFamily: properties.fontFamily || "Arial",
-    fontSize: properties.fontSize || "40px",
-    fontColor: properties.fontColor || "#FF0000",
-    fontStyle: properties.fontStyle || "normal",
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
   });
 
-  const [currentStyles, setCurrentStyles] = useState({
-    fontFamily: widgetData.properties?.fontFamily || "Arial",
-    fontSize: widgetData.properties?.fontSize || "40px",
-    fontColor: widgetData.properties?.fontColor || "#FF0000",
-    fontStyle: widgetData.properties?.fontStyle || "normal",
-    fontWeight: widgetData.properties?.fontWeight || "normal",
-    backgroundColor: widgetData.properties?.backgroundColor || "#ffffff",
-  });
-
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return "";
-    const date = new Date(timestamp);
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
-    const hours = String(date.getUTCHours()).padStart(2, "0");
-    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-    const seconds = String(date.getUTCSeconds()).padStart(2, "0");
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  };
-
-  // ----------- Fetch scripts current & hisrory values -----------
-  const fetchScriptData = async (terminalID, scriptName) => {
-    try {
-      const currentDataResponse = await fetch(
-        `${apiKey}terminal/${terminalID}/script/${scriptName}/currentValue`
-      );
-      const currentData = await currentDataResponse.json();
-
-      const historicalDataResponse = await fetch(
-        `${apiKey}terminal/${terminalID}/script/${scriptName}/history`
-      );
-      const historicalData = await historicalDataResponse.json();
-
-      return {
-        value: currentData[scriptName],
-        timestamp: currentData.timestamp,
-        data: historicalData || [],
-      };
-    } catch (error) {
-      console.error("Error fetching script data:", error);
-      return {
-        value: null,
-        timestamp: "",
-        data: [],
-      };
-    }
-  };
-
-  // ----------- Drag and Drop -----------
-  const handleDragStart = (e) => {
-    onDragStart(e, terminalID);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    onDrop(terminalID);
-  };
-
-  // ----------- Fetch available scripts -----------
-  const fetchScripts = async (terminalID) => {
-    try {
-      const response = await fetch(`${apiKey}terminal/${terminalID}/scripts`);
-      const data = await response.json();
-
-      if (data && data.scripts) {
-        return Object.keys(data.scripts);
-      } else {
-        console.error("Unexpected response structure:", data);
-        return [];
-      }
-    } catch (error) {
-      console.error("Error fetching scripts:", error);
-      return [];
-    }
-  };
-  // ------------ Trasform data for graph -----------
-  const transformDataForGraph = (data) => {
-    return data.map((item) => ({
-      x: new Date(item.timestamp),
-      y: parseFloat(item[Object.keys(item)[0]]),
-    }));
-  };
-
-  const actions = {
-    UPDATE_CURRENT_DATA: "UPDATE_CURRENT_DATA",
-    UPDATE_HISTORICAL_DATA: "UPDATE_HISTORICAL_DATA",
-    UPDATE_EXPANDED_DATA: "UPDATE_EXPANDED_DATA",
-    SET_ERROR: "SET_ERROR",
-    CLEAR_HISTORICAL_DATA: "CLEAR_HISTORICAL_DATA",
-  };
-
-  const dataReducer = (state, action) => {
-    switch (action.type) {
-      case actions.UPDATE_CURRENT_DATA:
-        return {
-          ...state,
-          value: action.payload.value,
-          timestamp: action.payload.timestamp,
-          error: null,
+  const updateHistoricalData = useCallback(
+    (newValue, newTimestamp) => {
+      setHistoricalData((prevData) => {
+        const newDataPoint = {
+          value: Number(newValue),
+          timestamp: formatTimestamp(newTimestamp),
         };
-      case actions.UPDATE_HISTORICAL_DATA:
-        return {
-          ...state,
-          scriptData: action.payload,
-          error: null,
-        };
-      case actions.UPDATE_EXPANDED_DATA:
-        return {
-          ...state,
-          detailedData: action.payload,
-          error: null,
-        };
-      case actions.SET_ERROR:
-        return {
-          ...state,
-          error: action.payload,
-        };
-      case actions.CLEAR_HISTORICAL_DATA:
-        return {
-          ...state,
-          scriptData: [],
-          detailedData: [],
-        };
-      default:
-        return state;
-    }
-  };
 
-  const [state, dispatch] = useReducer(dataReducer, {
-    value: widgetData.currentValue,
-    timestamp: "",
-    scriptData: [],
-    detailedData: [],
-    error: null,
-  });
-
-  const EXPANDED_LIMIT = 900;
-  const LIVE_UPDATE_INTERVAL = 20000;
-
-  const fetchData = useCallback(
-    async (isExpanded = false) => {
-      if (terminalName && scriptName) {
-        try {
-          // Fetch current value
-          const currentDataResponse = await fetch(
-            `${apiKey}terminal/${terminalID}/script/${scriptName}/currentValue`
-          );
-          const currentData = await currentDataResponse.json();
-
-          dispatch({
-            type: actions.UPDATE_CURRENT_DATA,
-            payload: {
-              value: parseFloat(currentData[scriptName]),
-              timestamp: currentData.timestamp,
-            },
-          });
-
-          // Fetch historical data
-          const historicalDataResponse = await fetch(
-            `${apiKey}terminal/${terminalID}/script/${scriptName}/history`
-          );
-          const historicalData = await historicalDataResponse.json();
-
-          // Sort data by timestamp
-          const sortedData = historicalData.sort(
-            (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-          );
-
-          // Transform and update both expanded and regular views
-          const expandedData = getLatestData(sortedData, EXPANDED_LIMIT);
-          const regularData = getLatestData(
-            sortedData,
-            widgetData.xAxisConfiguration?.value || 100
-          );
-
-          const transformedExpandedData = transformDataForGraph(expandedData);
-          const transformedRegularData = transformDataForGraph(regularData);
-
-          // Always update both datasets
-          dispatch({
-            type: actions.UPDATE_EXPANDED_DATA,
-            payload: transformedExpandedData,
-          });
-          dispatch({
-            type: actions.UPDATE_HISTORICAL_DATA,
-            payload: transformedRegularData,
-          });
-        } catch (error) {
-          console.error("Error fetching data:", error);
-          dispatch({
-            type: actions.SET_ERROR,
-            payload: "Failed to fetch data",
-          });
+        const updatedData = [...prevData, newDataPoint];
+        if (updatedData.length > MAX_DATA_POINTS) {
+          updatedData.shift();
         }
-      }
+
+        return updatedData;
+      });
     },
-    [terminalName, scriptName, terminalID, widgetData.xAxisConfiguration]
+    [MAX_DATA_POINTS]
   );
 
-  useEffect(() => {
-    fetchData();
-
-    const liveUpdateInterval = setInterval(() => {
-      fetchData();
-    }, LIVE_UPDATE_INTERVAL);
-
-    return () => clearInterval(liveUpdateInterval);
-  }, [fetchData]);
-
-  // Effect for handling refresh interval (complete data refresh)
-  useEffect(() => {
-    if (widgetData.refreshInterval && widgetData.refreshInterval > 0) {
-      const refreshInterval = setInterval(() => {
-        dispatch({ type: actions.CLEAR_HISTORICAL_DATA });
-        fetchData();
-      }, widgetData.refreshInterval * 1000);
-
-      return () => clearInterval(refreshInterval);
+  const fetchData = useCallback(async () => {
+    if (!widgetData.terminalID || isDragging || isLayoutChanging) {
+      return;
     }
-  }, [widgetData.refreshInterval, fetchData]);
-  const limitDataPoints = (data, limit) => {
-    if (!Array.isArray(data) || data.length <= limit) return data;
-
-    const step = Math.ceil(data.length / limit);
-    return data.filter((_, index) => index % step === 0).slice(0, limit);
-  };
-
-  const getLatestData = (data, limit) => {
-    if (!Array.isArray(data) || data.length === 0) return [];
-    return data
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      .slice(0, limit);
-  };
-
-  useEffect(() => {
-    if (isGraphExpanded && comparisonScripts.length > 0) {
-      const updateComparisonData = async () => {
-        const newComparisonData = {};
-        for (const script of comparisonScripts) {
-          const data = await fetchScriptData(terminalID, script);
-          const transformedData = transformDataForGraph(data.data || []);
-          const limitedData = limitDataPoints(transformedData, EXPANDED_LIMIT);
-          newComparisonData[script] = limitedData;
-        }
-        setComparisonData(newComparisonData);
-      };
-
-      updateComparisonData();
-
-      const comparisonUpdateInterval = setInterval(() => {
-        updateComparisonData();
-      }, LIVE_UPDATE_INTERVAL);
-
-      return () => clearInterval(comparisonUpdateInterval);
-    }
-  }, [isGraphExpanded, comparisonScripts, terminalID]);
-  const handleExpandClick = () => {
-    setIsGraphExpanded(true);
-    setIsDialogOpen(true);
-    fetchData(true);
-  };
-
-  // ------------ Delete Widget -----------
-  const handleDeleteWidget = async () => {
-    setIsDeleting(true);
-    setDeleteError(null);
 
     try {
-      if (!widgetData.scriptId) {
-        throw new Error("Script ID not found");
+      const currentResponse = await fetch(
+        `${apiKey}terminal/${widgetData.terminalID}/script/${encodeURIComponent(
+          widgetData.scriptName
+        )}/currentValue`
+      );
+
+      if (!currentResponse.ok) {
+        throw new Error(`HTTP error! status: ${currentResponse.status}`);
       }
 
-      // Call the parent component's delete function with scriptId
-      await onDelete(widgetData.scriptId);
-      setIsConfirmDialogOpen(false);
-    } catch (error) {
-      console.error("Error deleting widget:", error);
-      setDeleteError(
-        error.message || "Failed to delete widget. Please try again."
-      );
-    } finally {
-      setIsDeleting(false);
+      const currentData = await currentResponse.json();
+
+      if (currentData && currentData[widgetData.scriptName] !== undefined) {
+        const newValue = Number(currentData[widgetData.scriptName]).toFixed(
+          widgetData.decimalPlaces
+        );
+        setCurrentValue(newValue);
+        const newTimestamp = currentData.timestamp;
+        setTimestamp(newTimestamp);
+
+        if (widgetData.areaGraph) {
+          updateHistoricalData(newValue, newTimestamp);
+        }
+      }
+
+      if (historicalData.length === 0 && widgetData.areaGraph) {
+        const historyResponse = await fetch(
+          `${apiKey}terminal/${
+            widgetData.terminalID
+          }/script/${encodeURIComponent(widgetData.scriptName)}/history`
+        );
+
+        if (!historyResponse.ok) {
+          throw new Error(`HTTP error! status: ${historyResponse.status}`);
+        }
+
+        const historyData = await historyResponse.json();
+
+        if (Array.isArray(historyData)) {
+          const transformedData = historyData.map((item) => ({
+            value: Number(item[widgetData.scriptName]),
+            timestamp: formatTimestamp(item.timestamp),
+          }));
+
+          let filteredData = transformedData;
+          if (widgetData.xAxisConfig) {
+            if (widgetData.xAxisConfig.type === "records") {
+              filteredData = transformedData.slice(
+                -widgetData.xAxisConfig.value
+              );
+            } else if (widgetData.xAxisConfig.type === "seconds") {
+              const cutoffTime = new Date(
+                Date.now() - widgetData.xAxisConfig.value * 1000
+              );
+              filteredData = transformedData.filter(
+                (item) => new Date(item.timestamp) > cutoffTime
+              );
+            }
+          }
+          setHistoricalData(filteredData);
+        }
+      }
+
+      setError(null);
+    } catch (err) {
+      setError(`Failed to fetch data: ${err.message}`);
+      console.error("Data fetch error:", err);
     }
-  };
-
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setIsGraphExpanded(false);
-    setComparisonScriptName("");
-    setComparisonData([]);
-    setComparisonScripts([]);
-  };
-
-  const handleConfirmDelete = () => {
-    handleDeleteWidget();
-    setIsConfirmDialogOpen(false);
-  };
-
-  const handleCancelDelete = () => {
-    setIsConfirmDialogOpen(false);
-  };
-
-  const defaultSize = widgetData.areaGraph
-    ? { width: 310, height: 310 }
-    : { width: 200, height: 125 };
-  const minConstraints = widgetData.areaGraph ? [310, 310] : [200, 125];
-  const maxConstraints = widgetData.areaGraph ? [620, 400] : [300, 200];
-
-  const handleResize = (event, { size }) => {
-    onResize(terminalID, size);
-  };
-
-  // ------------ Compare Widget -----------
-  const handleComparisonScriptChange = (event) => {
-    const {
-      target: { value },
-    } = event;
-    if (value.includes("none")) {
-      setComparisonScripts([]);
-    } else {
-      setComparisonScripts(
-        typeof value === "string" ? value.split(",") : value
-      );
-    }
-  };
+  }, [
+    widgetData,
+    isExpanded,
+    isDragging,
+    isLayoutChanging,
+    updateHistoricalData,
+    MAX_DATA_POINTS,
+    historicalData.length,
+  ]);
 
   useEffect(() => {
-    const fetchComparisonData = async () => {
-      const newComparisonData = {};
-      for (const script of comparisonScripts) {
-        const data = await fetchScriptData(terminalID, script);
-        const transformedData = transformDataForGraph(data.data || []);
-        // Apply the same limiting logic to comparison data
-        const limitedData = limitDataPoints(transformedData, EXPANDED_LIMIT);
-        newComparisonData[script] = limitedData;
+    let intervalId;
+
+    const initializeAndStartPolling = async () => {
+      if (widgetData.terminalID && !isDragging && !isLayoutChanging) {
+        await fetchData();
+
+        intervalId = setInterval(fetchData, REFRESH_INTERVAL);
       }
-      setComparisonData(newComparisonData);
     };
 
-    if (comparisonScripts.length > 0) {
-      fetchComparisonData();
-    } else {
-      setComparisonData({});
-    }
-  }, [comparisonScripts, terminalID]);
+    initializeAndStartPolling();
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [fetchData, widgetData.terminalID, isDragging, isLayoutChanging]);
+
   useEffect(() => {
-    if (isGraphExpanded) {
-      fetchScripts(terminalID).then((scripts) => {
-        setAvailableScripts(scripts);
-        setSelectedScript(scriptName);
-      });
-    }
-  }, [isGraphExpanded, terminalID, scriptName]);
+    const handleFullscreenChange = () => {
+      setIsFullScreen(!!document.fullscreenElement);
+    };
 
-  const isBackgroundDark = (color = "#ffffff") => {
-    if (!color || typeof color !== "string") {
-      console.error("Invalid color value:", color);
-      return false;
-    }
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
 
-    const hex = color.replace("#", "");
-    if (hex.length !== 6) {
-      console.error("Invalid hex color format:", color);
-      return false;
-    }
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange
+      );
+    };
+  }, []);
 
+  useEffect(() => {
+    if (widgetData.terminalID && !isDragging && !isLayoutChanging) {
+      fetchData();
+      console.log(widgetData, "Widget data");
+
+      const intervalId = setInterval(fetchData, REFRESH_INTERVAL);
+
+      return () => {
+        clearInterval(intervalId);
+      };
+    }
+  }, [fetchData, widgetData.terminalID, isDragging, isLayoutChanging]);
+
+  useEffect(() => {
+    const currentValueElement =
+      graphContainerRef.current?.querySelector(".current-value");
+    if (currentValueElement && widgetData.properties) {
+      currentValueElement.style.fontFamily = widgetData.properties.fontFamily;
+      currentValueElement.style.fontSize = `${widgetData.properties.fontSize}px`;
+      currentValueElement.style.fontWeight = widgetData.properties.fontWeight;
+      currentValueElement.style.color = widgetData.properties.fontColor;
+    }
+  }, [widgetData]);
+
+  const isColorDark = (backgroundColor) => {
+    if (!backgroundColor || backgroundColor === "transparent") return false;
+    const hex = backgroundColor.replace("#", "");
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness < 128;
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.5;
   };
 
-  const getAutoTextColor = (bgColor) => {
-    return isBackgroundDark(bgColor) ? "#ffffff" : "#000000";
-  };
-  const iconColor = isBackgroundDark(backgroundColor) ? "#ffffff" : "#000000";
-  const autoTextColor = getAutoTextColor(backgroundColor);
+  const handleDeleteWidget = async () => {
+    try {
+      const confirmed = await new Promise((resolve) => {
+        const handleConfirm = () => resolve(true);
+        const handleCancel = () => resolve(false);
+        setConfirmationDialog({
+          open: true,
+          onConfirm: handleConfirm,
+          onCancel: handleCancel,
+        });
+      });
 
-  const handleDeleteClick = () => {
-    setIsConfirmDialogOpen(true);
-  };
-
-  const iconSize = widgetData.areaGraph ? "extra-small" : "extra-small";
-  const iconStyle = {
-    color: iconColor,
-    fontSize: "16px",
-    padding: "2px",
-    borderRadius: "50%",
-    transition: "background-color 0.2s ease, transform 0.2s",
-    textShadow: `0 0 3px ${iconColor === "#ffffff" ? "#000000" : "#ffffff"}`,
-    "&:hover": {
-      backgroundColor: "rgba(255, 255, 255, 0.1)",
-      transform: "scale(1.05)",
-      boxShadow: "0 1px 4px rgba(0, 0, 0, 0.2)",
-    },
-  };
-  const [isHovered, setIsHovered] = useState(false);
-
-  const handleMouseEnter = () => {
-    setIsHovered(true);
+      if (confirmed) {
+        await onDelete(widgetData._id);
+        console.log("Widget deleted successfully");
+        setSnackbar({
+          open: true,
+          message: "Widget deleted successfully",
+          severity: "error",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to delete widget:", err);
+    } finally {
+      setConfirmationDialog({ open: false });
+    }
   };
 
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-  };
-  const handleEdit = () => {
-    setIsFormatDialog(true);
+  //----------------- Icon Click Handlers ---------------
+  const handleIconClick = (event, callback) => {
+    event.stopPropagation();
+    callback();
   };
 
-  const handleStylesUpdate = (newStyles) => {
-    setCurrentStyles(newStyles);
-    setBackgroundColor(newStyles.backgroundColor || backgroundColor);
-    setTextStyle({
-      fontFamily: newStyles.fontFamily || textStyle.fontFamily,
-      fontSize: newStyles.fontSize || textStyle.fontSize,
-      fontColor: newStyles.fontColor || textStyle.fontColor,
-      fontStyle: newStyles.fontStyle || textStyle.fontStyle,
-      fontWeight: newStyles.fontWeight || textStyle.fontWeight,
+  // ----------------- Handle graph expansion -----------------
+  const handleExpandGraph = () => {
+    setIsExpanded(true);
+  };
+
+  // ----------------- Handle fullscreen toggle -----------------
+  const handleFullScreenToggle = useCallback(async () => {
+    try {
+      if (!isFullScreen) {
+        const element = graphContainerRef.current;
+        if (element?.requestFullscreen) {
+          await element.requestFullscreen();
+        } else if (element?.webkitRequestFullscreen) {
+          await element.webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          await document.webkitExitFullscreen();
+        }
+      }
+    } catch (error) {
+      console.error("Fullscreen error:", error);
+    }
+  }, [isFullScreen]);
+
+  // ----------------- Handle PDF export -----------------
+  const handleExportPDF = async () => {
+    const graphElement = graphContainerRef.current?.querySelector(
+      "#expanded-graph-content"
+    );
+    if (!graphElement) return;
+
+    try {
+      const canvas = await html2canvas(graphElement);
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPdf("l", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${widgetData.scriptName}-graph.pdf`);
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+    }
+  };
+
+  // ----------------- Handle zoom -----------------
+  const handleZoom = (direction) => {
+    setZoomLevel((prev) => {
+      const newZoom = direction === "in" ? prev + 0.1 : prev - 0.1;
+      return Math.max(0.5, Math.min(2, newZoom));
     });
   };
 
-  return (
+  // ----------------- Handle text properties format updates -----------------
+  const handleTextFormatApply = async (newProperties) => {
+    try {
+      const response = await fetch(`${apiKey}terminal/widget/configure`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          widgetId: widgetData.id,
+
+          properties: newProperties,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        widgetData.properties = newProperties;
+        setTextFormatOpen(false);
+        setSnackbar({
+          open: true,
+          message: "Widget updated successfully",
+          severity: "success",
+        });
+      } else {
+        throw new Error(data.message || "Failed to update widget");
+      }
+    } catch (err) {
+      setError("Failed to update text format");
+      setSnackbar({
+        open: true,
+        message: "Failed to update widget",
+        severity: "error",
+      });
+      console.error("Text format update error:", err);
+    }
+  };
+
+  // ----------------- Setup effects -----------------
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullScreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange
+      );
+    };
+  }, []);
+
+  const GraphComponent =
+    widgetData.graphType === "simple" ? SimpleGraph : MultiAxisGraph;
+
+  const fetchComparisonScripts = async () => {
+    try {
+      const response = await fetch(
+        `${apiKey}terminal/${widgetData.terminalID}/scripts`
+      );
+      if (!response.ok) throw new Error("Failed to fetch scripts");
+      const data = await response.json();
+      const scripts = Object.keys(data.scripts).filter(
+        (script) => script !== widgetData.scriptName
+      );
+      setAvailableComparisonScripts(scripts);
+    } catch (err) {
+      console.error("Failed to fetch comparison scripts:", err);
+      setError("Failed to load comparison scripts");
+    }
+  };
+
+  useEffect(() => {
+    if (isExpanded) {
+      fetchComparisonScripts();
+    }
+  }, [isExpanded]);
+
+  const renderExpandedContent = () => (
     <>
-      <ResizableBox
-        draggable
-        onDragStart={handleDragStart}
-        onDrop={handleDrop}
-        onDragOver={(e) => e.preventDefault()}
-        width={defaultSize.width || widgetData.width}
-        height={defaultSize.height || widgetData.height}
-        minConstraints={minConstraints}
-        maxConstraints={maxConstraints}
-        onResize={handleResize}
-        resizeHandles={["se"]}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          pb: 1,
+          borderBottom: "1px solid rgba(0, 0, 0, 0.1)",
+          background: "linear-gradient(90deg, #f7f8fc, #e8eaf6)",
+          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+        }}
       >
-        <Tooltip title={formatTimestamp(state.timestamp)}>
-          <Box
+        <Typography
+          sx={{
+            fontFamily: widgetData.properties.fontFamily,
+            fontSize: widgetData.properties.fontSize,
+            fontWeight: widgetData.properties.fontWeight,
+
+            textShadow: "1px 1px 2px rgba(0, 0, 0, 0.2)",
+          }}
+        >
+          {widgetData.scriptName}
+        </Typography>
+        <Box>
+          <IconButton
+            onClick={handleExportPDF}
             sx={{
-              width: "100%",
-              height: "100%",
-              border: "1px solid #007c89",
-              borderRadius: "8px",
-              padding: 2,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              backgroundColor: backgroundColor,
-              position: "relative",
-              boxSizing: "border-box",
+              color: "#ff5722",
+              "&:hover": { backgroundColor: "rgba(255, 87, 34, 0.1)" },
             }}
           >
-            <Box
+            <FileDownload />
+          </IconButton>
+          <IconButton
+            onClick={handleFullScreenToggle}
+            sx={{
+              color: "#4caf50",
+              "&:hover": { backgroundColor: "rgba(76, 175, 80, 0.1)" },
+            }}
+          >
+            {isFullScreen ? <FullscreenExit /> : <Fullscreen />}
+          </IconButton>
+          <IconButton
+            onClick={() => setIsExpanded(false)}
+            sx={{
+              color: "#f44336",
+              "&:hover": { backgroundColor: "rgba(244, 67, 54, 0.1)" },
+            }}
+          >
+            <Close />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent
+        id="expanded-graph-content"
+        sx={{
+          transform: `scale(${zoomLevel})`,
+          transformOrigin: "top left",
+          height: "calc(100% - 64px)",
+          pt: 0,
+          background: "#f5f5f5",
+          overflow: "auto",
+          borderRadius: "0 0 12px 12px",
+        }}
+      >
+        <Box
+          sx={{
+            height: "calc(100% - 80px)",
+            border: "1px solid rgba(0, 0, 0, 0.1)",
+            borderRadius: "8px",
+            overflow: "hidden",
+            background: "#ffffff",
+            boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
+          }}
+        >
+          <GraphComponent
+            widgetData={widgetData}
+            currentValue={currentValue}
+            historicalData={historicalData}
+            timestamp={timestamp}
+            showXAxis={true}
+            selectedScripts={selectedComparisonScripts}
+            isExpanded={isExpanded}
+            isRealTime={true}
+          />
+        </Box>
+      </DialogContent>
+    </>
+  );
+  return (
+    <>
+      <Card
+        className={className}
+        style={{
+          ...style,
+          backgroundColor: widgetData.properties?.backgroundColor || "#fff",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+
+            p: 1,
+            borderBottom: "1px solid rgba(0,0,0,0.12)",
+            backgroundColor: widgetData.properties.backgroundColor || "#fff",
+            color: isColorDark(widgetData.properties.backgroundColor)
+              ? "#fff"
+              : "inherit",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+            }}
+          >
+            <IconButton
+              size="small"
               sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mb: 1,
-                flexShrink: 0,
-                position: "relative",
+                color: isColorDark(widgetData.properties.backgroundColor)
+                  ? "#fff"
+                  : "#000",
               }}
             >
-              <Box>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontFamily: textStyle.fontFamily,
-                    fontSize: 20,
-                    color: autoTextColor,
-                    fontStyle: textStyle.fontStyle,
-                  }}
-                  onClick={() => handleEdit("scriptName")}
-                >
-                  {scriptName}
-                </Typography>
-                <Typography
-                  variant="h3"
-                  sx={{
-                    fontFamily: textStyle.fontFamily,
-                    fontSize: textStyle.fontSize,
-                    color: textStyle.fontColor || autoTextColor,
-                    fontStyle: textStyle.fontStyle,
-                    fontWeight: "bold",
-                  }}
-                  onClick={() => handleEdit("value")}
-                >
-                  {Number(state.value).toFixed(widgetData.decimalPlaces)}
-                </Typography>
-              </Box>
-              {isHovered && (
-                <Box
-                  sx={{
-                    position: "absolute",
-                    top: 0,
-                    right: 0,
-                    display: "flex",
-                    flexDirection: "row",
-                  }}
-                >
-                  <IconButton
-                    aria-label="Refresh widget"
-                    size={iconSize}
-                    sx={iconStyle}
-                    onClick={() => fetchData()}
-                  >
-                    <RefreshIcon fontSize={iconSize} />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => handleEdit("value")}
-                    aria-label="Edit widget"
-                    size={iconSize}
-                    sx={iconStyle}
-                  >
-                    <EditIcon fontSize={iconSize} />
-                  </IconButton>
-                  <IconButton
-                    onClick={handleDeleteClick}
-                    aria-label="Delete widget"
-                    size={iconSize}
-                    sx={iconStyle}
-                  >
-                    <DeleteIcon fontSize={iconSize} />
-                  </IconButton>
-                </Box>
-              )}
-            </Box>
-
-            {widgetData.areaGraph && (
-              <Box
+              <DragIndicator sx={{ fontSize: "0.75rem" }} />
+            </IconButton>
+            <Tooltip title={`Last Sync: ${formatTimestamp(timestamp)}`}>
+              <Typography
+                variant="subtitle2"
                 sx={{
-                  flex: 1,
-                  mt: 2,
-                  overflow: "hidden",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  fontFamily: widgetData.properties.fontFamily,
+                  fontSize: "1.5rem",
+                  fontWeight: widgetData.properties.fontWeight,
+                  fontStyle: widgetData.properties.fontStyle,
+                  textAlign: "center",
+                  lineHeight: "1.5rem",
+                  color: widgetData.properties.fontColor,
                 }}
               >
-                {state.scriptData.length > 0 &&
-                  (graphType === "simple" ? (
-                    <LineGraph
-                      data={state.scriptData}
-                      expanded={false}
-                      backgroundColor={backgroundColor}
-                      hideXAxis={true}
-                      scriptName={scriptName}
-                    />
-                  ) : (
-                    <MultiAxisGraph
-                      data={state.scriptData}
-                      expanded={false}
-                      backgroundColor={backgroundColor}
-                      hideXAxis={true}
-                      scriptName={scriptName}
-                    />
-                  ))}
-              </Box>
+                {widgetData.scriptName}
+              </Typography>
+            </Tooltip>
+          </Box>
+          <Box sx={{ display: "flex" }}>
+            {widgetData.areaGraph && (
+              <IconButton
+                size="small"
+                onClick={(event) => handleIconClick(event, handleExpandGraph)}
+                sx={{
+                  color: isColorDark(widgetData.properties.backgroundColor)
+                    ? "#fff"
+                    : "#000",
+                }}
+              >
+                <OpenInFull sx={{ fontSize: "1.2rem" }} />
+              </IconButton>
             )}
-            <Box
+            <IconButton
+              size="small"
+              onClick={(event) =>
+                handleIconClick(event, () => setTextFormatOpen(true))
+              }
               sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mt: 1,
-                flexShrink: 0,
+                color: isColorDark(widgetData.properties.backgroundColor)
+                  ? "#fff"
+                  : "#000",
               }}
             >
-              {widgetData.areaGraph && (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  <Typography color={autoTextColor} fontSize="small">
-                    Last Sync {formatTimestamp(state.timestamp)}
-                  </Typography>
+              <Settings sx={{ fontSize: "1.2rem" }} />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={(event) => handleIconClick(event, handleDeleteWidget)}
+              sx={{
+                color: isColorDark(widgetData.properties.backgroundColor)
+                  ? "#fff"
+                  : "#000",
+              }}
+            >
+              <DeleteForeverIcon
+                sx={{
+                  fontSize: "1.2rem",
+                  "&:hover": { backgroundColor: "rgba(244, 67, 54, 0.1)" },
+                }}
+              />
+            </IconButton>
+          </Box>
+        </Box>
+        <Box sx={{ flexGrow: 1, p: 2, overflow: "hidden" }}>
+          {error ? (
+            <Typography color="error">{error}</Typography>
+          ) : (
+            <>
+              {!widgetData.areaGraph ? (
+                <Box
+                  sx={{
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Tooltip title={`Last Sync: ${formatTimestamp(timestamp)}`}>
+                    <Typography
+                      variant="h4"
+                      className="current-value"
+                      sx={{
+                        fontFamily: widgetData.properties?.fontFamily,
+                        fontSize: `${widgetData.properties?.fontSize}px`,
+                        fontWeight: widgetData.properties?.fontWeight,
+                        color: widgetData.properties?.fontColor,
+                        fontStyle: widgetData.properties?.fontStyle,
+                      }}
+                    >
+                      {currentValue}
+                    </Typography>
+                  </Tooltip>
+                </Box>
+              ) : (
+                <Box sx={{ height: "100%" }}>
+                  <Tooltip title={`Last Sync: ${formatTimestamp(timestamp)}`}>
+                    <Typography
+                      className="current-value"
+                      sx={{
+                        fontFamily: widgetData.properties.fontFamily,
+                        fontSize: `${widgetData.properties.fontSize}px`,
+                        fontWeight: widgetData.properties.fontWeight,
+                        fontStyle: widgetData.properties.fontStyle,
+
+                        color: widgetData.properties.fontColor,
+                        mb: 1,
+                      }}
+                    >
+                      {currentValue}
+                    </Typography>
+                  </Tooltip>
+                  <Box sx={{ height: "calc(100% - 40px)" }}>
+                    <GraphComponent
+                      widgetData={widgetData}
+                      currentValue={currentValue}
+                      timestamp={timestamp}
+                      showXAxis={false}
+                    />
+                  </Box>
                 </Box>
               )}
-
-              {widgetData.areaGraph && (
-                <Tooltip title="Expand graph">
-                  <IconButton
-                    onClick={handleExpandClick}
-                    aria-label="Expand graph"
-                    sx={{
-                      mt: 1,
-                      color: iconColor,
-                      textShadow: `0 0 5px ${
-                        iconColor === "#ffffff" ? "#000000" : "#ffffff"
-                      }`,
-                      "&:hover": {
-                        backgroundColor: "rgba(255, 255, 255, 0.1)",
-                      },
-                    }}
-                  >
-                    <KeyboardArrowDown />
-                  </IconButton>
-                </Tooltip>
-              )}
-            </Box>
-          </Box>
-        </Tooltip>
-      </ResizableBox>
-      <FormatDialog
-        open={isFormatDialog}
-        onClose={() => setIsFormatDialog(false)}
-        currentStyles={currentStyles}
-        setCurrentStyles={setCurrentStyles}
-        terminalID={terminalID}
-        scriptName={scriptName}
-        isNewWidget={false}
-        onStylesUpdate={handleStylesUpdate}
-      />
-      <Dialog open={isConfirmDialogOpen} onClose={handleCancelDelete}>
-        <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent>
-          Are you sure you want to delete this widget?
-          {deleteError && (
-            <Typography color="error" sx={{ mt: 2 }}>
-              {deleteError}
-            </Typography>
+            </>
           )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelDelete}>Cancel</Button>
-          <Button
-            onClick={handleConfirmDelete}
-            color="primary"
-            disabled={isDeleting}
+        </Box>
+        <Dialog
+          open={isExpanded}
+          onClose={() => setIsExpanded(false)}
+          maxWidth="xl"
+          fullWidth
+          PaperProps={{
+            ref: graphContainerRef,
+            sx: { height: "90vh" },
+          }}
+        >
+          <DialogTitle
+            sx={{ display: "flex", justifyContent: "space-between" }}
           >
-            {isDeleting ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <EnhancedDialog
-        isDialogOpen={isDialogOpen}
-        isGraphExpanded={isGraphExpanded}
-        handleCloseDialog={handleCloseDialog}
-        terminalName={terminalName}
-        selectedScript={selectedScript}
-        comparisonScripts={comparisonScripts}
-        handleComparisonScriptChange={handleComparisonScriptChange}
-        availableScripts={availableScripts}
-        graphType={graphType}
-        state={state}
-        comparisonData={comparisonData}
-        refreshInterval={widgetData.refreshInterval} // Pass refreshInterval to EnhancedDialog
-      />
+            <Typography
+              sx={{
+                fontFamily: widgetData.properties.fontFamily,
+                fontSize: widgetData.properties.fontSize,
+                fontWeight: widgetData.properties.fontWeight,
+                color: isColorDark(widgetData.properties.backgroundColor)
+                  ? "#fff"
+                  : "inherit",
+              }}
+            >
+              {widgetData.scriptName}
+            </Typography>
+            <Box>
+              <IconButton onClick={() => handleZoom("in")}>
+                <ZoomIn />
+              </IconButton>
+              <IconButton onClick={() => handleZoom("out")}>
+                <ZoomOut />
+              </IconButton>
+              <IconButton onClick={handleExportPDF}>
+                <FileDownload />
+              </IconButton>
+              <IconButton onClick={handleFullScreenToggle}>
+                {isFullScreen ? <FullscreenExit /> : <Fullscreen />}
+              </IconButton>
+              <IconButton onClick={() => setIsExpanded(false)}>
+                <DeleteForeverIcon />
+              </IconButton>
+            </Box>
+          </DialogTitle>
+          <DialogContent
+            id="expanded-graph-content"
+            sx={{
+              transform: `scale(${zoomLevel})`,
+              transformOrigin: "top left",
+              height: "calc(100% - 64px)",
+            }}
+          >
+            <GraphComponent
+              widgetData={widgetData}
+              currentValue={currentValue}
+              timestamp={timestamp}
+              showXAxis={true}
+            />
+          </DialogContent>
+        </Dialog>
+        <Dialog
+          open={isExpanded}
+          onClose={() => {
+            setIsExpanded(false);
+            setSelectedScripts([]);
+            setComparisonData([]);
+          }}
+          maxWidth="xl"
+          fullWidth
+          PaperProps={{
+            ref: graphContainerRef,
+            sx: { height: "90vh" },
+          }}
+        >
+          {renderExpandedContent()}
+        </Dialog>
+        <TextFormatDialog
+          open={textFormatOpen}
+          onClose={() => setTextFormatOpen(false)}
+          initialProperties={widgetData.properties}
+          onApply={handleTextFormatApply}
+          mode="update"
+        />
+        <ConfirmationDialog
+          open={confirmationDialog.open}
+          onConfirm={confirmationDialog.onConfirm}
+          onCancel={confirmationDialog.onCancel}
+        >
+          Are you sure you want to delete this widget?
+        </ConfirmationDialog>
+      </Card>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+      </Snackbar>
     </>
   );
 };

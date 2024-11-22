@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -12,10 +12,17 @@ import {
   MenuItem,
   Checkbox,
   ListItemText,
+  useTheme,
+  Paper,
+  Typography,
 } from "@mui/material";
 import {
   AreaChart,
   Area,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -27,6 +34,9 @@ import CloseIcon from "@mui/icons-material/Close";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
+import ZoomInIcon from "@mui/icons-material/ZoomIn";
+import ZoomOutIcon from "@mui/icons-material/ZoomOut";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 
 const EnhancedGraph = ({
   openGraph,
@@ -38,18 +48,117 @@ const EnhancedGraph = ({
   reversedGraphData,
   graphexportToPdf,
 }) => {
-  const [zoomDomain, setZoomDomain] = useState({
+  const theme = useTheme();
+  const [zoomRange, setZoomRange] = useState({
     start: 0,
-    end: reversedGraphData.length - 1,
+    end: 100,
+    minPoints: 5,
   });
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const chartRef = useRef(null);
+  const [chartType, setChartType] = useState("area");
+  const chartContainerRef = useRef(null);
   const containerRef = useRef(null);
 
-  // ---------- - Full Screen -------------
+  const handleChartTypeChange = (event) => {
+    setChartType(event.target.value);
+  };
+
+  const getColor = (index) => {
+    const colors = [
+      "#2196F3",
+      "#FF5722",
+      "#4CAF50",
+      "#9C27B0",
+      "#FF9800",
+      "#E91E63",
+      "#00BCD4",
+      "#3F51B5",
+      "#F44336",
+      "#009688",
+    ];
+    return colors[index % colors.length];
+  };
+
+  const handleWheel = useCallback((event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const container = chartContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const mouseX = (event.clientX - rect.left) / rect.width;
+
+    const zoomFactor = event.deltaY > 0 ? 1.1 : 0.9;
+
+    setZoomRange((prevRange) => {
+      const currentRangeSize = prevRange.end - prevRange.start;
+      const newRangeSize = Math.max(
+        5,
+        Math.min(100, currentRangeSize * zoomFactor)
+      );
+
+      const rangeCenter = prevRange.start + mouseX * currentRangeSize;
+      let newStart = rangeCenter - newRangeSize * mouseX;
+      let newEnd = newStart + newRangeSize;
+
+      if (newStart < 0) {
+        newStart = 0;
+        newEnd = newRangeSize;
+      }
+      if (newEnd > 100) {
+        newEnd = 100;
+        newStart = 100 - newRangeSize;
+      }
+
+      return {
+        start: Math.max(0, newStart),
+        end: Math.min(100, newEnd),
+        minPoints: prevRange.minPoints,
+      };
+    });
+  }, []);
+
+  const handleResetZoom = () => {
+    setZoomRange({
+      start: 0,
+      end: 100,
+      minPoints: 5,
+    });
+  };
+
+  const handleZoomButton = (zoomIn) => {
+    setZoomRange((prevRange) => {
+      const currentRangeSize = prevRange.end - prevRange.start;
+      const rangeCenter = prevRange.start + currentRangeSize / 2;
+      const newRangeSize = Math.max(
+        5,
+        Math.min(100, currentRangeSize * (zoomIn ? 0.8 : 1.2))
+      );
+
+      let newStart = rangeCenter - newRangeSize / 2;
+      let newEnd = rangeCenter + newRangeSize / 2;
+
+      if (newStart < 0) {
+        newStart = 0;
+        newEnd = newRangeSize;
+      }
+      if (newEnd > 100) {
+        newEnd = 100;
+        newStart = 100 - newRangeSize;
+      }
+
+      return {
+        start: Math.max(0, newStart),
+        end: Math.min(100, newEnd),
+        minPoints: prevRange.minPoints,
+      };
+    });
+  };
+
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen();
+      containerRef.current?.requestFullscreen();
       setIsFullScreen(true);
     } else {
       document.exitFullscreen();
@@ -57,51 +166,116 @@ const EnhancedGraph = ({
     }
   };
 
-  // ------------ Zoom In & Zoom Out -------------
-  const handleWheel = useCallback(
-    (e) => {
-      e.preventDefault();
-      const { start, end } = zoomDomain;
-      const range = end - start;
-      const zoomFactor = e.deltaY > 0 ? 1.05 : 0.95;
-      const newRange = Math.max(
-        10,
-        Math.min(reversedGraphData.length, range * zoomFactor)
-      );
-
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - containerRect.left;
-      const zoomCenter = start + (mouseX / containerRect.width) * range;
-
-      let newStart = Math.max(0, zoomCenter - newRange / 2);
-      let newEnd = Math.min(
-        reversedGraphData.length - 1,
-        zoomCenter + newRange / 2
-      );
-
-      if (newEnd - newStart < newRange) {
-        if (newStart === 0) {
-          newEnd = Math.min(reversedGraphData.length - 1, newRange);
-        } else {
-          newStart = Math.max(0, reversedGraphData.length - 1 - newRange);
-        }
-      }
-
-      setZoomDomain({ start: newStart, end: newEnd });
-    },
-    [zoomDomain, reversedGraphData.length]
-  );
+  const getZoomedData = useCallback(() => {
+    const startIndex = Math.floor(
+      (reversedGraphData.length * zoomRange.start) / 100
+    );
+    const endIndex = Math.ceil(
+      (reversedGraphData.length * zoomRange.end) / 100
+    );
+    return reversedGraphData.slice(startIndex, endIndex);
+  }, [reversedGraphData, zoomRange]);
 
   const formatXAxis = (timestamp) => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
-    const hours = String(date.getUTCHours()).padStart(2, "0");
-    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-    const seconds = String(date.getUTCSeconds()).padStart(2, "0");
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date);
+  };
+
+  useEffect(() => {
+    const container = chartContainerRef.current;
+    if (container) {
+      container.addEventListener("wheel", handleWheel, { passive: false });
+      return () => {
+        container.removeEventListener("wheel", handleWheel);
+      };
+    }
+  }, [handleWheel]);
+
+  const renderChart = () => {
+    const ChartComponent =
+      chartType === "area"
+        ? AreaChart
+        : chartType === "line"
+        ? LineChart
+        : BarChart;
+    const DataComponent =
+      chartType === "area" ? Area : chartType === "line" ? Line : Bar;
+
+    const zoomedData = getZoomedData();
+
+    return (
+      <ChartComponent
+        data={zoomedData}
+        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+      >
+        <CartesianGrid
+          strokeDasharray="3 3"
+          stroke={theme.palette.divider}
+          opacity={0.5}
+        />
+        <XAxis
+          dataKey="timestamp"
+          stroke={theme.palette.text.primary}
+          tickFormatter={formatXAxis}
+          textAnchor="end"
+          height={60}
+          tick={{ fontSize: 12 }}
+          angle={-45}
+        />
+        <YAxis
+          stroke={theme.palette.text.primary}
+          tick={{ fontSize: 12 }}
+          width={60}
+        />
+        <RechartsTooltip
+          contentStyle={{
+            backgroundColor: theme.palette.background.paper,
+            borderRadius: 8,
+            border: `1px solid ${theme.palette.divider}`,
+            boxShadow: theme.shadows[3],
+            padding: "10px",
+          }}
+          cursor={{ stroke: theme.palette.primary.main, strokeWidth: 1 }}
+        />
+        <Legend
+          verticalAlign="top"
+          height={36}
+          wrapperStyle={{
+            paddingBottom: "20px",
+            fontSize: "14px",
+          }}
+        />
+        {selectedGraphScripts.map((script, index) => (
+          <DataComponent
+            key={script}
+            type="monotone"
+            dataKey={script}
+            name={script}
+            stroke={getColor(index)}
+            fill={chartType === "line" ? "none" : getColor(index)}
+            strokeWidth={2}
+            fillOpacity={chartType === "area" ? 0.4 : 0.8}
+            dot={chartType === "line" ? { r: 3 } : false}
+            activeDot={
+              chartType !== "bar"
+                ? {
+                    r: 6,
+                    stroke: theme.palette.background.paper,
+                    strokeWidth: 2,
+                  }
+                : false
+            }
+          />
+        ))}
+      </ChartComponent>
+    );
   };
 
   return (
@@ -111,86 +285,115 @@ const EnhancedGraph = ({
       maxWidth="lg"
       fullWidth
       PaperProps={{
-        style: {
-          backgroundColor: "#f5f5f5",
-          borderRadius: "16px",
-          boxShadow: "0 14px 45px rgba(0, 0, 0, 0.15)",
+        sx: {
+          borderRadius: 2,
+          bgcolor: theme.palette.background.paper,
         },
       }}
     >
       <DialogTitle
-        style={{
-          background: "linear-gradient(135deg, #3f51b5 30%, #5c6bc0 90%)",
+        sx={{
+          background: theme.palette.primary.main,
           color: "white",
-          textAlign: "center",
-          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          p: 2,
         }}
       >
-        {selectedTerminal}
-        <Tooltip title="Export to PDF" arrow>
+        <Typography variant="h6" component="div" sx={{ fontWeight: "bold" }}>
+          {selectedTerminal}
+        </Typography>
+        <Box>
           <IconButton
-            style={{
-              position: "absolute",
-              right: "90px",
-              top: "10px",
-              color: "white",
-            }}
+            onClick={() => handleZoomButton(true)}
+            sx={{ color: "white", mr: 1 }}
+            size="small"
+          >
+            <Tooltip title="Zoom In" arrow>
+              <ZoomInIcon />
+            </Tooltip>
+          </IconButton>
+          <IconButton
+            onClick={() => handleZoomButton(false)}
+            sx={{ color: "white", mr: 1 }}
+            size="small"
+          >
+            <Tooltip title="Zoom Out" arrow>
+              <ZoomOutIcon />
+            </Tooltip>
+          </IconButton>
+          <IconButton
+            onClick={handleResetZoom}
+            sx={{ color: "white", mr: 1 }}
+            size="small"
+          >
+            <Tooltip title="Reset Zoom" arrow>
+              <RestartAltIcon />
+            </Tooltip>
+          </IconButton>
+          <IconButton
             onClick={graphexportToPdf}
+            sx={{ color: "white", mr: 1 }}
+            size="small"
           >
-            <PictureAsPdfIcon />
+            <Tooltip title="Export to PDF" arrow>
+              <PictureAsPdfIcon />
+            </Tooltip>
           </IconButton>
-        </Tooltip>
-        <Tooltip title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"} arrow>
           <IconButton
-            style={{
-              position: "absolute",
-              right: "50px",
-              top: "10px",
-              color: "white",
-            }}
             onClick={toggleFullScreen}
+            sx={{ color: "white", mr: 1 }}
+            size="small"
           >
-            {isFullScreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+            <Tooltip
+              title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"}
+              arrow
+            >
+              {isFullScreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+            </Tooltip>
           </IconButton>
-        </Tooltip>
-        <Tooltip title="Close" arrow>
           <IconButton
-            style={{
-              position: "absolute",
-              right: "10px",
-              top: "10px",
-              color: "white",
-            }}
             onClick={handleCloseGraph}
+            sx={{ color: "white" }}
+            size="small"
           >
-            <CloseIcon />
+            <Tooltip title="Close" arrow>
+              <CloseIcon />
+            </Tooltip>
           </IconButton>
-        </Tooltip>
+        </Box>
       </DialogTitle>
-      <DialogContent>
-        <Box mb={3} mt={2}>
-          <FormControl fullWidth variant="outlined">
-            <InputLabel id="script-select-label">Select Variable</InputLabel>
+
+      <DialogContent
+        sx={{
+          p: 3,
+          display: "flex",
+          flexDirection: "column",
+          gap: 3,
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 3,
+          }}
+        >
+          <FormControl sx={{ minWidth: 200, flex: 1, mt: 2 }} size="small">
+            <InputLabel id="script-select-label">Select Variables</InputLabel>
             <Select
               labelId="script-select-label"
+              label="Select Variables"
               multiple
               value={selectedGraphScripts}
               onChange={handleScriptSelect}
               renderValue={(selected) => selected.join(", ")}
-              style={{
-                backgroundColor: "white",
-                borderRadius: "8px",
-                boxShadow: "0 3px 10px rgba(0, 0, 0, 0.1)",
-                fontSize: "16px",
-                height: "40px",
-                padding: "0 12px",
-              }}
-              MenuProps={{
-                PaperProps: {
-                  style: {
-                    borderRadius: "10px",
-                    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.25)",
-                  },
+              sx={{
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: theme.palette.primary.main,
                 },
               }}
             >
@@ -206,88 +409,67 @@ const EnhancedGraph = ({
                 ))}
             </Select>
           </FormControl>
+
+          <FormControl sx={{ minWidth: 100, mt: 2 }} size="small">
+            <InputLabel id="chart-type-label">Chart Type</InputLabel>
+            <Select
+              labelId="chart-type-label"
+              label="Chart Type"
+              value={chartType}
+              onChange={handleChartTypeChange}
+              sx={{
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: theme.palette.primary.main,
+                },
+              }}
+            >
+              <MenuItem value="area">Area</MenuItem>
+              <MenuItem value="line">Line</MenuItem>
+              <MenuItem value="bar">Bar</MenuItem>
+            </Select>
+          </FormControl>
         </Box>
 
-        <div
-          id="graph-container"
+        <Paper
           ref={containerRef}
-          style={{
-            background: "linear-gradient(white, #e3f2fd)",
-            padding: "25px",
-            borderRadius: "12px",
-            boxShadow: "0 6px 20px rgba(0, 0, 0, 0.1)",
-            height: isFullScreen ? "100vh" : "400px",
+          elevation={3}
+          sx={{
+            height: isFullScreen ? "100vh" : 500,
+            borderRadius: 2,
+            transition: "all 0.3s ease",
+            overflow: "hidden",
+            position: "relative",
+            cursor: "zoom-in",
+            "&:before": {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              opacity: 0.1,
+              zIndex: 0,
+            },
+            "&:hover": {
+              cursor: "zoom-in",
+            },
           }}
-          onWheel={handleWheel}
         >
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={reversedGraphData.slice(
-                Math.floor(zoomDomain.start),
-                Math.ceil(zoomDomain.end) + 1
-              )}
-              margin={{ top: 30, right: 40, left: 20, bottom: 20 }}
-              ref={chartRef}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-              <XAxis
-                dataKey="timestamp"
-                stroke="#555"
-                style={{ fontSize: "12px" }}
-                tickFormatter={formatXAxis}
-                textAnchor="end"
-                height={70}
-              />
-              <YAxis stroke="#555" style={{ fontSize: "13px" }} />
-              <RechartsTooltip
-                contentStyle={{
-                  backgroundColor: "rgba(255, 255, 255, 0.95)",
-                  borderRadius: "8px",
-                  boxShadow: "0 3px 10px rgba(0, 0, 0, 0.15)",
-                  padding: "10px",
-                }}
-              />
-              <Legend verticalAlign="top" height={36} />
-              {selectedGraphScripts.map((script, index) => (
-                <Area
-                  key={script}
-                  type="monotone"
-                  dataKey={script}
-                  stroke={`hsl(${(index * 137) % 360}, 60%, 50%)`}
-                  fill={`url(#gradient${index})`}
-                  strokeWidth={2}
-                  fillOpacity={0.6}
-                />
-              ))}
-              {selectedGraphScripts.map((script, index) => (
-                <defs key={`defs${index}`}>
-                  <linearGradient
-                    id={`gradient${index}`}
-                    x1="0%"
-                    y1="0%"
-                    x2="0%"
-                    y2="100%"
-                  >
-                    <stop
-                      offset="0%"
-                      style={{
-                        stopColor: `hsl(${(index * 137) % 360}, 60%, 50%)`,
-                        stopOpacity: 1,
-                      }}
-                    />
-                    <stop
-                      offset="100%"
-                      style={{
-                        stopColor: `hsl(${(index * 137) % 360}, 60%, 80%)`,
-                        stopOpacity: 0.5,
-                      }}
-                    />
-                  </linearGradient>
-                </defs>
-              ))}
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+          <Box
+            ref={chartContainerRef}
+            sx={{
+              width: "100%",
+              height: "100%",
+              position: "relative",
+              zIndex: 1,
+            }}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              {renderChart()}
+            </ResponsiveContainer>
+          </Box>
+        </Paper>
       </DialogContent>
     </Dialog>
   );

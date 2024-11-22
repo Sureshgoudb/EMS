@@ -25,9 +25,16 @@ import {
   DialogContent,
   DialogActions,
   Switch,
-  Tooltip,
   CircularProgress,
+  IconButton,
+  Alert,
+  Tooltip,
+  Snackbar,
+  Stack,
 } from "@mui/material";
+import { ArrowBack, Save, Close } from "@mui/icons-material";
+import ExportButtons from "../ExportButtons";
+import Clock from "react-live-clock";
 import dayjs from "dayjs";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -40,10 +47,9 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
-import TableColumnCreate from "./TableColumnCreate";
+import TableColumnCreate from "./CreateNewTableDialog";
 import EnhancedGraph from "./EnhancedGraph";
 import * as XLSX from "xlsx";
-import { toast, ToastContainer } from "react-toastify";
 
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
@@ -153,6 +159,26 @@ const DataTable = () => {
     { value: "daily", label: "Daily" },
   ]);
   const requestCache = useRef(new Map());
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "info", // 'success', 'error', 'warning', 'info'
+  });
+
+  const showNotification = (message, severity = "info") => {
+    setSnackbar({
+      open: true,
+      message,
+      severity,
+    });
+  };
+
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === "clickaway") {
+      return;
+    }
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
 
   useEffect(() => {
     if (selectedTerminal) {
@@ -264,18 +290,17 @@ const DataTable = () => {
           tableData
         );
         console.log("Table updated successfully:", response.data);
-        toast.success("Table updated successfully");
+        showNotification("Table updated successfully", "success");
       } else {
         response = await axios.post(`${apiKey}terminal/createTable`, tableData);
         console.log("Table saved successfully:", response.data);
-        toast.success("Table saved successfully");
+        showNotification("Table updated successfully", "success");
       }
       setSaveDialogOpen(false);
 
       setTableInfo(response.data);
     } catch (error) {
       console.error("Error saving/updating table:", error);
-      toast.error("Failed to save/update table");
     } finally {
       setIsSaving(false);
     }
@@ -385,10 +410,9 @@ const DataTable = () => {
         heightLeft -= pdf.internal.pageSize.getHeight();
       }
       pdf.save("multi_variable_comparison.pdf");
-      toast.success("PDF exported successfully");
+      showNotification("PDF exported successfully", "success");
     } catch (error) {
       console.error("Error exporting to PDF: ", error);
-      toast.error("Failed to export PDF");
     }
   };
 
@@ -521,10 +545,9 @@ const DataTable = () => {
 
   const handleGoBack = () => {
     navigate("/view/terminal", {
-      state: { activeTab: "Historical Data Display" },
+      state: { activeTab: 1 },
     });
   };
-
   const [scriptData, setScriptData] = useState({});
 
   // ---------- Function to handle script change ----------
@@ -550,7 +573,11 @@ const DataTable = () => {
         const newData = { ...prevData };
         removedScripts.forEach((script) => {
           delete newData[script];
-          toast.info(`Script ${script} has been removed from the table.`);
+          showNotification(
+            "Column removed",
+
+            "error"
+          );
         });
         return newData;
       });
@@ -558,6 +585,11 @@ const DataTable = () => {
 
     addedScripts.forEach((script) => {
       fetchScriptData(script);
+      showNotification(
+        "new Column added",
+
+        "info"
+      );
     });
   };
 
@@ -639,14 +671,12 @@ const DataTable = () => {
     }
   };
 
-  // Optimize data loading
   const loadData = useCallback(async () => {
     if (!selectedTerminal || !selectedProfile || selectedScripts.length === 0)
       return;
 
     setLoading(true);
 
-    // Use Promise.all for parallel requests
     const fetchPromises = selectedScripts.map((script) =>
       fetchScriptData(script)
     );
@@ -655,12 +685,10 @@ const DataTable = () => {
     setLoading(false);
   }, [selectedTerminal, selectedProfile, selectedScripts, fromDate, toDate]);
 
-  // Optimize useEffect hooks
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Optimize row processing
   useEffect(() => {
     const mergedData = {};
     Object.values(scriptData).forEach((scriptRows) => {
@@ -818,10 +846,7 @@ const DataTable = () => {
         doc.addImage(imgData, "PNG", 14, position, imgWidth, imgHeight);
       }
     }
-
     doc.save("filtered_data.pdf");
-    toast.success("PDF exported successfully");
-
     setExporting(false);
   };
 
@@ -843,7 +868,6 @@ const DataTable = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "FilteredData");
     XLSX.writeFile(wb, "filtered_data.xlsx");
-    toast.success("Excel exported successfully");
     setExporting(false);
   };
 
@@ -910,6 +934,69 @@ const DataTable = () => {
   );
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{
+            width: "100%",
+            "& .MuiAlert-message": {
+              fontSize: "0.9rem",
+              fontWeight: 500,
+            },
+            boxShadow: 3,
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+      <Paper sx={{ p: 2, mb: 3, backgroundColor: "#f8f9fa" }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          spacing={2}
+        >
+          <Tooltip title="Back to View">
+            <IconButton onClick={() => handleGoBack()}>
+              <ArrowBack />
+            </IconButton>
+          </Tooltip>
+          <Typography
+            variant="h6"
+            sx={{
+              flexGrow: 1,
+              textAlign: "center",
+              fontWeight: "bold",
+              color: "#4a90e2",
+            }}
+          >
+            Table Name: {tableInfo ? tableInfo.name : "Loading..."}
+          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography>
+              <Clock format="DD-MM-YYYY" ticking={false} />
+            </Typography>
+            <Typography>
+              <Clock format="HH:mm:ss" ticking />
+            </Typography>
+
+            <Button
+              variant="contained"
+              startIcon={<Save />}
+              onClick={handleSaveTable}
+            >
+              Save Table
+            </Button>
+          </Box>
+        </Stack>
+      </Paper>
       <Grid container spacing={3}>
         <Grid item xs={12} md={3}>
           <Paper
@@ -932,9 +1019,10 @@ const DataTable = () => {
               sx={{
                 fontWeight: "bold",
                 color: "#1a237e",
+                textAlign: "center",
               }}
             >
-              Table Name: {tableInfo ? tableInfo.name : "Loading..."}
+              Table Configuration
             </Typography>
             <StyledFormControl fullWidth sx={{ mb: 3 }}>
               <InputLabel>Profile</InputLabel>
@@ -1059,54 +1147,6 @@ const DataTable = () => {
               />
             </Box>
 
-            <Box
-              display="flex"
-              fullWidth
-              sx={{
-                mt: 3,
-                justifyContent: "center",
-                gap: 2,
-              }}
-            >
-              <Button
-                onClick={handleSaveTable}
-                variant="outlined"
-                color="primary"
-                sx={{
-                  mt: 3,
-                  borderRadius: 3,
-                  color: "#1565c0",
-                  borderColor: "#1565c0",
-                  "&:hover": {
-                    borderColor: "#0d47a1",
-                    color: "#0d47a1",
-                    transform: "scale(1.05)",
-                    transition: "transform 0.2s",
-                  },
-                }}
-              >
-                Save Table
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={handleGoBack}
-                sx={{
-                  mt: 3,
-                  borderRadius: 3,
-                  color: "#1565c0",
-                  borderColor: "#1565c0",
-                  "&:hover": {
-                    borderColor: "#0d47a1",
-                    color: "#0d47a1",
-                    transform: "scale(1.05)",
-                    transition: "transform 0.2s",
-                  },
-                }}
-              >
-                Back to view
-              </Button>
-            </Box>
-
             <Dialog
               open={saveDialogOpen}
               onClose={() => setSaveDialogOpen(false)}
@@ -1114,21 +1154,27 @@ const DataTable = () => {
                 sx: {
                   p: 3,
                   borderRadius: 4,
-                  backgroundColor: "#ffffff",
-                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
+                  backgroundColor: "#f0f4f8",
+                  boxShadow: "0 15px 40px rgba(0, 0, 0, 0.15)",
+                  maxWidth: "450px",
+                  width: "100%",
                 },
               }}
             >
               <DialogTitle
                 sx={{
                   textAlign: "center",
-                  color: "#3f51b5",
-                  letterSpacing: "0.4px",
+                  color: "#1565c0",
+                  fontWeight: 700,
+                  fontSize: "1.6rem",
+                  mb: 2,
+                  pb: 1,
+                  borderBottom: "2px solid #e0e0e0",
                 }}
               >
                 Save Table
               </DialogTitle>
-              <DialogContent>
+              <DialogContent sx={{ py: 3, px: 4 }}>
                 <TextField
                   autoFocus
                   margin="dense"
@@ -1137,17 +1183,56 @@ const DataTable = () => {
                   value={tableName}
                   onChange={(e) => setTableName(e.target.value)}
                   sx={{
-                    backgroundColor: "#f5f7fa",
-                    borderRadius: "8px",
+                    "& .MuiInputLabel-root": {
+                      color: "#607d8b",
+                      fontWeight: 500,
+                    },
+                    "& .MuiInputLabel-root.Mui-focused": {
+                      color: "#1565c0",
+                    },
+                    backgroundColor: "#ffffff",
+                    borderRadius: "12px",
+                    boxShadow: "0 4px 6px rgba(0,0,0,0.05)",
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: "12px",
+                      "& fieldset": {
+                        borderColor: "#cfd8dc",
+                        transition: "all 0.3s ease",
+                      },
+                      "&:hover fieldset": {
+                        borderColor: "#90caf9",
+                      },
+                      "&.Mui-focused fieldset": {
+                        borderColor: "#1565c0",
+                        borderWidth: 2,
+                      },
+                    },
                   }}
                 />
               </DialogContent>
-              <DialogActions sx={{ justifyContent: "center" }}>
-                <Button onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
+              <DialogActions
+                sx={{
+                  justifyContent: "center",
+                  gap: 2,
+                  mt: 1,
+                  mb: 2,
+                  px: 4,
+                }}
+              >
+                <Button
+                  onClick={() => setSaveDialogOpen(false)}
+                  variant="outlined"
+                  color="error"
+                  startIcon={<Close />}
+                >
+                  Cancel
+                </Button>
                 <Button
                   onClick={handleSaveConfirm}
-                  color="primary"
                   disabled={isSaving}
+                  variant="contained"
+                  color="primary"
+                  startIcon={<Save />}
                 >
                   {isSaving ? "Saving..." : "Save"}
                 </Button>
@@ -1159,44 +1244,11 @@ const DataTable = () => {
               fullWidth
               sx={{ mt: 3, justifyContent: "center", gap: 2 }}
             >
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={exportToPdf}
-                disabled={exporting}
-                sx={{
-                  p: 1.5,
-                  borderRadius: 3,
-                  background: "#3f51b5",
-                  boxShadow: "0 3px 10px rgba(0, 0, 0, 0.1)",
-                  "&:hover": {
-                    backgroundColor: "#303f9f",
-                    transform: "scale(1.05)",
-                    transition: "transform 0.2s",
-                  },
-                }}
-              >
-                Export PDF
-              </Button>
-              <Button
-                variant="contained"
-                color="secondary"
-                onClick={exportToExcel}
-                disabled={exporting}
-                sx={{
-                  p: 1.5,
-                  borderRadius: 3,
-                  background: "#f50057",
-                  boxShadow: "0 3px 10px rgba(0, 0, 0, 0.1)",
-                  "&:hover": {
-                    backgroundColor: "#c51162",
-                    transform: "scale(1.05)",
-                    transition: "transform 0.2s",
-                  },
-                }}
-              >
-                Export Excel
-              </Button>
+              <ExportButtons
+                exporting={exporting}
+                exportToPdf={exportToPdf}
+                exportToExcel={exportToExcel}
+              />
             </Box>
           </Paper>
         </Grid>
@@ -1215,11 +1267,7 @@ const DataTable = () => {
                 <TableHead>
                   <TableRow>
                     {columns.map((column) => (
-                      <StyledTableCell
-                        key={column.id}
-                        align="center"
-                        sx={{ backgroundColor: "#007c89" }}
-                      >
+                      <StyledTableCell key={column.id} align="center">
                         <Box
                           display="flex"
                           flexDirection="column"
@@ -1407,8 +1455,6 @@ const DataTable = () => {
       />
 
       {renderGraph()}
-
-      <ToastContainer />
     </LocalizationProvider>
   );
 };

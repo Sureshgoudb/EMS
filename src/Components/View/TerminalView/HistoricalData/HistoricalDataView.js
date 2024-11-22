@@ -13,14 +13,15 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useNavigate } from "react-router-dom";
-import TableColumnCreate from "./TableColumnCreate";
+import TableColumnCreate from "./CreateNewTableDialog";
+import ConfirmationDialog from "../ConfirmationDialog";
 import axios from "axios";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
@@ -33,6 +34,11 @@ const HistoricalDataView = () => {
   const [error, setError] = useState(null);
   const [tableToDelete, setTableToDelete] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   useEffect(() => {
     fetchTables();
@@ -41,83 +47,60 @@ const HistoricalDataView = () => {
   const fetchTables = async () => {
     try {
       setLoading(true);
-
       const userDataString = localStorage.getItem("user");
-      if (!userDataString) {
+      if (!userDataString)
         throw new Error("User data not found in localStorage");
-      }
 
       const userData = JSON.parse(userDataString);
       const { user_Type, customerID } = userData;
       setIsAdmin(user_Type === "Admin");
 
-      let response;
-      if (user_Type === "Admin") {
-        response = await axios.get(`${apiKey}terminal/table/list`);
-      } else {
-        if (!customerID) {
-          throw new Error("Customer ID not found");
-        }
-        response = await axios.get(
-          `${apiKey}terminal/table/allTables/${customerID}`
-        );
-      }
+      const response =
+        user_Type === "Admin"
+          ? await axios.get(`${apiKey}terminal/table/list`)
+          : await axios.get(`${apiKey}terminal/table/allTables/${customerID}`);
 
       const tableData = response.data;
       if (!Array.isArray(tableData)) {
-        console.error("Received non-array data:", tableData);
-        setTables([]);
         setError("Invalid data format received from server");
         return;
       }
-
       setTables(tableData);
       setError(null);
     } catch (err) {
-      console.error("Error fetching tables:", err);
-      const errorMessage =
-        err.message === "User data not found in localStorage"
-          ? "Please log in to view tables"
-          : err.message === "Customer ID not found"
-          ? "Customer ID not found. Please contact support"
-          : "Failed to load tables. Please try again later.";
-      setError(errorMessage);
-      setTables([]);
+      setError("Failed to load tables. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTableClick = (tableId) => {
-    navigate(`/data-table/${tableId}`);
-  };
-
-  const handleAddTable = () => {
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-  };
+  const handleTableClick = (tableId) => navigate(`/data-table/${tableId}`);
+  const handleAddTable = () => setOpenDialog(true);
+  const handleCloseDialog = () => setOpenDialog(false);
 
   const handleCreateTable = async (tableData) => {
     try {
       const userData = JSON.parse(localStorage.getItem("user"));
-      if (!isAdmin && userData?.customerID) {
+      if (!isAdmin && userData?.customerID)
         tableData.customerID = userData.customerID;
-      }
 
       const response = await axios.post(
         `${apiKey}terminal/createTable`,
         tableData
       );
-
-      toast.success("Table created successfully");
+      setSnackbar({
+        open: true,
+        message: "Table created successfully",
+        severity: "success",
+      });
       await fetchTables();
       navigate(`/data-table/${response.data._id}`);
     } catch (error) {
-      console.error("Error creating table:", error);
-      toast.error(error.response?.data?.error || "Failed to create table");
+      setSnackbar({
+        open: true,
+        message: "Failed to create table",
+        severity: "error",
+      });
     } finally {
       setOpenDialog(false);
     }
@@ -126,13 +109,19 @@ const HistoricalDataView = () => {
   const handleDeleteTable = async () => {
     try {
       await axios.delete(`${apiKey}terminal/table/delete/${tableToDelete}`);
+      setSnackbar({
+        open: true,
+        message: "Table deleted successfully",
+        severity: "success",
+      });
       fetchTables();
-      toast.success("Table deleted successfully");
       setDeleteDialogOpen(false);
-      setTableToDelete(null);
     } catch (error) {
-      console.error("Error deleting table:", error);
-      toast.error("Failed to delete table");
+      setSnackbar({
+        open: true,
+        message: "Failed to delete table",
+        severity: "error",
+      });
     }
   };
 
@@ -142,163 +131,162 @@ const HistoricalDataView = () => {
     setDeleteDialogOpen(true);
   };
 
-  if (loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
-  }
+  const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
   return (
-    <Box sx={{ p: 3, bgcolor: "#e3f2fd", minHeight: "100vh" }}>
-      <ToastContainer position="top-right" autoClose={3000} />
-      <Grid container spacing={3} justifyContent="center">
-        <Grid item xs={12} md={8}>
-          <Grid container spacing={3}>
-            {Array.isArray(tables) && tables.length > 0 ? (
-              tables.map((table) => (
-                <Grid
-                  item
-                  xs={12}
-                  sm={6}
-                  md={4}
-                  key={table._id}
-                  sx={{ minWidth: "250px" }}
-                >
-                  <Paper
-                    sx={{
-                      p: 3,
-                      borderRadius: "12px",
-                      cursor: "pointer",
-                      backgroundColor: "#ffffff",
-                      boxShadow: 3,
-                      width: "100%",
-                      height: "100%",
-                      transition: "transform 0.3s, box-shadow 0.3s",
-                      "&:hover": {
-                        background:
-                          "linear-gradient(to bottom right, rgba(0, 124, 137, 0.3), rgba(77, 208, 225, 0.3))",
-                        transform: "translateY(-4px)",
-                        boxShadow: 6,
-                      },
-                      position: "relative",
-                    }}
-                    onClick={() => handleTableClick(table._id)}
-                  >
-                    <Typography variant="h6" sx={{ color: "#333", mb: 1 }}>
-                      {table.name}
-                    </Typography>
-
-                    <Typography variant="body2" sx={{ color: "#666" }}>
-                      <span style={{ fontWeight: "bold" }}>Profile:</span>{" "}
-                      {table.profile}
-                    </Typography>
-
-                    {(isAdmin || !isAdmin) && (
-                      <Box>
-                        <Tooltip title="Delete Table">
-                          <IconButton
-                            sx={{
-                              position: "absolute",
-                              top: 8,
-                              right: 8,
-                              transition: "opacity 0.3s",
-                              "&:hover": {
-                                opacity: 1,
-                              },
-                            }}
-                            onClick={(e) =>
-                              openDeleteConfirmation(table._id, e)
-                            }
-                          >
-                            <DeleteIcon sx={{ color: "#e57373" }} />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    )}
-                  </Paper>
-                </Grid>
-              ))
-            ) : (
-              <Grid item xs={12}>
-                <Typography variant="body1" textAlign="center">
-                  No tables found
-                </Typography>
-              </Grid>
-            )}
-          </Grid>
-        </Grid>
-
-        <Grid
-          item
-          xs={12}
+    <Box p={4} minHeight="100vh" bgcolor="background.default">
+      {loading ? (
+        <Box
           display="flex"
           justifyContent="center"
-          sx={{ mt: 3 }}
+          alignItems="center"
+          minHeight="100vh"
         >
-          <Button
-            variant="contained"
-            sx={{
-              backgroundColor: "#007c89",
-              color: "white",
-              mt: 2,
-              "&:hover": {
-                backgroundColor: "#005f6a",
-              },
-            }}
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={handleAddTable}
-          >
-            Add New Table
-          </Button>
-        </Grid>
-      </Grid>
+          <CircularProgress color="primary" />
+        </Box>
+      ) : error ? (
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight="100vh"
+        >
+          <Typography color="error">{error}</Typography>
+        </Box>
+      ) : (
+        <>
+          <Grid container spacing={4} justifyContent="center">
+            <Grid item xs={12} md={8}>
+              <Grid container spacing={4}>
+                {tables.length > 0 ? (
+                  tables.map((table) => (
+                    <Grid item xs={12} sm={6} md={4} key={table._id}>
+                      <Paper
+                        elevation={3}
+                        sx={{
+                          p: 3,
+                          borderRadius: "12px",
+                          cursor: "pointer",
+                          position: "relative",
+                          transition:
+                            "transform 0.2s ease-in-out, box-shadow 0.3s",
+                          "&:hover": {
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                            transform: "translateY(-4px)",
+                          },
+                        }}
+                        onClick={() => handleTableClick(table._id)}
+                      >
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            color: "#1976d2",
+                            fontSize: "1rem",
+                            fontWeight: 500,
+                            mb: 0.5,
+                          }}
+                        >
+                          {table.name}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: "#637381",
+                            fontSize: "0.75rem",
+                            mb: 0.5,
+                          }}
+                        >
+                          Profile: {table.profile}
+                        </Typography>
+                        {isAdmin && (
+                          <Tooltip title="Delete Table">
+                            <IconButton
+                              onClick={(e) =>
+                                openDeleteConfirmation(table._id, e)
+                              }
+                              sx={{ position: "absolute", top: 8, right: 8 }}
+                            >
+                              <DeleteIcon color="error" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Paper>
+                    </Grid>
+                  ))
+                ) : (
+                  <Grid item xs={12} textAlign="center">
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        color: "#637381",
+                        mb: 2,
+                      }}
+                    >
+                      No terminals with table found
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: "#637381",
+                        mb: 2,
+                      }}
+                    >
+                      Create a new display to get started
+                    </Typography>
+                  </Grid>
+                )}
+              </Grid>
+            </Grid>
+            <Grid item xs={12} display="flex" justifyContent="center" mt={3}>
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<AddIcon />}
+                sx={{
+                  borderRadius: "8px",
+                  textTransform: "none",
+                  boxShadow: "0 2px 4px rgba(156,39,176,0.2)",
+                  "&:hover": {
+                    boxShadow: "0 4px 8px rgba(156,39,176,0.3)",
+                  },
+                }}
+                onClick={handleAddTable}
+              >
+                Create New Table
+              </Button>
+            </Grid>
+          </Grid>
 
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-      >
-        <DialogTitle>{"Confirm Deletion"}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
+          <ConfirmationDialog
+            open={deleteDialogOpen}
+            onConfirm={handleDeleteTable}
+            onCancel={() => setDeleteDialogOpen(false)}
+          >
             Are you sure you want to delete this table? This action cannot be
             undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)} color="primary">
-            Cancel
-          </Button>
-          <Button onClick={handleDeleteTable} color="secondary" autoFocus>
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <TableColumnCreate
-        open={openDialog}
-        onClose={handleCloseDialog}
-        onCreateColumn={handleCreateTable}
-      />
+          </ConfirmationDialog>
+          <TableColumnCreate
+            open={openDialog}
+            onClose={handleCloseDialog}
+            onCreateColumn={handleCreateTable}
+          />
+
+          <Snackbar
+            open={snackbar.open}
+            autoHideDuration={3000}
+            onClose={handleCloseSnackbar}
+            anchorOrigin={{ vertical: "top", horizontal: "right" }}
+          >
+            <Alert
+              onClose={handleCloseSnackbar}
+              severity={snackbar.severity}
+              sx={{ width: "100%" }}
+            >
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
+        </>
+      )}
     </Box>
   );
 };

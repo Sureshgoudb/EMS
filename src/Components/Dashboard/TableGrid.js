@@ -14,6 +14,7 @@ const StyledCard = styled(Card)(({ theme }) => ({
   overflow: "hidden",
   display: "flex",
   flexDirection: "column",
+
   height: "100vh",
   transition: "all 0.5s ease-in-out",
   "&:hover": {
@@ -36,6 +37,8 @@ const StyledTypography = styled(Typography)(({ theme }) => ({
 const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   height: "100%",
   fontWeight: "bold",
+  alignContent: "center",
+  alignItems: "center",
   "& .MuiDataGrid-root": {
     backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderRadius: "15px",
@@ -44,6 +47,10 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   "& .MuiDataGrid-cell": {
     borderBottom: "1px solid rgba(224, 224, 224, 0.5)",
     color: "#333",
+    justifyContent: "center", // Centers content horizontally
+    display: "flex", // Needed for justifyContent to work
+    alignItems: "center", // Centers content vertically
+    textAlign: "center", // Aligns text content
     fontFamily: "'Poppins', 'Arial', sans-serif",
     transition: "all 0.3s ease",
   },
@@ -212,37 +219,37 @@ const TableGrid = () => {
       {
         field: "AvC MW",
         headerName: "AvC MW",
-        width: 100,
+        width: 125,
         headerClassName: "header-cell",
       },
       {
         field: "SG MW",
         headerName: "SG MW",
-        width: 100,
+        width: 125,
         headerClassName: "header-cell",
       },
       {
         field: "Inst MW",
         headerName: "Inst MW",
-        width: 100,
+        width: 125,
         headerClassName: "header-cell",
       },
       {
         field: "Avg MW",
         headerName: "Avg MW",
-        width: 100,
+        width: 125,
         headerClassName: "header-cell",
       },
       {
         field: "UI MW",
         headerName: "UI MW",
-        width: 100,
+        width: 125,
         headerClassName: "header-cell",
       },
       {
         field: "UI Percentage",
         headerName: "UI Percentage",
-        width: 100,
+        width: 125,
         headerClassName: "header-cell",
         cellClassName: (params) => {
           const value = parseFloat(params.value);
@@ -257,7 +264,7 @@ const TableGrid = () => {
       {
         field: "4thBLK SG MW",
         headerName: "4thBLK SG MW",
-        width: 100,
+        width: 125,
         headerClassName: "header-cell",
       },
     ];

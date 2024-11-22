@@ -13,7 +13,7 @@ import DeviceData from "./Components/DeviceData";
 import { Provider } from "react-redux";
 import appStore from "./store/store";
 import Profile from "./Components/Profile";
-import Devices from "./Components/Devices";
+import Devices from "./CoTerminalWidgetsPagemponents/Devices";
 import DeviceDetails from "./Components/DeviceDetails";
 import VariableDetails from "./Components/VariableDetails";
 import Users from "./Components/Users/Users";
@@ -23,7 +23,7 @@ import Dashboard from "./Components/Dashboard";
 import Schedule from "./Components/Schedule";
 import Reports from "./Components/Reports";
 import TerminalView from "./Components/View/TerminalView/TerminalView";
-import TerminalWidgetsPage from "./Components/View/TerminalView/TerminalWidgetsPage";
+import TerminalDetailPage from "./Components/View/TerminalView/TerminalDetailPage";
 import DataTable from "./Components/View/TerminalView/HistoricalData/DataTable";
 
 const Main = () => {
@@ -105,8 +105,8 @@ const Main = () => {
           element: <TerminalView />,
         },
         {
-          path: "/terminal/:terminalID",
-          element: <TerminalWidgetsPage />,
+          path: "/terminal/:terminalId",
+          element: <TerminalDetailPage />,
         },
         {
           path: "/schedule",

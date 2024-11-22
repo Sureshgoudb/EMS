@@ -29,6 +29,7 @@ import { ZoomIn, ZoomOut, RestartAlt } from "@mui/icons-material";
 const apiUrl = process.env.REACT_APP_API_LOCAL_URL;
 
 const formatTimestamp = (timestamp) => {
+  if (!timestamp) return "";
   const date = new Date(timestamp);
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
     2,
@@ -40,34 +41,29 @@ const formatTimestamp = (timestamp) => {
   ).padStart(2, "0")}`;
 };
 
-const MultiAxisGraph = ({
-  widgetData,
-  showXAxis = true,
-  isExpanded = false,
-}) => {
+const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
   const [error, setError] = useState(null);
   const [availableScripts, setAvailableScripts] = useState([]);
   const [selectedScripts, setSelectedScripts] = useState([]);
   const [mergedData, setMergedData] = useState([]);
-  const [displayData, setDisplayData] = useState([]);
   const [chartType, setChartType] = useState("Area");
   const [zoomRange, setZoomRange] = useState({
     start: 0,
     end: 100,
     minPoints: 5,
   });
+  const [displayData, setDisplayData] = useState([]);
   const chartRef = useRef(null);
   const colors = [
+    "#2196f3",
     "#f44336",
-    "#795548",
-    "#9c27b0",
     "#4caf50",
     "#ff9800",
-    "#2196f3",
+    "#9c27b0",
     "#795548",
   ];
 
-  //  ----------- X Axis Configuration -------------
+  // Filter data based on configuration and zoom state
   const filterDataByConfig = useCallback(
     (data) => {
       if (!data || data.length === 0) return [];
@@ -89,7 +85,7 @@ const MultiAxisGraph = ({
         );
       }
 
-      //----------- Apply zoom range ------------
+      // Apply zoom range
       const startIdx = Math.floor(
         filteredData.length * (zoomRange.start / 100)
       );
@@ -99,7 +95,7 @@ const MultiAxisGraph = ({
     [widgetData.xAxisConfiguration, isExpanded, zoomRange]
   );
 
-  // ------------  Fetch data for each script -------------
+  // Fetch available scripts only when expanded
   useEffect(() => {
     if (!isExpanded) return;
 
@@ -143,6 +139,7 @@ const MultiAxisGraph = ({
     }
   };
 
+  // Update data without loading state
   useEffect(() => {
     let isMounted = true;
 
@@ -279,6 +276,19 @@ const MultiAxisGraph = ({
     }
   }, [handleWheel]);
 
+  useEffect(() => {
+    const filteredData = filterDataByConfig(mergedData);
+    setDisplayData(filteredData);
+  }, [mergedData, filterDataByConfig]);
+
+  useEffect(() => {
+    const chartNode = chartRef.current;
+    if (!chartNode) return;
+
+    chartNode.addEventListener("wheel", handleWheel, { passive: false });
+    return () => chartNode.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
+
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
@@ -296,7 +306,7 @@ const MultiAxisGraph = ({
     return null;
   };
 
-  const renderChartType = (dataKey, color, yAxisId) => {
+  const renderChartType = (dataKey, color) => {
     switch (chartType) {
       case "Line":
         return (
@@ -306,7 +316,6 @@ const MultiAxisGraph = ({
             stroke={color}
             dot={false}
             isAnimationActive={false}
-            yAxisId={yAxisId}
           />
         );
       case "Area":
@@ -318,18 +327,10 @@ const MultiAxisGraph = ({
             stroke={color}
             fillOpacity={0.3}
             isAnimationActive={false}
-            yAxisId={yAxisId}
           />
         );
       case "Bar":
-        return (
-          <Bar
-            dataKey={dataKey}
-            fill={color}
-            yAxisId={yAxisId}
-            isAnimationActive={false}
-          />
-        );
+        return <Bar dataKey={dataKey} fill={color} isAnimationActive={false} />;
       default:
         return null;
     }
@@ -344,7 +345,7 @@ const MultiAxisGraph = ({
   }
 
   return (
-    <Box sx={{ width: "100%", height: "100%" }}>
+    <Box sx={{ width: "100%", height: "100%" }} ref={chartRef}>
       {isExpanded && (
         <Box
           sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, ml: 2 }}
@@ -402,6 +403,7 @@ const MultiAxisGraph = ({
           </Box>
         </Box>
       )}
+
       <Box
         ref={chartRef}
         sx={{
@@ -416,26 +418,13 @@ const MultiAxisGraph = ({
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="timestamp" hide={!showXAxis} />
+            <YAxis tick={{ fontSize: 12 }} domain={["auto", "auto"]} />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
-            <YAxis
-              tick={{ fontSize: 12 }}
-              domain={["auto", "auto"]}
-              stroke={colors[0]}
-            />
-            {selectedScripts.map((script, index) => (
-              <YAxis
-                key={script}
-                yAxisId={index + 1}
-                tick={{ fontSize: 12 }}
-                domain={["auto", "auto"]}
-                orientation="right"
-                stroke={colors[index + 1]}
-              />
-            ))}
-            {renderChartType(widgetData.scriptName, colors[0], 0)}
+
+            {renderChartType(widgetData.scriptName, colors[0])}
             {selectedScripts.map((script, index) =>
-              renderChartType(script, colors[index + 1], index + 1)
+              renderChartType(script, colors[(index + 1) % colors.length])
             )}
           </ComposedChart>
         </ResponsiveContainer>
@@ -444,4 +433,4 @@ const MultiAxisGraph = ({
   );
 };
 
-export default MultiAxisGraph;
+export default SimpleGraph;
