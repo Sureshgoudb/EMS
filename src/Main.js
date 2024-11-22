@@ -13,7 +13,7 @@ import DeviceData from "./Components/DeviceData";
 import { Provider } from "react-redux";
 import appStore from "./store/store";
 import Profile from "./Components/Profile";
-import Devices from "./CoTerminalWidgetsPagemponents/Devices";
+import Devices from "./Components/Devices";
 import DeviceDetails from "./Components/DeviceDetails";
 import VariableDetails from "./Components/VariableDetails";
 import Users from "./Components/Users/Users";
