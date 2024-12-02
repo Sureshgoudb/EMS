@@ -52,8 +52,8 @@ const TerminalDetailPage = () => {
     return {
       x: x >= 0 ? x : (index % 3) * 4,
       y: y >= 0 ? y : Math.floor(index / 3) * 4,
-      w: Math.min(w, 8),
-      h: Math.min(h, 8),
+      w: Math.min(w, 12),
+      h: Math.min(h, 12),
       minW: 2,
       minH: 1,
     };
@@ -116,6 +116,7 @@ const TerminalDetailPage = () => {
         return {
           id: script._id,
           scriptName: script.scriptName,
+          dispalyName: script.displayName,
           properties: script.properties,
           areaGraph: script.areaGraph,
           position: script.position || defaultPosition,

@@ -80,27 +80,8 @@ const Widget = ({
     severity: "success",
   });
 
-  const updateHistoricalData = useCallback(
-    (newValue, newTimestamp) => {
-      setHistoricalData((prevData) => {
-        const newDataPoint = {
-          value: Number(newValue),
-          timestamp: formatTimestamp(newTimestamp),
-        };
-
-        const updatedData = [...prevData, newDataPoint];
-        if (updatedData.length > MAX_DATA_POINTS) {
-          updatedData.shift();
-        }
-
-        return updatedData;
-      });
-    },
-    [MAX_DATA_POINTS]
-  );
-
   const fetchData = useCallback(async () => {
-    if (!widgetData.terminalID || isDragging || isLayoutChanging) {
+    if (!widgetData.terminalID) {
       return;
     }
 
@@ -124,48 +105,6 @@ const Widget = ({
         setCurrentValue(newValue);
         const newTimestamp = currentData.timestamp;
         setTimestamp(newTimestamp);
-
-        if (widgetData.areaGraph) {
-          updateHistoricalData(newValue, newTimestamp);
-        }
-      }
-
-      if (historicalData.length === 0 && widgetData.areaGraph) {
-        const historyResponse = await fetch(
-          `${apiKey}terminal/${
-            widgetData.terminalID
-          }/script/${encodeURIComponent(widgetData.scriptName)}/history`
-        );
-
-        if (!historyResponse.ok) {
-          throw new Error(`HTTP error! status: ${historyResponse.status}`);
-        }
-
-        const historyData = await historyResponse.json();
-
-        if (Array.isArray(historyData)) {
-          const transformedData = historyData.map((item) => ({
-            value: Number(item[widgetData.scriptName]),
-            timestamp: formatTimestamp(item.timestamp),
-          }));
-
-          let filteredData = transformedData;
-          if (widgetData.xAxisConfig) {
-            if (widgetData.xAxisConfig.type === "records") {
-              filteredData = transformedData.slice(
-                -widgetData.xAxisConfig.value
-              );
-            } else if (widgetData.xAxisConfig.type === "seconds") {
-              const cutoffTime = new Date(
-                Date.now() - widgetData.xAxisConfig.value * 1000
-              );
-              filteredData = transformedData.filter(
-                (item) => new Date(item.timestamp) > cutoffTime
-              );
-            }
-          }
-          setHistoricalData(filteredData);
-        }
       }
 
       setError(null);
@@ -173,15 +112,7 @@ const Widget = ({
       setError(`Failed to fetch data: ${err.message}`);
       console.error("Data fetch error:", err);
     }
-  }, [
-    widgetData,
-    isExpanded,
-    isDragging,
-    isLayoutChanging,
-    updateHistoricalData,
-    MAX_DATA_POINTS,
-    historicalData.length,
-  ]);
+  }, [widgetData, isExpanded, isDragging, isLayoutChanging]);
 
   useEffect(() => {
     let intervalId;
@@ -449,7 +380,7 @@ const Widget = ({
             textShadow: "1px 1px 2px rgba(0, 0, 0, 0.2)",
           }}
         >
-          {widgetData.scriptName}
+          {widgetData.dispalyName}
         </Typography>
         <Box>
           <IconButton
@@ -574,7 +505,7 @@ const Widget = ({
                   color: widgetData.properties.fontColor,
                 }}
               >
-                {widgetData.scriptName}
+                {widgetData.dispalyName}
               </Typography>
             </Tooltip>
           </Box>
@@ -707,7 +638,7 @@ const Widget = ({
                   : "inherit",
               }}
             >
-              {widgetData.scriptName}
+              {widgetData.dispalyName}
             </Typography>
             <Box>
               <IconButton onClick={() => handleZoom("in")}>

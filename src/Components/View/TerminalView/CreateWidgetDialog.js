@@ -35,6 +35,8 @@ const CreateWidgetDialog = ({
   const [formData, setFormData] = useState({
     terminal: "",
     script: "",
+    displayName: "",
+
     decimalPlaces: "2",
     isAreaGraph: false,
     graphType: "simple",
@@ -166,7 +168,9 @@ const CreateWidgetDialog = ({
     if (!formData.script) {
       tempErrors.script = "Script is required";
     }
-
+    if (!formData.displayName) {
+      tempErrors.displayName = "Display Name is required";
+    }
     const decimalPlacesNum = Number(formData.decimalPlaces);
     if (
       isNaN(decimalPlacesNum) ||
@@ -373,6 +377,8 @@ const CreateWidgetDialog = ({
         scripts: [
           {
             scriptName: formData.script,
+            displayName: formData.displayName,
+
             areaGraph: formData.isAreaGraph,
             properties: textProperties,
             position,
@@ -501,7 +507,15 @@ const CreateWidgetDialog = ({
           </Select>
           {errors.script && <FormHelperText>{errors.script}</FormHelperText>}
         </FormControl>
-
+        <TextField
+          label="Display Name *"
+          value={formData.displayName}
+          onChange={handleChange("displayName")}
+          fullWidth
+          sx={{ mt: 2 }}
+          error={!!errors.displayName}
+          helperText={errors.displayName}
+        />
         <TextField
           label="Decimal Places"
           type="number"

@@ -23,7 +23,19 @@ import {
   OutlinedInput,
   IconButton,
   Tooltip as MuiTooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  List,
+  ListItem,
+  ListItemText,
+  Checkbox,
+  Button,
 } from "@mui/material";
+import {
+  BarChart as GraphTypeIcon,
+  CompareArrows as CompareScriptsIcon,
+} from "@mui/icons-material";
 import { ZoomIn, ZoomOut, RestartAlt } from "@mui/icons-material";
 
 const apiUrl = process.env.REACT_APP_API_LOCAL_URL;
@@ -49,6 +61,10 @@ const MultiAxisGraph = ({
   const [availableScripts, setAvailableScripts] = useState([]);
   const [selectedScripts, setSelectedScripts] = useState([]);
   const [mergedData, setMergedData] = useState([]);
+  const [isCompareScriptsDialogOpen, setIsCompareScriptsDialogOpen] =
+    useState(false);
+  const [isGraphTypeDialogOpen, setIsGraphTypeDialogOpen] = useState(false);
+
   const [displayData, setDisplayData] = useState([]);
   const [chartType, setChartType] = useState("Area");
   const [zoomRange, setZoomRange] = useState({
@@ -101,7 +117,7 @@ const MultiAxisGraph = ({
 
   // ------------  Fetch data for each script -------------
   useEffect(() => {
-    if (!isExpanded) return;
+    if (!isExpanded && !isCompareScriptsDialogOpen) return;
 
     const fetchAvailableScripts = async () => {
       try {
@@ -121,7 +137,167 @@ const MultiAxisGraph = ({
     };
 
     fetchAvailableScripts();
-  }, [widgetData.terminalID, widgetData.scriptName, isExpanded]);
+  }, [
+    widgetData.terminalID,
+    widgetData.scriptName,
+    isExpanded,
+    isCompareScriptsDialogOpen,
+  ]);
+
+  // Rest of the previous implementation remains the same...
+
+  // New method for handling script comparison in non-expanded view
+  const handleCompareScriptsDialog = () => {
+    setIsCompareScriptsDialogOpen(true);
+  };
+
+  const handleCompareScriptsClose = () => {
+    setIsCompareScriptsDialogOpen(false);
+  };
+
+  const handleCompareScriptsConfirm = () => {
+    // Confirm selected scripts
+    setIsCompareScriptsDialogOpen(false);
+  };
+
+  const handleScriptToggle = (script) => {
+    setSelectedScripts((prev) =>
+      prev.includes(script)
+        ? prev.filter((s) => s !== script)
+        : [...prev, script]
+    );
+  };
+
+  const handleGraphTypeDialog = () => {
+    setIsGraphTypeDialogOpen(true);
+  };
+
+  const handleGraphTypeClose = () => {
+    setIsGraphTypeDialogOpen(false);
+  };
+
+  const handleGraphTypeChange = (type) => {
+    setChartType(type);
+    setIsGraphTypeDialogOpen(false);
+  };
+  const isColorDark = (backgroundColor) => {
+    if (!backgroundColor || backgroundColor === "transparent") return false;
+    const hex = backgroundColor.replace("#", "");
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.5;
+  };
+  // Render additional icons for non-expanded view
+  const renderNonExpandedIcons = () => {
+    if (isExpanded) return null;
+
+    return (
+      <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+
+          right: 85,
+          zIndex: 10,
+          display: "flex",
+          p: 1,
+        }}
+      >
+        <MuiTooltip title="Change Graph Type">
+          <IconButton
+            size="small"
+            sx={{
+              color: isColorDark(widgetData.properties.backgroundColor)
+                ? "#fff"
+                : "#000",
+            }}
+            onClick={handleGraphTypeDialog}
+          >
+            <GraphTypeIcon fontSize="small" />
+          </IconButton>
+        </MuiTooltip>
+        <MuiTooltip title="Compare Scripts">
+          <IconButton
+            size="small"
+            sx={{
+              color: isColorDark(widgetData.properties.backgroundColor)
+                ? "#fff"
+                : "#000",
+            }}
+            onClick={handleCompareScriptsDialog}
+          >
+            <CompareScriptsIcon fontSize="small" />
+          </IconButton>
+        </MuiTooltip>
+      </Box>
+    );
+  };
+
+  // Graph Type Selection Dialog
+  const renderGraphTypeDialog = () => (
+    <Dialog open={isGraphTypeDialogOpen} onClose={handleGraphTypeClose}>
+      <DialogTitle>Select Graph Type</DialogTitle>
+      <DialogContent>
+        <List>
+          {["Line", "Area", "Bar"].map((type) => (
+            <ListItem
+              key={type}
+              button
+              onClick={() => handleGraphTypeChange(type)}
+            >
+              <ListItemText primary={type} />
+            </ListItem>
+          ))}
+        </List>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Compare Scripts Dialog
+  const renderCompareScriptsDialog = () => (
+    <Dialog
+      open={isCompareScriptsDialogOpen}
+      onClose={handleCompareScriptsClose}
+      maxWidth="xs"
+      fullWidth
+    >
+      <DialogTitle>Compare Scripts</DialogTitle>
+      <DialogContent>
+        <List>
+          {availableScripts.map((script) => (
+            <ListItem
+              key={script}
+              button
+              onClick={() => handleScriptToggle(script)}
+              dense
+            >
+              <Checkbox
+                edge="start"
+                checked={selectedScripts.includes(script)}
+                tabIndex={-1}
+                disableRipple
+              />
+              <ListItemText primary={script} />
+            </ListItem>
+          ))}
+        </List>
+        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+          <Button onClick={handleCompareScriptsClose} color="primary">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCompareScriptsConfirm}
+            color="primary"
+            variant="contained"
+          >
+            Confirm
+          </Button>
+        </Box>
+      </DialogContent>
+    </Dialog>
+  );
 
   const fetchScriptData = async (scriptName) => {
     try {
@@ -344,7 +520,10 @@ const MultiAxisGraph = ({
   }
 
   return (
-    <Box sx={{ width: "100%", height: "100%" }}>
+    <Box sx={{ width: "100%", height: "100%" }} ref={chartRef}>
+      {renderNonExpandedIcons()}
+      {renderGraphTypeDialog()}
+      {renderCompareScriptsDialog()}
       {isExpanded && (
         <Box
           sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, ml: 2 }}

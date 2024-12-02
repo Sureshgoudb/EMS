@@ -38,6 +38,19 @@ import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(date.getUTCDate()).padStart(2, "0")} ${String(
+    date.getUTCHours()
+  ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(
+    date.getUTCSeconds()
+  ).padStart(2, "0")}`;
+};
+
 const EnhancedGraph = ({
   openGraph,
   handleCloseGraph,
@@ -176,18 +189,6 @@ const EnhancedGraph = ({
     return reversedGraphData.slice(startIndex, endIndex);
   }, [reversedGraphData, zoomRange]);
 
-  const formatXAxis = (timestamp) => {
-    if (!timestamp) return "";
-    const date = new Date(timestamp);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(date);
-  };
-
   useEffect(() => {
     const container = chartContainerRef.current;
     if (container) {
@@ -223,10 +224,10 @@ const EnhancedGraph = ({
         <XAxis
           dataKey="timestamp"
           stroke={theme.palette.text.primary}
-          tickFormatter={formatXAxis}
+          tickFormatter={formatTimestamp}
           textAnchor="end"
           height={60}
-          tick={{ fontSize: 12 }}
+          tick={{ fontSize: 10 }}
           angle={-45}
         />
         <YAxis
@@ -262,13 +263,13 @@ const EnhancedGraph = ({
             fill={chartType === "line" ? "none" : getColor(index)}
             strokeWidth={2}
             fillOpacity={chartType === "area" ? 0.4 : 0.8}
-            dot={chartType === "line" ? { r: 3 } : false}
+            dot={chartType === "line" ? { r: 0.1 } : false}
             activeDot={
               chartType !== "bar"
                 ? {
                     r: 6,
                     stroke: theme.palette.background.paper,
-                    strokeWidth: 2,
+                    strokeWidth: 0.1,
                   }
                 : false
             }
