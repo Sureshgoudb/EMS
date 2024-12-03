@@ -31,8 +31,14 @@ import {
   ListItemText,
   Checkbox,
   Button,
+  Menu,
 } from "@mui/material";
-import { ZoomIn, ZoomOut, RestartAlt } from "@mui/icons-material";
+import {
+  ZoomIn,
+  ZoomOut,
+  RestartAlt,
+  Timer as TimerIcon,
+} from "@mui/icons-material";
 
 import {
   BarChart as GraphTypeIcon,
@@ -66,10 +72,42 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     minPoints: 5,
   });
   const [displayData, setDisplayData] = useState([]);
-  const [isGraphTypeDialogOpen, setIsGraphTypeDialogOpen] = useState(false);
   const [isCompareScriptsDialogOpen, setIsCompareScriptsDialogOpen] =
     useState(false);
+  const [isGraphTypeDialogOpen, setIsGraphTypeDialogOpen] = useState(false);
   const chartRef = useRef(null);
+  const [timerAnchorEl, setTimerAnchorEl] = useState(null);
+  const timerIntervalRef = useRef(null);
+
+  const [timerState, setTimerState] = useState(() => {
+    const savedTimerState = localStorage.getItem(
+      `persistentTimerState_${widgetData.id}`
+    );
+    if (savedTimerState) {
+      const parsedState = JSON.parse(savedTimerState);
+      const now = Date.now();
+
+      if (now < parsedState.endTime) {
+        return {
+          ...parsedState,
+          remainingTime: Math.max(
+            0,
+            Math.ceil((parsedState.endTime - now) / 1000)
+          ),
+        };
+      }
+    }
+    return null;
+  });
+
+  const timerSlots = [
+    { label: "1 minute", value: 1 * 60 },
+    { label: "15 min", value: 15 * 60 },
+    { label: "1 hr", value: 60 * 60 },
+    { label: "8 hr", value: 8 * 60 * 60 },
+    { label: "24 hr", value: 24 * 60 * 60 },
+  ];
+
   const colors = [
     "#2196f3",
     "#f44336",
@@ -79,39 +117,149 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     "#795548",
   ];
 
-  // Filter data based on configuration and zoom state
+  const alignTimeToInterval = (currentTime, interval) => {
+    const date = new Date(currentTime);
+
+    switch (interval) {
+      case 1 * 60:
+        date.setSeconds(0, 0);
+        return date.getTime();
+
+      case 15 * 60:
+        const minutes = date.getMinutes();
+        const alignedMinutes = Math.floor(minutes / 15) * 15;
+        date.setMinutes(alignedMinutes, 0, 0);
+        return date.getTime();
+
+      case 60 * 60:
+        date.setMinutes(0, 0, 0);
+        return date.getTime();
+
+      case 8 * 60 * 60:
+        const hours = date.getHours();
+        const alignedHours = Math.floor(hours / 8) * 8;
+        date.setHours(alignedHours, 0, 0, 0);
+        return date.getTime();
+
+      case 24 * 60 * 60:
+        date.setHours(0, 0, 30, 0);
+        return date.getTime();
+
+      default:
+        return currentTime;
+    }
+  };
+
+  const startTimer = useCallback((slot) => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+
+    const now = Date.now();
+    const alignedStartTime = alignTimeToInterval(now, slot.value);
+    const endTime = alignedStartTime + slot.value * 1000;
+
+    const newTimerState = {
+      selectedSlot: slot,
+      startTime: alignedStartTime,
+      endTime: endTime,
+      remainingTime: Math.ceil((endTime - now) / 1000),
+      alignedStartTime: alignedStartTime,
+    };
+
+    localStorage.setItem(
+      `persistentTimerState_${widgetData.id}`,
+      JSON.stringify(newTimerState)
+    );
+    setTimerState(newTimerState);
+
+    timerIntervalRef.current = setInterval(() => {
+      const currentTime = Date.now();
+      const remainingSeconds = Math.max(
+        0,
+        Math.ceil((endTime - currentTime) / 1000)
+      );
+
+      if (remainingSeconds <= 0) {
+        startTimer(slot);
+      } else {
+        setTimerState((prev) => ({
+          ...prev,
+          remainingTime: remainingSeconds,
+        }));
+      }
+    }, 1000);
+
+    setTimerAnchorEl(null);
+  }, []);
+
+  const formatRemainingTime = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const handleTimerSlotSelect = (slot) => {
+    startTimer(slot);
+  };
+
   const filterDataByConfig = useCallback(
     (data) => {
       if (!data || data.length === 0) return [];
 
       let filteredData = data;
 
-      if (isExpanded) {
-        filteredData = data.slice(-900);
-      } else if (!widgetData.xAxisConfiguration) {
-        filteredData = data.slice(-10);
-      } else if (widgetData.xAxisConfiguration.type === "records") {
-        filteredData = data.slice(-widgetData.xAxisConfiguration.value);
-      } else if (widgetData.xAxisConfiguration.type === "seconds") {
-        const cutoffTime = new Date(
-          Date.now() - widgetData.xAxisConfiguration.value * 1000
+      if (timerState && timerState.selectedSlot) {
+        const timerStartTime = new Date(timerState.alignedStartTime);
+        const timerEndTime = new Date(
+          timerStartTime.getTime() + timerState.selectedSlot.value * 1000
         );
-        filteredData = data.filter(
-          (item) => new Date(item.timestamp) > cutoffTime
-        );
+
+        filteredData = data.filter((item) => {
+          const itemTime = new Date(item.timestamp);
+          return itemTime >= timerStartTime && itemTime <= timerEndTime;
+        });
+      } else {
+        if (isExpanded) {
+          filteredData = data.slice(-2880);
+        } else if (!widgetData.xAxisConfiguration) {
+          filteredData = data.slice(-10);
+        } else if (widgetData.xAxisConfiguration.type === "records") {
+          filteredData = data.slice(-widgetData.xAxisConfiguration.value);
+        } else if (widgetData.xAxisConfiguration.type === "seconds") {
+          const cutoffTime = new Date(
+            Date.now() - widgetData.xAxisConfiguration.value * 1000
+          );
+          filteredData = data.filter(
+            (item) => new Date(item.timestamp) > cutoffTime
+          );
+        }
       }
 
-      // Apply zoom range
       const startIdx = Math.floor(
         filteredData.length * (zoomRange.start / 100)
       );
       const endIdx = Math.ceil(filteredData.length * (zoomRange.end / 100));
       return filteredData.slice(startIdx, endIdx);
     },
-    [widgetData.xAxisConfiguration, isExpanded, zoomRange]
+    [widgetData.xAxisConfiguration, isExpanded, zoomRange, timerState]
   );
 
-  // Fetch available scripts only when expanded
+  useEffect(() => {
+    if (timerState && timerState.selectedSlot) {
+      startTimer(timerState.selectedSlot);
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [startTimer]);
+
   useEffect(() => {
     if (!isExpanded && !isCompareScriptsDialogOpen) return;
 
@@ -160,9 +308,9 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     }
   };
 
-  // Update data without loading state
   useEffect(() => {
     let isMounted = true;
+    let intervalId;
 
     const updateData = async () => {
       try {
@@ -174,6 +322,7 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
           [widgetData.scriptName]: item[widgetData.scriptName],
         }));
 
+        // Fetch data for selected comparison scripts
         for (const script of selectedScripts) {
           const scriptData = await fetchScriptData(script);
           const reversedScriptData = [...scriptData].reverse();
@@ -197,19 +346,21 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     };
 
     updateData();
-    const interval = setInterval(updateData, 30000);
+
+    if (selectedScripts.length > 0 || widgetData.scriptName) {
+      intervalId = setInterval(updateData, 30000);
+    }
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      if (intervalId) clearInterval(intervalId);
     };
-  }, [selectedScripts, widgetData.scriptName, filterDataByConfig]);
+  }, [selectedScripts, widgetData.scriptName]);
 
   const handleScriptChange = (event) => {
     setSelectedScripts(event.target.value);
   };
 
-  // Zoom handling
   const handleWheel = useCallback((event) => {
     event.preventDefault();
 
@@ -326,6 +477,7 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     }
     return null;
   };
+
   const isColorDark = (backgroundColor) => {
     if (!backgroundColor || backgroundColor === "transparent") return false;
     const hex = backgroundColor.replace("#", "");
@@ -382,11 +534,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     setIsCompareScriptsDialogOpen(false);
   };
 
-  const handleCompareScriptsConfirm = () => {
-    // Confirm selected scripts
-    setIsCompareScriptsDialogOpen(false);
-  };
-
   const handleScriptToggle = (script) => {
     setSelectedScripts((prev) =>
       prev.includes(script)
@@ -408,7 +555,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     setIsGraphTypeDialogOpen(false);
   };
 
-  // Render additional icons for non-expanded view
   const renderNonExpandedIcons = () => {
     if (isExpanded) return null;
 
@@ -423,6 +569,33 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
           p: 1,
         }}
       >
+        <MuiTooltip title="Timer Settings">
+          <IconButton
+            size="small"
+            sx={{
+              color: isColorDark(widgetData.properties.backgroundColor)
+                ? "#fff"
+                : "#000",
+              mr: 1,
+            }}
+            onClick={(e) => setTimerAnchorEl(e.currentTarget)}
+          >
+            <TimerIcon fontSize="small" />
+            {timerState && timerState.selectedSlot && (
+              <Typography
+                variant="caption"
+                sx={{
+                  ml: 0.5,
+                  color: isColorDark(widgetData.properties.backgroundColor)
+                    ? "#fff"
+                    : "#000",
+                }}
+              >
+                {formatRemainingTime(timerState.remainingTime)}
+              </Typography>
+            )}
+          </IconButton>
+        </MuiTooltip>
         <MuiTooltip title="Change Graph Type">
           <IconButton
             size="small"
@@ -430,6 +603,7 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
               color: isColorDark(widgetData.properties.backgroundColor)
                 ? "#fff"
                 : "#000",
+              mr: 1,
             }}
             onClick={handleGraphTypeDialog}
           >
@@ -449,23 +623,83 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
             <CompareScriptsIcon fontSize="small" />
           </IconButton>
         </MuiTooltip>
+        <Menu
+          anchorEl={timerAnchorEl}
+          open={Boolean(timerAnchorEl)}
+          onClose={() => setTimerAnchorEl(null)}
+        >
+          {timerSlots.map((slot) => (
+            <MenuItem
+              key={slot.value}
+              onClick={() => handleTimerSlotSelect(slot)}
+            >
+              {slot.label}
+            </MenuItem>
+          ))}
+        </Menu>
       </Box>
     );
   };
 
   // Graph Type Selection Dialog
   const renderGraphTypeDialog = () => (
-    <Dialog open={isGraphTypeDialogOpen} onClose={handleGraphTypeClose}>
-      <DialogTitle>Select Graph Type</DialogTitle>
-      <DialogContent>
-        <List>
+    <Dialog
+      open={isGraphTypeDialogOpen}
+      onClose={handleGraphTypeClose}
+      sx={{
+        "& .MuiPaper-root": {
+          padding: "20px",
+          backgroundColor: "#f7f9fc",
+          borderRadius: "12px",
+          boxShadow: "0 4px 10px rgba(0, 0, 0, 0.2)",
+        },
+      }}
+    >
+      <DialogTitle
+        sx={{
+          fontWeight: "bold",
+          fontSize: "1.5rem",
+          textAlign: "center",
+          color: "#333",
+        }}
+      >
+        Select Graph Type
+      </DialogTitle>
+      <DialogContent
+        sx={{
+          paddingTop: "10px",
+        }}
+      >
+        <List
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+          }}
+        >
           {["Line", "Area", "Bar"].map((type) => (
             <ListItem
               key={type}
               button
               onClick={() => handleGraphTypeChange(type)}
+              sx={{
+                backgroundColor: "#ffffff",
+                border: "1px solid #e0e0e0",
+                borderRadius: "8px",
+                "&:hover": {
+                  backgroundColor: "#f0f0f0",
+                },
+                transition: "background-color 0.3s ease",
+              }}
             >
-              <ListItemText primary={type} />
+              <ListItemText
+                primary={type}
+                sx={{
+                  textAlign: "center",
+                  color: "#333",
+                  fontWeight: "500",
+                }}
+              />
             </ListItem>
           ))}
         </List>
@@ -473,44 +707,147 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     </Dialog>
   );
 
+  const renderExpandedTimerControls = () => {
+    if (!isExpanded) return null;
+
+    return (
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, ml: 2 }}>
+        <MuiTooltip title="Timer Settings">
+          <IconButton
+            onClick={(e) => setTimerAnchorEl(e.currentTarget)}
+            sx={{ ml: 6 }}
+          >
+            <TimerIcon />
+            {timerState && timerState.selectedSlot && (
+              <Typography variant="caption" sx={{ ml: 1 }}>
+                {formatRemainingTime(timerState.remainingTime)}
+              </Typography>
+            )}
+          </IconButton>
+        </MuiTooltip>
+        <Menu
+          anchorEl={timerAnchorEl}
+          open={Boolean(timerAnchorEl)}
+          onClose={() => setTimerAnchorEl(null)}
+        >
+          {timerSlots.map((slot) => (
+            <MenuItem
+              key={slot.value}
+              onClick={() => handleTimerSlotSelect(slot)}
+            >
+              {slot.label}
+            </MenuItem>
+          ))}
+        </Menu>
+      </Box>
+    );
+  };
   // Compare Scripts Dialog
   const renderCompareScriptsDialog = () => (
     <Dialog
       open={isCompareScriptsDialogOpen}
       onClose={handleCompareScriptsClose}
-      maxWidth="xs"
+      maxWidth={false}
       fullWidth
+      PaperProps={{
+        style: {
+          width: "600px",
+          height: "500px",
+          borderRadius: "12px",
+          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.2)",
+        },
+      }}
     >
-      <DialogTitle>Compare Scripts</DialogTitle>
-      <DialogContent>
-        <List>
+      <DialogTitle
+        style={{
+          background: "linear-gradient(90deg, #2196f3, #0d47a1)",
+          color: "#fff",
+          fontWeight: "bold",
+          textAlign: "center",
+          padding: "24px",
+          fontSize: "20px",
+        }}
+      >
+        Compare Scripts
+      </DialogTitle>
+      <DialogContent
+        style={{
+          padding: "16px",
+          backgroundColor: "#f9f9f9",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          height: "calc(100% - 24px)",
+        }}
+      >
+        <List
+          style={{
+            maxHeight: "300px",
+            overflowY: "auto",
+            background: "#fff",
+            border: "1px solid #ddd",
+            borderRadius: "8px",
+            padding: "8px",
+          }}
+        >
           {availableScripts.map((script) => (
             <ListItem
               key={script}
               button
               onClick={() => handleScriptToggle(script)}
               dense
+              style={{
+                margin: "4px 0",
+                borderRadius: "6px",
+                transition: "background-color 0.3s",
+              }}
+              sx={{
+                "&:hover": {
+                  backgroundColor: "#f1f1f1",
+                },
+              }}
             >
               <Checkbox
                 edge="start"
                 checked={selectedScripts.includes(script)}
                 tabIndex={-1}
                 disableRipple
+                style={{
+                  color: selectedScripts.includes(script) ? "#2196f3" : "#ccc",
+                }}
               />
-              <ListItemText primary={script} />
+              <ListItemText
+                primary={script}
+                style={{
+                  fontSize: "14px",
+                  fontWeight: selectedScripts.includes(script)
+                    ? "bold"
+                    : "normal",
+                }}
+              />
             </ListItem>
           ))}
         </List>
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
-          <Button onClick={handleCompareScriptsClose} color="primary">
-            Cancel
-          </Button>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 2,
+            marginTop: 2,
+          }}
+        >
           <Button
-            onClick={handleCompareScriptsConfirm}
+            onClick={handleCompareScriptsClose}
             color="primary"
-            variant="contained"
+            style={{
+              backgroundColor: "#f44336",
+              color: "#fff",
+              textTransform: "none",
+              borderRadius: "8px",
+              padding: "6px 16px",
+            }}
           >
-            Confirm
+            Back
           </Button>
         </Box>
       </DialogContent>
@@ -522,9 +859,16 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
       {renderNonExpandedIcons()}
       {renderGraphTypeDialog()}
       {renderCompareScriptsDialog()}
+
       {isExpanded && (
         <Box
-          sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, ml: 2 }}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            mb: 2,
+            ml: 2,
+          }}
         >
           <FormControl sx={{ flex: 1, mt: 2, ml: 8 }} size="small">
             <InputLabel>Compare Scripts</InputLabel>
@@ -560,6 +904,9 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
               <MenuItem value="Bar">Bar</MenuItem>
             </Select>
           </FormControl>
+
+          {renderExpandedTimerControls()}
+
           <Box sx={{ minWidth: 120, mt: 2, mr: 2 }}>
             <MuiTooltip title="Zoom In">
               <IconButton onClick={() => handleZoomButton(true)} size="small">
@@ -579,6 +926,7 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
           </Box>
         </Box>
       )}
+
       <Box
         ref={chartRef}
         sx={{

@@ -192,16 +192,6 @@ const CreateWidgetDialog = ({
           formData.xAxisConfig === "records" ? "Records" : "Seconds"
         } must not exceed 1000`;
       }
-
-      const refreshValue = Number(formData.refreshInterval);
-      if (isNaN(refreshValue) || refreshValue < 1) {
-        tempErrors.refreshInterval =
-          "Refresh interval must be at least 1 second";
-      }
-      if (refreshValue > 3600) {
-        tempErrors.refreshInterval =
-          "Refresh interval must not exceed 3600 seconds";
-      }
     }
 
     setErrors(tempErrors);
@@ -602,7 +592,7 @@ const CreateWidgetDialog = ({
               inputProps={{ min: 1, max: 1000 }}
             />
 
-            <TextField
+            {/* <TextField
               label="Refresh Interval (Seconds)"
               type="number"
               value={formData.refreshInterval}
@@ -614,7 +604,7 @@ const CreateWidgetDialog = ({
                 "Enter a value between 1 and 3600 seconds"
               }
               inputProps={{ min: 1, max: 3600 }}
-            />
+            /> */}
           </Box>
         )}
       </DialogContent>
