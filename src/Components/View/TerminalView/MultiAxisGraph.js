@@ -66,7 +66,12 @@ const MultiAxisGraph = ({
 }) => {
   const [error, setError] = useState(null);
   const [availableScripts, setAvailableScripts] = useState([]);
-  const [selectedScripts, setSelectedScripts] = useState([]);
+  const [selectedScripts, setSelectedScripts] = useState(() => {
+    const storedScripts = localStorage.getItem(
+      `comparisonScripts_${widgetData.id}`
+    );
+    return storedScripts ? JSON.parse(storedScripts) : [];
+  });
   const [mergedData, setMergedData] = useState([]);
   const [chartType, setChartType] = useState("Area");
   const [zoomRange, setZoomRange] = useState({
@@ -364,9 +369,15 @@ const MultiAxisGraph = ({
   }, [selectedScripts, widgetData.scriptName]);
 
   const handleScriptChange = (event) => {
-    setSelectedScripts(event.target.value);
-  };
+    const newSelectedScripts = event.target.value;
 
+    localStorage.setItem(
+      `comparisonScripts_${widgetData.id}`,
+      JSON.stringify(newSelectedScripts)
+    );
+
+    setSelectedScripts(newSelectedScripts);
+  };
   // --------- Zoom in Zoom out -----------
   const handleWheel = useCallback((event) => {
     event.preventDefault();
@@ -566,16 +577,17 @@ const MultiAxisGraph = ({
     setIsCompareScriptsDialogOpen(false);
   };
 
-  const handleCompareScriptsConfirm = () => {
-    setIsCompareScriptsDialogOpen(false);
-  };
-
   const handleScriptToggle = (script) => {
-    setSelectedScripts((prev) =>
-      prev.includes(script)
-        ? prev.filter((s) => s !== script)
-        : [...prev, script]
+    const newSelectedScripts = selectedScripts.includes(script)
+      ? selectedScripts.filter((s) => s !== script)
+      : [...selectedScripts, script];
+
+    localStorage.setItem(
+      `comparisonScripts_${widgetData.id}`,
+      JSON.stringify(newSelectedScripts)
     );
+
+    setSelectedScripts(newSelectedScripts);
   };
 
   const handleGraphTypeDialog = () => {

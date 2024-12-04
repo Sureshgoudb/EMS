@@ -63,7 +63,13 @@ const formatTimestamp = (timestamp) => {
 const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
   const [error, setError] = useState(null);
   const [availableScripts, setAvailableScripts] = useState([]);
-  const [selectedScripts, setSelectedScripts] = useState([]);
+  const [selectedScripts, setSelectedScripts] = useState(() => {
+    // Retrieve selected scripts from local storage using widget ID
+    const storedScripts = localStorage.getItem(
+      `comparisonScripts_${widgetData.id}`
+    );
+    return storedScripts ? JSON.parse(storedScripts) : [];
+  });
   const [mergedData, setMergedData] = useState([]);
   const [chartType, setChartType] = useState("Area");
   const [zoomRange, setZoomRange] = useState({
@@ -358,9 +364,17 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
   }, [selectedScripts, widgetData.scriptName]);
 
   const handleScriptChange = (event) => {
-    setSelectedScripts(event.target.value);
-  };
+    const newSelectedScripts = event.target.value;
 
+    // Save to local storage
+    localStorage.setItem(
+      `comparisonScripts_${widgetData.id}`,
+      JSON.stringify(newSelectedScripts)
+    );
+
+    // Update state
+    setSelectedScripts(newSelectedScripts);
+  };
   const handleWheel = useCallback((event) => {
     event.preventDefault();
 
@@ -535,11 +549,16 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
   };
 
   const handleScriptToggle = (script) => {
-    setSelectedScripts((prev) =>
-      prev.includes(script)
-        ? prev.filter((s) => s !== script)
-        : [...prev, script]
+    const newSelectedScripts = selectedScripts.includes(script)
+      ? selectedScripts.filter((s) => s !== script)
+      : [...selectedScripts, script];
+
+    localStorage.setItem(
+      `comparisonScripts_${widgetData.id}`,
+      JSON.stringify(newSelectedScripts)
     );
+
+    setSelectedScripts(newSelectedScripts);
   };
 
   const handleGraphTypeDialog = () => {
