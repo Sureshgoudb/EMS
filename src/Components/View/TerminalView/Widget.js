@@ -53,25 +53,15 @@ const Widget = ({
   isLayoutChanging,
 }) => {
   const [currentValue, setCurrentValue] = useState(null);
-  const [historicalData, setHistoricalData] = useState([]);
   const [textFormatOpen, setTextFormatOpen] = useState(false);
   const [timestamp, setTimestamp] = useState(null);
   const [error, setError] = useState(null);
-  const [selectedScripts, setSelectedScripts] = useState([]);
-  const [availableComparisonScripts, setAvailableComparisonScripts] = useState(
-    []
-  );
-  const [selectedComparisonScripts, setSelectedComparisonScripts] = useState(
-    []
-  );
-  const [comparisonData, setComparisonData] = useState([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const graphContainerRef = React.useRef(null);
   const [confirmationDialog, setConfirmationDialog] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const MAX_DATA_POINTS = isExpanded ? 30 : 10;
   const REFRESH_INTERVAL = 30000; // 30 seconds
 
   const [snackbar, setSnackbar] = useState({
@@ -335,29 +325,6 @@ const Widget = ({
   const GraphComponent =
     widgetData.graphType === "simple" ? SimpleGraph : MultiAxisGraph;
 
-  const fetchComparisonScripts = async () => {
-    try {
-      const response = await fetch(
-        `${apiKey}terminal/${widgetData.terminalID}/scripts`
-      );
-      if (!response.ok) throw new Error("Failed to fetch scripts");
-      const data = await response.json();
-      const scripts = Object.keys(data.scripts).filter(
-        (script) => script !== widgetData.scriptName
-      );
-      setAvailableComparisonScripts(scripts);
-    } catch (err) {
-      console.error("Failed to fetch comparison scripts:", err);
-      setError("Failed to load comparison scripts");
-    }
-  };
-
-  useEffect(() => {
-    if (isExpanded) {
-      fetchComparisonScripts();
-    }
-  }, [isExpanded]);
-
   const renderExpandedContent = () => (
     <>
       <DialogTitle
@@ -437,11 +404,8 @@ const Widget = ({
         >
           <GraphComponent
             widgetData={widgetData}
-            currentValue={currentValue}
-            historicalData={historicalData}
             timestamp={timestamp}
             showXAxis={true}
-            selectedScripts={selectedComparisonScripts}
             isExpanded={isExpanded}
             isRealTime={true}
           />
@@ -490,7 +454,7 @@ const Widget = ({
                   : "#000",
               }}
             >
-              <DragIndicator sx={{ fontSize: "0.75rem" }} />
+              {/* <DragIndicator sx={{ fontSize: "0.75rem" }} /> */}
             </IconButton>
             <Tooltip title={`Last Sync: ${formatTimestamp(timestamp)}`}>
               <Typography
@@ -509,7 +473,7 @@ const Widget = ({
               </Typography>
             </Tooltip>
           </Box>
-          <Box sx={{ display: "flex" }}>
+          <Box sx={{ display: "flex", mr: 3 }}>
             {widgetData.areaGraph && (
               <IconButton
                 size="small"
@@ -581,6 +545,19 @@ const Widget = ({
                       }}
                     >
                       {currentValue}
+                      {widgetData.unit && (
+                        <span
+                          style={{
+                            fontFamily: widgetData.properties?.fontFamily,
+                            fontSize: `${widgetData.properties?.fontSize}px`,
+                            fontWeight: widgetData.properties?.fontWeight,
+                            color: widgetData.properties?.fontColor,
+                            fontStyle: widgetData.properties?.fontStyle,
+                          }}
+                        >
+                          {` ${widgetData.unit.toUpperCase()}`}
+                        </span>
+                      )}
                     </Typography>
                   </Tooltip>
                 </Box>
@@ -600,6 +577,19 @@ const Widget = ({
                       }}
                     >
                       {currentValue}
+                      {widgetData.unit && (
+                        <span
+                          style={{
+                            fontFamily: widgetData.properties?.fontFamily,
+                            fontSize: `${widgetData.properties?.fontSize}px`,
+                            fontWeight: widgetData.properties?.fontWeight,
+                            color: widgetData.properties?.fontColor,
+                            fontStyle: widgetData.properties?.fontStyle,
+                          }}
+                        >
+                          {` ${widgetData.unit.toUpperCase()}`}
+                        </span>
+                      )}
                     </Typography>
                   </Tooltip>
                   <Box sx={{ height: "calc(100% - 40px)" }}>
@@ -678,8 +668,6 @@ const Widget = ({
           open={isExpanded}
           onClose={() => {
             setIsExpanded(false);
-            setSelectedScripts([]);
-            setComparisonData([]);
           }}
           maxWidth="xl"
           fullWidth

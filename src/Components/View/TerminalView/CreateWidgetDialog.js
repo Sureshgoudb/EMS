@@ -36,7 +36,7 @@ const CreateWidgetDialog = ({
     terminal: "",
     script: "",
     displayName: "",
-
+    unit: "",
     decimalPlaces: "2",
     isAreaGraph: false,
     graphType: "simple",
@@ -171,6 +171,7 @@ const CreateWidgetDialog = ({
     if (!formData.displayName) {
       tempErrors.displayName = "Display Name is required";
     }
+
     const decimalPlacesNum = Number(formData.decimalPlaces);
     if (
       isNaN(decimalPlacesNum) ||
@@ -368,6 +369,7 @@ const CreateWidgetDialog = ({
           {
             scriptName: formData.script,
             displayName: formData.displayName,
+            unit: formData.unit || null, // Allow null if no unit is provided
 
             areaGraph: formData.isAreaGraph,
             properties: textProperties,
@@ -505,6 +507,14 @@ const CreateWidgetDialog = ({
           sx={{ mt: 2 }}
           error={!!errors.displayName}
           helperText={errors.displayName}
+        />
+        <TextField
+          label="Unit (Optional)"
+          value={formData.unit}
+          onChange={handleChange("unit")}
+          fullWidth
+          sx={{ mt: 2 }}
+          placeholder="Enter unit (e.g., %, km/h, °C)"
         />
         <TextField
           label="Decimal Places"

@@ -117,6 +117,7 @@ const TerminalDetailPage = () => {
           id: script._id,
           scriptName: script.scriptName,
           dispalyName: script.displayName,
+          unit: script.unit,
           properties: script.properties,
           areaGraph: script.areaGraph,
           position: script.position || defaultPosition,
