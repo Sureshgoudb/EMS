@@ -63,6 +63,7 @@ const Widget = ({
   const [confirmationDialog, setConfirmationDialog] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const REFRESH_INTERVAL = 30000; // 30 seconds
+  const [isHovered, setIsHovered] = useState(false);
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -424,14 +425,17 @@ const Widget = ({
           display: "flex",
           flexDirection: "column",
         }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
         <Box
           sx={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-
+            justifyContent: "center",
+            position: "relative",
             p: 1,
+            mr: 3,
             borderBottom: "1px solid rgba(0,0,0,0.12)",
             backgroundColor: widgetData.properties.backgroundColor || "#fff",
             color: isColorDark(widgetData.properties.backgroundColor)
@@ -441,44 +445,21 @@ const Widget = ({
         >
           <Box
             sx={{
+              position: "absolute",
+              right: 30,
               display: "flex",
               alignItems: "center",
-              gap: 1,
+              opacity: isHovered ? 1 : 0,
+              transition: "opacity 0.3s ease",
+              pointerEvents: isHovered ? "auto" : "none",
             }}
           >
-            <IconButton
-              size="small"
-              sx={{
-                color: isColorDark(widgetData.properties.backgroundColor)
-                  ? "#fff"
-                  : "#000",
-              }}
-            >
-              {/* <DragIndicator sx={{ fontSize: "0.75rem" }} /> */}
-            </IconButton>
-            <Tooltip title={`Last Sync: ${formatTimestamp(timestamp)}`}>
-              <Typography
-                variant="subtitle2"
-                sx={{
-                  fontFamily: widgetData.properties.fontFamily,
-                  fontSize: "1.5rem",
-                  fontWeight: widgetData.properties.fontWeight,
-                  fontStyle: widgetData.properties.fontStyle,
-                  textAlign: "center",
-                  lineHeight: "1.5rem",
-                  color: widgetData.properties.fontColor,
-                }}
-              >
-                {widgetData.dispalyName}
-              </Typography>
-            </Tooltip>
-          </Box>
-          <Box sx={{ display: "flex", mr: 3 }}>
             {widgetData.areaGraph && (
               <IconButton
                 size="small"
                 onClick={(event) => handleIconClick(event, handleExpandGraph)}
                 sx={{
+                  top: 1,
                   color: isColorDark(widgetData.properties.backgroundColor)
                     ? "#fff"
                     : "#000",
@@ -493,6 +474,7 @@ const Widget = ({
                 handleIconClick(event, () => setTextFormatOpen(true))
               }
               sx={{
+                top: 1,
                 color: isColorDark(widgetData.properties.backgroundColor)
                   ? "#fff"
                   : "#000",
@@ -504,6 +486,7 @@ const Widget = ({
               size="small"
               onClick={(event) => handleIconClick(event, handleDeleteWidget)}
               sx={{
+                top: 1,
                 color: isColorDark(widgetData.properties.backgroundColor)
                   ? "#fff"
                   : "#000",
@@ -517,7 +500,25 @@ const Widget = ({
               />
             </IconButton>
           </Box>
+
+          <Tooltip title={`Last Sync: ${formatTimestamp(timestamp)}`}>
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontFamily: widgetData.properties.fontFamily,
+                fontSize: "1.5rem",
+                fontWeight: widgetData.properties.fontWeight,
+                fontStyle: widgetData.properties.fontStyle,
+                textAlign: "center",
+                lineHeight: "1.5rem",
+                color: widgetData.properties.fontColor,
+              }}
+            >
+              {widgetData.dispalyName}
+            </Typography>
+          </Tooltip>
         </Box>
+
         <Box sx={{ flexGrow: 1, p: 2, overflow: "hidden" }}>
           {error ? (
             <Typography color="error">{error}</Typography>
@@ -563,7 +564,7 @@ const Widget = ({
                 </Box>
               ) : (
                 <Box sx={{ height: "100%" }}>
-                  <Tooltip title={`Last Sync: ${formatTimestamp(timestamp)}`}>
+                  {/* <Tooltip title={`Last Sync: ${formatTimestamp(timestamp)}`}>
                     <Typography
                       className="current-value"
                       sx={{
@@ -591,7 +592,7 @@ const Widget = ({
                         </span>
                       )}
                     </Typography>
-                  </Tooltip>
+                  </Tooltip> */}
                   <Box sx={{ height: "calc(100% - 40px)" }}>
                     <GraphComponent
                       widgetData={widgetData}

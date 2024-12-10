@@ -745,17 +745,23 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
               mr: 1,
 
               position: "absolute",
-              top: 2,
-              right: 110,
+              top: 4,
+              right: 20,
               display: "flex",
               p: 1,
             }}
             onClick={handleSavePreferences}
           >
-            <SaveIcon fontSize="small" />
+            <SaveIcon
+              sx={{
+                fontSize: "1.2rem",
+                "&:hover": { backgroundColor: "rgba(244, 67, 54, 0.1)" },
+              }}
+              fontSize="small"
+            />
           </IconButton>
         </MuiTooltip>
-        <MuiTooltip title="More Options">
+        <MuiTooltip title="Graph Options">
           <IconButton
             size="small"
             onClick={handleMenuOpen}
@@ -782,21 +788,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
             },
           }}
         >
-          {/* Save Preferences */}
-          <ListItem disablePadding>
-            <ListItemButton
-              onClick={() => {
-                handleSavePreferences();
-                handleMenuClose();
-              }}
-            >
-              <ListItemIcon>
-                <SaveIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText primary="Save Preferences" />
-            </ListItemButton>
-          </ListItem>
-
           {/* Profile Settings */}
           <ListItem disablePadding>
             <ListItemButton onClick={openProfileDialog}>

@@ -145,13 +145,15 @@ const TableGrid = () => {
     "& .ui-percentage-dark-red": {
       color: "#F44336",
     },
-    "& .row-critical": {
-      animation: "blink 1s infinite",
-    },
-    "@keyframes blink": {
+
+    "@keyframes blink-cell": {
       "0%": { backgroundColor: "rgba(244, 67, 54, 0.1)" },
       "50%": { backgroundColor: "rgba(244, 67, 54, 0.3)" },
       "100%": { backgroundColor: "rgba(244, 67, 54, 0.1)" },
+    },
+    "& .ui-percentage-critical": {
+      color: "#f44336",
+      animation: "blink-cell 1s infinite",
     },
   }));
 
@@ -323,7 +325,7 @@ const TableGrid = () => {
             return `${baseClass} ui-percentage-light-red`;
           if (value < -20 && value >= -28)
             return `${baseClass} ui-percentage-dark-red`;
-          if (value < -28) return `${baseClass} row-critical`;
+          if (value < -28) return `${baseClass} ui-percentage-critical`; // Apply critical class
 
           return `${baseClass} ui-percentage-low`;
         },
