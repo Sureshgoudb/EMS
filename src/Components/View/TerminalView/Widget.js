@@ -13,7 +13,6 @@ import {
 } from "@mui/material";
 import {
   Settings,
-  DragIndicator,
   OpenInFull,
   Fullscreen,
   ZoomIn,
@@ -62,7 +61,7 @@ const Widget = ({
   const graphContainerRef = React.useRef(null);
   const [confirmationDialog, setConfirmationDialog] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const REFRESH_INTERVAL = 30000; // 30 seconds
+  const REFRESH_INTERVAL = 30000;
   const [isHovered, setIsHovered] = useState(false);
 
   const [snackbar, setSnackbar] = useState({
@@ -632,12 +631,6 @@ const Widget = ({
               {widgetData.dispalyName}
             </Typography>
             <Box>
-              <IconButton onClick={() => handleZoom("in")}>
-                <ZoomIn />
-              </IconButton>
-              <IconButton onClick={() => handleZoom("out")}>
-                <ZoomOut />
-              </IconButton>
               <IconButton onClick={handleExportPDF}>
                 <FileDownload />
               </IconButton>
