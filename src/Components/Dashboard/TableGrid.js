@@ -14,6 +14,27 @@ import { styled } from "@mui/material/styles";
 import { Refresh } from "@mui/icons-material";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
+const ALLOWED_SCRIPTS = [
+  "BLK No",
+  "AvC MW",
+  "SG MW",
+  "Inst MW",
+  "Avg MW",
+  "UI MW",
+  "UI Percentage",
+  "4thBLK SG MW",
+];
+
+const COLUMN_NAMES = {
+  "AvC MW": "AvC MW",
+  "SG MW": "SG MW",
+  "Inst MW": "AG MW",
+  "Avg MW": "Block Average MW",
+  "UI MW": "UI MW",
+  "UI Percentage": "MAE",
+  "4thBLK SG MW": "4th Block SG",
+};
+
 const StyledCard = styled(Card)(({ theme }) => ({
   height: "100vh",
   borderRadius: 0,
@@ -45,12 +66,14 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
   width: "100%",
   backgroundColor: theme.palette.background.default,
   color: theme.palette.text.primary,
+  border: `2px solid ${theme.palette.divider}`,
 
   "& .MuiDataGrid-root": {
     border: "none",
   },
   "& .MuiDataGrid-cell": {
     borderBottom: `1px solid ${theme.palette.divider}`,
+    borderRight: `1px solid ${theme.palette.divider}`,
     color: theme.palette.text.primary,
     fontWeight: "bold",
     justifyContent: "center",
@@ -71,12 +94,14 @@ const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
     display: "flex",
     alignItems: "center",
     textAlign: "center",
+    borderBottom: `1px solid ${theme.palette.divider}`,
   },
   "& .MuiDataGrid-columnHeader": {
     justifyContent: "center",
     display: "flex",
     alignItems: "center",
     textAlign: "center",
+    borderRight: `1px solid ${theme.palette.divider}`,
   },
   "& .MuiDataGrid-columnHeaderTitle": {
     textAlign: "center",
@@ -200,8 +225,11 @@ const TableGrid = () => {
       const response = await axios.get(
         `${apiKey}terminal/${terminalId}/scripts`
       );
-      const scriptNames = Object.keys(response.data.scripts);
-      setScripts(scriptNames.filter((script) => script !== "BLK No"));
+      // Filter scripts to only include allowed scripts
+      const filteredScripts = Object.keys(response.data.scripts).filter(
+        (script) => ALLOWED_SCRIPTS.includes(script)
+      );
+      setScripts(filteredScripts.filter((script) => script !== "BLK No"));
       setScriptsData(response.data.scripts);
     } catch (error) {
       console.error("Error fetching scripts:", error);
@@ -221,20 +249,11 @@ const TableGrid = () => {
         headerAlign: "center",
         align: "center",
       },
-      {
-        field: "timestamp",
-        headerName: "Date Time",
-        flex: 1.5,
-        headerClassName: "header-cell",
-        cellClassName: "centered-cell",
-        headerAlign: "center",
-        align: "center",
-      },
     ];
 
     const scriptColumns = scripts.map((script) => ({
       field: script,
-      headerName: script,
+      headerName: COLUMN_NAMES[script] || script,
       flex: 1,
       headerClassName: "header-cell",
       cellClassName: (params) => {
@@ -256,7 +275,17 @@ const TableGrid = () => {
       align: "center",
     }));
 
-    setColumns([...defaultColumns, ...scriptColumns]);
+    const dateTimeColumn = {
+      field: "timestamp",
+      headerName: "Last Updated",
+      flex: 1.5,
+      headerClassName: "header-cell",
+      cellClassName: "centered-cell",
+      headerAlign: "center",
+      align: "center",
+    };
+
+    setColumns([...defaultColumns, ...scriptColumns, dateTimeColumn]);
   };
 
   const fetchGridData = async () => {
@@ -273,7 +302,7 @@ const TableGrid = () => {
           let isCritical = false;
 
           await Promise.all(
-            Object.keys(scriptsData).map(async (script) => {
+            ALLOWED_SCRIPTS.map(async (script) => {
               try {
                 const response = await axios.get(
                   `${apiKey}terminal/${terminal.terminalId}/script/${script}/currentValue`
@@ -284,7 +313,7 @@ const TableGrid = () => {
 
                 if (script === "BLK No") {
                   setBlkNo(scriptData);
-                } else {
+                } else if (ALLOWED_SCRIPTS.includes(script)) {
                   row[script] =
                     typeof scriptData === "number"
                       ? scriptData.toFixed(2)
@@ -370,7 +399,7 @@ const TableGrid = () => {
             letterSpacing: "1.5px",
             transition: "transform 0.3s ease, box-shadow 0.3s ease",
             "&:hover": {
-              boxShadow: "0px 6px 6px rgba(0, 0, 0, 0.4)",
+              boxShadow: "0px 6px 6px rgba(0, 0, 0, 0.3)",
             },
           }}
         >

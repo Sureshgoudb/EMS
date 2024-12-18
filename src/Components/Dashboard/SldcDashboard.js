@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   AppBar,
   Toolbar,
@@ -13,22 +13,50 @@ import {
   MenuItem,
   Grid,
   Box,
+  RadioGroup,
+  FormControl,
+  FormControlLabel,
+  Radio,
+  Select,
+  InputLabel,
+  Snackbar
 } from "@mui/material";
 import {
   TextFields as TextFieldsIcon,
   Numbers as NumbersIcon,
   BarChart as BarChartIcon,
   GridView as GridViewIcon,
+  FormatColorText,
+  AccountTree,
+  DeviceHub,
+  Assessment
 } from "@mui/icons-material";
 import axios from "axios";
+import TextFormatDialog from "../View/TerminalView/TextFormatDialog";
+import PlainTextWidget from "./PlainTextWidget";
+import NumberWidget from "./NumberWidget";
+import GraphWidget from "./GraphWidget";
+import DataGridWidget from "./DataGridWidget";
+import GridLayout from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 
 const SldcDashboard = () => {
   const [open, setOpen] = useState(false);
   const [widgetType, setWidgetType] = useState("");
   const [formData, setFormData] = useState({
+    customerID: "",
     type: "",
     terminal: { terminalId: "", terminalName: "" },
     customText: "",
+    properties: {
+      fontFamily: "Arial",
+      fontSize: "40px",
+      fontColor: "#FF0000",
+      backgroundColor: "#ffffff",
+      fontStyle: "normal",
+      fontWeight: "400",
+    },
     script: [
       {
         scriptName: "",
@@ -37,24 +65,190 @@ const SldcDashboard = () => {
         unit: "",
         properties: {
           fontFamily: "Arial",
-          fontWeight: "normal",
-          fontColor: "#000000",
-          backgroundColor: "#FFFFFF",
-        },
-        position: {
-          x: 0,
-          y: 0,
-          width: 100,
-          height: 50,
+          fontSize: "40px",
+          fontColor: "#FF0000",
+          backgroundColor: "#ffffff",
+          fontStyle: "normal",
+          fontWeight: "400",
         },
       },
     ],
-    graphType: "",
-    xAxisConfig: "",
-    resetInterval: 0,
+    xAxisConfig: { type: "records", value: "" },
+    resetInterval: "15 minutes",
     columns: [{ name: "", field: "" }],
     profile: "",
+    graphType: "simple",
   });
+  const [terminals, setTerminals] = useState([]);
+  const [scriptNames, setScriptNames] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [recordOrSeconds, setRecordOrSeconds] = useState("records");
+  const [graphType, setGraphType] = useState("simple");
+  const [textFormatOpen, setTextFormatOpen] = useState(false);
+  const [textProperties, setTextProperties] = useState({
+    fontFamily: "Arial",
+    fontSize: "40px",
+    fontColor: "#FF0000",
+    backgroundColor: "#ffffff",
+    fontStyle: "normal",
+    fontWeight: "400",
+  });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  const [graphProfiles] = useState([
+    { value: "trend", label: "Trend", icon: <AccountTree /> },
+    { value: "block", label: "Block", icon: <DeviceHub /> },
+    { value: "daily", label: "Daily", icon: <Assessment /> }
+  ]);
+  const [graphTerminals, setGraphTerminals] = useState([]);
+  const [graphVariables, setGraphVariables] = useState([]);
+  const [selectedGraphProfile, setSelectedGraphProfile] = useState("");
+  const [graphTerminalLoading, setGraphTerminalLoading] = useState(false);
+  const [graphVariableLoading, setGraphVariableLoading] = useState(false);
+  const [graphError, setGraphError] = useState(null)
+  const [widgets, setWidgets] = useState([]);
+  const layoutChangeRef = useRef(false);
+  const initialLoadRef = useRef(true);
+
+  const apiKey = process.env.REACT_APP_API_LOCAL_URL;
+
+  const getUserData = () => {
+    const userData = localStorage.getItem("user");
+    return userData ? JSON.parse(userData) : null;
+  };
+
+  useEffect(() => {
+    const fetchTerminals = async () => {
+      const user = getUserData();
+      if (!user) return;
+
+      try {
+        setLoading(true);
+        let response;
+
+        if (user.user_Type === "Admin") {
+          response = await fetch(`${apiKey}terminal/list`);
+        } else {
+          response = await fetch(`${apiKey}terminal/list/${user.customerID}`);
+        }
+
+        const data = await response.json();
+
+        if (response.ok) {
+          const terminalData =
+            user.user_Type === "Admin" ? data : data.terminals;
+          const formattedTerminals = terminalData.map((terminal) => ({
+            terminalId: terminal.terminalId,
+            terminalName: terminal.terminalName,
+          }));
+
+          setTerminals(formattedTerminals);
+        } else {
+          throw new Error(data.message || "Failed to fetch terminals");
+        }
+      } catch (err) {
+        setError("Failed to load terminals. Please try again later.");
+        console.error("Error fetching terminals:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (open && terminals.length === 0) {
+      fetchTerminals();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const fetchWidgets = async () => {
+      try {
+        const response = await axios.get(`${apiKey}sldcwidgets`);
+        setWidgets(response.data);
+        initialLoadRef.current = false;
+      } catch (error) {
+        console.error('Error fetching widgets:', error);
+      }
+    };
+    fetchWidgets();
+  }, [apiKey]);
+
+  const fetchScriptNames = async (terminalId) => {
+    try {
+      const response = await axios.get(`${apiKey}terminal/${terminalId}/scripts`);
+
+      if (response.data && response.data.scripts) {
+        const scriptsObject = response.data.scripts;
+        const scriptsArray = Object.keys(scriptsObject).map((key) => ({
+          value: key,
+          label: key,
+        }));
+
+        setScriptNames(scriptsArray);
+      } else {
+        console.error("Expected an object with a 'scripts' property, but got:", response.data);
+        setScriptNames([]);
+      }
+    } catch (error) {
+      console.error("Error fetching script names:", error);
+      setScriptNames([]);
+    }
+  };
+
+  const fetchGraphTerminals = async (profile) => {
+    const userInfo = JSON.parse(localStorage.getItem("user")) || {};
+    const isAdmin = userInfo.user_Type === "Admin";
+
+    setGraphTerminalLoading(true);
+    setGraphError(null);
+
+    try {
+      const response = await axios.get(
+        isAdmin
+          ? `${apiKey}terminals/${profile}`
+          : `${apiKey}terminals/${profile}/${userInfo.customerID}`
+      );
+
+      const formattedTerminals = (Array.isArray(response.data) ? response.data : []).map(terminal => ({
+        terminalId: terminal.terminalId,
+        terminalName: terminal.terminalName
+      }));
+
+      setGraphTerminals(formattedTerminals);
+    } catch (error) {
+      setGraphError("Failed to fetch terminals");
+      console.error("Terminal fetch error:", error);
+    } finally {
+      setGraphTerminalLoading(false);
+    }
+  };
+
+  const fetchGraphVariables = async (profile, terminal) => {
+    setGraphVariableLoading(true);
+    setGraphError(null);
+
+    try {
+      const response = await axios.get(
+        `${apiKey}variables/${profile}/${terminal.terminalName || terminal}`
+      );
+
+      const formattedVariables = (Array.isArray(response.data) ? response.data : []).map(variable => ({
+        value: variable.scriptName || variable,
+        label: variable.displayName || variable
+      }));
+
+      setGraphVariables(formattedVariables);
+    } catch (error) {
+      setGraphError("Failed to fetch variables");
+      console.error("Variables fetch error:", error);
+    } finally {
+      setGraphVariableLoading(false);
+    }
+  };
 
   const handleOpen = (type) => {
     setWidgetType(type);
@@ -63,6 +257,14 @@ const SldcDashboard = () => {
       type,
       terminal: { terminalId: "", terminalName: "" },
       customText: "",
+      properties: {
+        fontFamily: "Arial",
+        fontSize: "40px",
+        fontColor: "#FF0000",
+        backgroundColor: "#ffffff",
+        fontStyle: "normal",
+        fontWeight: "400",
+      },
       script: [
         {
           scriptName: "",
@@ -71,23 +273,19 @@ const SldcDashboard = () => {
           unit: "",
           properties: {
             fontFamily: "Arial",
-            fontWeight: "normal",
-            fontColor: "#000000",
-            backgroundColor: "#FFFFFF",
-          },
-          position: {
-            x: 0,
-            y: 0,
-            width: 100,
-            height: 50,
+            fontSize: "40px",
+            fontColor: "#FF0000",
+            backgroundColor: "#ffffff",
+            fontStyle: "normal",
+            fontWeight: "400",
           },
         },
       ],
-      graphType: "",
-      xAxisConfig: "",
-      resetInterval: 0,
+      xAxisConfig: { type: "records", value: "" },
+      resetInterval: "15 minutes",
       columns: [{ name: "", field: "" }],
       profile: "",
+      graphType: "simple",
     }));
     setOpen(true);
   };
@@ -100,7 +298,6 @@ const SldcDashboard = () => {
   const handleChange = (e, index = null) => {
     const { name, value } = e.target;
 
-    // Handle nested object updates
     const updateNestedState = (prevState, path, newValue) => {
       const keys = path.split(".");
       const newState = { ...prevState };
@@ -115,7 +312,6 @@ const SldcDashboard = () => {
     };
 
     setFormData((prevData) => {
-      // Handle array-based fields like script and columns
       if (index !== null) {
         if (name.startsWith("script.")) {
           const newScript = [...prevData.script];
@@ -137,14 +333,26 @@ const SldcDashboard = () => {
         }
       }
 
-      // Handle nested objects
       if (name.includes(".")) {
         return updateNestedState(prevData, name, value);
       }
 
-      // Default case for top-level fields
       return { ...prevData, [name]: value };
     });
+  };
+
+  const handleTerminalChange = (e) => {
+    const selectedTerminal = terminals.find(
+      (terminal) => terminal.terminalId === e.target.value
+    );
+    setFormData((prevData) => ({
+      ...prevData,
+      terminal: {
+        terminalId: selectedTerminal.terminalId,
+        terminalName: selectedTerminal.terminalName,
+      },
+    }));
+    fetchScriptNames(selectedTerminal.terminalId);
   };
 
   const handleAddScript = () => {
@@ -159,15 +367,11 @@ const SldcDashboard = () => {
           unit: "",
           properties: {
             fontFamily: "Arial",
-            fontWeight: "normal",
-            fontColor: "#000000",
-            backgroundColor: "#FFFFFF",
-          },
-          position: {
-            x: 0,
-            y: 0,
-            width: 100,
-            height: 50,
+            fontSize: "40px",
+            fontColor: "#FF0000",
+            backgroundColor: "#ffffff",
+            fontStyle: "normal",
+            fontWeight: "400",
           },
         },
       ],
@@ -183,17 +387,70 @@ const SldcDashboard = () => {
 
   const handleSubmit = async () => {
     try {
+      const userInfo = JSON.parse(localStorage.getItem("user")) || {};
+      const customerID = userInfo.customerID;
+
+      const dataToSubmit = {
+        ...formData,
+        customerID,
+        // Add layout properties
+        x: (widgets.length * 2) % 12, // Calculate initial x position
+        y: Math.floor(widgets.length / 6), // Calculate initial y position
+        w: 4, // Default width
+        h: 2, // Default height
+      };
+
       const response = await axios.post(
         "http://localhost:4001/sldscreatewidget",
-        formData
+        dataToSubmit,
       );
-      alert("Widget created successfully!");
-      console.log(response.data);
+      
+      // Update widgets state with the new widget
+      setWidgets(prev => [...prev, response.data]);
       handleClose();
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.error || "Failed to create widget.");
     }
+  };
+  const handleGraphTypeChange = (event) => {
+    const selectedGraphType = event.target.value;
+    setGraphType(selectedGraphType);
+    setFormData((prevData) => ({
+      ...prevData,
+      graphType: selectedGraphType,
+    }));
+  };
+
+  const handleRadioChange = (event) => {
+    const selectedValue = event.target.value;
+    setRecordOrSeconds(selectedValue);
+    setFormData((prevData) => ({
+      ...prevData,
+      xAxisConfig: {
+        ...prevData.xAxisConfig,
+        type: selectedValue,
+        value: prevData.xAxisConfig.value || 0,
+      },
+    }));
+  };
+
+  const handleTextFormatApply = (newProperties) => {
+    setTextProperties(newProperties);
+    setFormData((prevData) => ({
+      ...prevData,
+      properties: newProperties,
+      script: prevData.script.map((s) => ({
+        ...s,
+        properties: newProperties, // Apply new properties to each script
+      })),
+    }));
+    setTextFormatOpen(false);
+    setSnackbar({
+      open: true,
+      message: "Text format updated successfully",
+      severity: "success",
+    });
   };
 
   const renderFormFields = () => {
@@ -212,31 +469,30 @@ const SldcDashboard = () => {
         );
 
       case "number_widget":
-      case "graph_widget":
         return (
           <>
             <Grid container spacing={2}>
               <Grid item xs={6}>
                 <TextField
-                  label="Terminal ID"
+                  label="Terminal"
                   name="terminal.terminalId"
+                  select
                   fullWidth
                   value={formData.terminal.terminalId}
-                  onChange={handleChange}
+                  onChange={handleTerminalChange}
                   required
                   margin="dense"
-                />
-              </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  label="Terminal Name"
-                  name="terminal.terminalName"
-                  fullWidth
-                  value={formData.terminal.terminalName}
-                  onChange={handleChange}
-                  required
-                  margin="dense"
-                />
+                >
+                  {loading ? (
+                    <MenuItem disabled>Loading...</MenuItem>
+                  ) : (
+                    terminals.map((terminal) => (
+                      <MenuItem key={terminal.terminalId} value={terminal.terminalId}>
+                        {terminal.terminalName}
+                      </MenuItem>
+                    ))
+                  )}
+                </TextField>
               </Grid>
             </Grid>
 
@@ -248,12 +504,19 @@ const SldcDashboard = () => {
                     <TextField
                       label="Script Name"
                       name={`script.scriptName`}
+                      select
                       fullWidth
                       value={scriptItem.scriptName}
                       onChange={(e) => handleChange(e, index)}
                       required
                       margin="dense"
-                    />
+                    >
+                      {scriptNames.map((script) => (
+                        <MenuItem key={script.value} value={script.value}>
+                          {script.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
                   </Grid>
                   <Grid item xs={6}>
                     <TextField
@@ -289,39 +552,228 @@ const SldcDashboard = () => {
                 </Grid>
               </Box>
             ))}
-            <Button onClick={handleAddScript} variant="outlined" sx={{ mt: 2 }}>
-              Add Another Script
-            </Button>
+          </>
+        );
 
-            {widgetType === "graph_widget" && (
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={6}>
+      case "graph_widget":
+        return (
+          <>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  label="Profile"
+                  name="graph_profile"
+                  select
+                  fullWidth
+                  value={selectedGraphProfile}
+                  onChange={(e) => {
+                    const profile = e.target.value;
+                    setSelectedGraphProfile(profile);
+                    fetchGraphTerminals(profile);
+                    // Reset dependent fields
+                    setFormData(prevData => ({
+                      ...prevData,
+                      profile: profile,
+                      terminal: { terminalId: "", terminalName: "" },
+                      script: [{ scriptName: "", displayName: "", decimalPlaces: 2, unit: "", properties: { fontFamily: "Arial", fontSize: "40px", fontColor: "#FF0000", backgroundColor: "#ffffff", fontStyle: "normal", fontWeight: "400" } }]
+                    }));
+                  }}
+                  required
+                  margin="dense"
+                >
+                  {graphProfiles.map((profile) => (
+                    <MenuItem key={profile.value} value={profile.value}>
+                      {profile.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+
+              {selectedGraphProfile && (
+                <Grid item xs={12}>
                   <TextField
-                    label="Graph Type"
-                    name="graphType"
+                    label="Terminal"
+                    name="terminal.terminalId"
                     select
                     fullWidth
-                    value={formData.graphType}
-                    onChange={handleChange}
+                    value={formData.terminal.terminalId}
+                    onChange={(e) => {
+                      const selectedTerminal = graphTerminals.find(
+                        (terminal) => terminal.terminalId === e.target.value
+                      );
+                      setFormData((prevData) => ({
+                        ...prevData,
+                        terminal: {
+                          terminalId: selectedTerminal.terminalId,
+                          terminalName: selectedTerminal.terminalName,
+                        },
+                      }));
+                      fetchGraphVariables(selectedGraphProfile, selectedTerminal);
+                    }}
+                    required
                     margin="dense"
+                    disabled={graphTerminalLoading}
                   >
-                    <MenuItem value="line">Line</MenuItem>
-                    <MenuItem value="bar">Bar</MenuItem>
-                    <MenuItem value="pie">Pie</MenuItem>
+                    {graphTerminalLoading ? (
+                      <MenuItem disabled>Loading Terminals...</MenuItem>
+                    ) : (
+                      graphTerminals.map((terminal) => (
+                        <MenuItem
+                          key={terminal.terminalId}
+                          value={terminal.terminalId}
+                        >
+                          {terminal.terminalName}
+                        </MenuItem>
+                      ))
+                    )}
                   </TextField>
                 </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    label="X-Axis Configuration"
-                    name="xAxisConfig"
-                    fullWidth
-                    value={formData.xAxisConfig}
-                    onChange={handleChange}
-                    margin="dense"
-                  />
+              )}
+            </Grid>
+            {formData.script.map((scriptItem, index) => (
+              <Box key={index} sx={{ border: "1px solid #ddd", p: 2, mt: 2 }}>
+                <Typography variant="subtitle1">Script {index + 1}</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <TextField
+                      label="Script Name"
+                      name={`script.scriptName`}
+                      select
+                      fullWidth
+                      value={scriptItem.scriptName}
+                      onChange={(e) => handleChange(e, index)}
+                      required
+                      margin="dense"
+                    >
+                      {graphVariables.map((variable) => (
+                        <MenuItem key={variable.value} value={variable.value}>
+                          {variable.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      label="Display Name"
+                      name={`script.displayName`}
+                      fullWidth
+                      value={scriptItem.displayName}
+                      onChange={(e) => handleChange(e, index)}
+                      margin="dense"
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      label="Decimal Places"
+                      name={`script.decimalPlaces`}
+                      type="number"
+                      fullWidth
+                      value={scriptItem.decimalPlaces}
+                      onChange={(e) => handleChange(e, index)}
+                      margin="dense"
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField
+                      label="Unit"
+                      name={`script.unit`}
+                      fullWidth
+                      value={scriptItem.unit}
+                      onChange={(e) => handleChange(e, index)}
+                      margin="dense"
+                    />
+                  </Grid>
                 </Grid>
-              </Grid>
-            )}
+              </Box>
+            ))}
+            < Button onClick={handleAddScript} variant="outlined" sx={{ mt: 2 }
+            }>
+              Add Another Script
+            </Button >
+
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Box
+                sx={{ mt: 2, p: 2, bgcolor: "background.paper", borderRadius: 1 }}
+              >
+                <RadioGroup
+                  row
+                  value={graphType}
+                  onChange={handleGraphTypeChange}
+                  sx={{ mb: 2 }}
+                >
+                  <FormControlLabel
+                    value="simple"
+                    control={<Radio />}
+                    label="Simple Graph"
+                  />
+                  <FormControlLabel
+                    value="multi-axis"
+                    control={<Radio />}
+                    label="Multi-Axis Graph"
+                  />
+                </RadioGroup>
+
+                <RadioGroup
+                  row
+                  value={recordOrSeconds}
+                  onChange={handleRadioChange}
+                  sx={{ mb: 2 }}
+                >
+                  <FormControlLabel
+                    value="records"
+                    control={<Radio />}
+                    label="Number of Records"
+                  />
+                  <FormControlLabel
+                    value="seconds"
+                    control={<Radio />}
+                    label="Number of Seconds"
+                  />
+                </RadioGroup>
+
+                {recordOrSeconds === "records" && (
+                  <TextField
+                    label="Number of Records"
+                    type="number"
+                    fullWidth
+                    sx={{ mb: 2 }}
+                    inputProps={{ min: 1, max: 1000 }}
+                    onChange={(e) => handleChange({ target: { name: "xAxisConfig.value", value: e.target.value } })}
+                  />
+                )}
+                {recordOrSeconds === "seconds" && (
+                  <TextField
+                    label="Number of Seconds"
+                    type="number"
+                    fullWidth
+                    sx={{ mb: 2 }}
+                    inputProps={{ min: 1, max: 1000 }}
+                    onChange={(e) => handleChange({ target: { name: "xAxisConfig.value", value: e.target.value } })}
+                  />
+                )}
+
+                <FormControl fullWidth margin="dense">
+                  <InputLabel label="Reset Interval">Reset Interval</InputLabel>
+                  <Select
+                    label="Reset Interval"
+                    required
+                    value={formData.resetInterval}
+                    onChange={(e) => {
+                      setFormData((prevData) => ({
+                        ...prevData,
+                        resetInterval: e.target.value,
+                      }));
+                    }}
+                  >
+                    <MenuItem value="15 minutes">15 minutes</MenuItem>
+                    <MenuItem value="30 minutes">30 minutes</MenuItem>
+                    <MenuItem value="1 hour">1 hour</MenuItem>
+                    <MenuItem value="8 hours">8 hours</MenuItem>
+                    <MenuItem value="24 hours">24 hours</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+            </Grid>
           </>
         );
 
@@ -335,7 +787,7 @@ const SldcDashboard = () => {
                   name="terminal.terminalId"
                   fullWidth
                   value={formData.terminal.terminalId}
-                  onChange={handleChange}
+                  on Change={handleChange}
                   required
                   margin="dense"
                 />
@@ -404,6 +856,37 @@ const SldcDashboard = () => {
     }
   };
 
+  const onLayoutChange = useCallback((newLayout) => {
+    if (layoutChangeRef.current || initialLoadRef.current) return;
+    layoutChangeRef.current = true;
+
+    const positions = newLayout.map(layout => ({
+      id: layout.i,
+      position: {
+        x: layout.x,
+        y: layout.y,
+        width: layout.w,
+        height: layout.h
+      }
+    }));
+
+    axios.put(`${apiKey}sldcwidgets/updatepositions`, {
+      positions: positions
+    })
+    .then(() => {
+      setWidgets(prevWidgets => 
+        prevWidgets.map(widget => {
+          const newPosition = positions.find(p => p.id === widget._id)?.position;
+          return newPosition ? { ...widget, position: newPosition } : widget;
+        })
+      );
+    })
+    .finally(() => {
+      layoutChangeRef.current = false;
+    })
+    .catch(error => console.error('Error updating positions:', error));
+  }, [widgets, apiKey]);
+
   return (
     <div>
       <AppBar position="static">
@@ -441,11 +924,56 @@ const SldcDashboard = () => {
           <Button onClick={handleClose} color="secondary">
             Cancel
           </Button>
+          <Button
+            onClick={() => setTextFormatOpen(true)}
+            variant="outlined"
+            color="primary"
+            startIcon={<FormatColorText />}
+          >
+            Text Format
+          </Button>
+          <TextFormatDialog
+            open={textFormatOpen}
+            onClose={() => setTextFormatOpen(false)}
+            initialProperties={textProperties}
+            onApply={handleTextFormatApply}
+            mode="create"
+          />
           <Button onClick={handleSubmit} color="primary" variant="contained">
             Submit
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Box sx={{ p: 2, height: 'calc(100vh - 64px)', overflow: 'auto' }}>
+        <GridLayout
+          className="layout"
+          layout={widgets.map(widget => ({
+            i: widget._id,
+            x: widget.position?.x ?? 0,
+            y: widget.position?.y ?? 0,
+            w: widget.position?.width ?? 4,
+            h: widget.position?.height ?? 2
+          }))}
+          cols={12}
+          rowHeight={100}
+          width={1200}
+          onLayoutChange={onLayoutChange}
+          isDraggable={true}
+          isResizable={true}
+          margin={[10, 10]}
+          containerPadding={[0, 0]}
+        >
+          {widgets.map((widget) => (
+            <div key={widget._id}>
+              {widget.type === "plain_text" && <PlainTextWidget widget={widget} />}
+              {widget.type === "number_widget" && <NumberWidget widget={widget} />}
+              {widget.type === "graph_widget" && <GraphWidget widget={widget} />}
+              {widget.type === "data_grid" && <DataGridWidget widget={widget} />}
+            </div>
+          ))}
+        </GridLayout>
+      </Box>
     </div>
   );
 };
