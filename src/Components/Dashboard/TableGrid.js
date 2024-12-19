@@ -15,14 +15,14 @@ import { Refresh } from "@mui/icons-material";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 const ALLOWED_SCRIPTS = [
-  "BLK No",
+  "Block Number",
   "AvC MW",
   "SG MW",
-  "Inst MW",
-  "Avg MW",
+  "AG MW",
+  "Block Average MW",
   "UI MW",
-  "UI Percentage",
-  "4thBLK SG MW",
+  "MAE",
+  "4th Block SG",
 ];
 
 const COLUMN_NAMES = {
@@ -204,7 +204,7 @@ const TableGrid = () => {
     if (terminals.length > 0 && scripts.length > 0) {
       initializeGrid();
       fetchGridData();
-      const fetchInterval = setInterval(fetchGridData, 20000);
+      const fetchInterval = setInterval(fetchGridData, 10000);
       return () => {
         clearInterval(fetchInterval);
       };
@@ -229,7 +229,7 @@ const TableGrid = () => {
       const filteredScripts = Object.keys(response.data.scripts).filter(
         (script) => ALLOWED_SCRIPTS.includes(script)
       );
-      setScripts(filteredScripts.filter((script) => script !== "BLK No"));
+      setScripts(filteredScripts.filter((script) => script !== "Block Number"));
       setScriptsData(response.data.scripts);
     } catch (error) {
       console.error("Error fetching scripts:", error);
@@ -311,7 +311,7 @@ const TableGrid = () => {
                 const scriptData = response.data[script];
                 latestTimestamp = formatTimestamp(response.data.timestamp);
 
-                if (script === "BLK No") {
+                if (script === "Block Number") {
                   setBlkNo(scriptData);
                 } else if (ALLOWED_SCRIPTS.includes(script)) {
                   row[script] =

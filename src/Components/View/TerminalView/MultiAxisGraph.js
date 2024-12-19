@@ -443,7 +443,7 @@ const MultiAxisGraph = ({
     updateData();
 
     if (selectedScripts.length > 0 || widgetData.scriptName) {
-      intervalId = setInterval(updateData, 30000);
+      intervalId = setInterval(updateData, 10000);
     }
 
     return () => {

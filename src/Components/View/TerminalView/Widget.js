@@ -61,7 +61,7 @@ const Widget = ({
   const graphContainerRef = React.useRef(null);
   const [confirmationDialog, setConfirmationDialog] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const REFRESH_INTERVAL = 30000;
+  const REFRESH_INTERVAL = 10000;
   const [isHovered, setIsHovered] = useState(false);
 
   const [snackbar, setSnackbar] = useState({
