@@ -350,23 +350,14 @@ export default function DeviceData() {
             (<div className=" flex flex-wrap mx-10 my-36 md:mx-10 md:my-36 lg:mx-20 lg:my-36 ">
               {
                 values.map((item, index) =>
-                  item.fields.map((field) => {
+                  item.fields.map((field) => 
+                  {
                     const minWidth = `${field.name.length * 10}px`;
-                    (
-                    <div className="mt-4 ml-5 mr-5 mb-2 `order-{index}`  card-list w-full  md:w-40 lg:w-52 xl:w-52 rounded ">
-                      <div
-                        className="card h-20 rounded cursor-pointer "
-                        key={item.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragOver={() => handleDragOver(index)}
-                        onDragEnd={handleDragEnd}
-                        style={{
-                          backgroundColor: item === draggedItem ? "#850085" : "",
-                        }}
-                      >
+                 return   (
+                  <div className={`mt-4 ml-5 mr-5 mb-2 order-${index} card-list rounded`} key={item.id} style={{minWidth: minWidth}}> 
+                  <div className="card h-20 rounded cursor-pointer" draggable onDragStart={(e) => handleDragStart(e, index)} onDragOver={() => handleDragOver(index)} onDragEnd={handleDragEnd} style={{ backgroundColor: item === draggedItem ? "#850085" : "", minWidth: minWidth }} >
                         <div className=" text-center ">
-                          <div className="card-body text-center p-10" style={{ minWidth, maxWidth: '300px', wordWrap: 'break-word' }}>
+                          <div className="card-body text-center p-10" >
                             <p className="card-text">{field.name} </p>
                           </div>
                         </div>
@@ -382,7 +373,8 @@ export default function DeviceData() {
                       </div>
                     </div>
                   )
-})
+                }
+                )
                 )
               }</div>) : (
 
