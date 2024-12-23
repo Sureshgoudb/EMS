@@ -25,9 +25,11 @@ import { addDevice, removeDevice } from "../store/slices/deviceSlice";
 import CardLayout from "../common/CardLayout";
 import CardTitleBar from "../common/CardTitleBar";
 import dayjs from "dayjs";
-import { io } from 'socket.io-client';
 import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import { io } from 'socket.io-client';
 dayjs.extend(utc);
+dayjs.extend(timezone);
 export default function DeviceData() {
   //const [socketVar, setSocketVar] = useState(null);
   const [live, setLive] = useState(false);
@@ -174,7 +176,7 @@ export default function DeviceData() {
             let record = {
               id: index + 1,
               //timestamp: todate.toLocaleTimeString([], {year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',second:'2-digit'}),
-              timestamp: dayjs(item.timestamp).format("YYYY-MM-DD HH:mm:ss"),
+              timestamp: dayjs(item.timestamp).utc().format("YYYY-MM-DD HH:mm:ss"),
               device: item.device.devicename,
             };
             item.fields.map((param) => {
@@ -348,7 +350,9 @@ export default function DeviceData() {
             (<div className=" flex flex-wrap mx-10 my-36 md:mx-10 md:my-36 lg:mx-20 lg:my-36 ">
               {
                 values.map((item, index) =>
-                  item.fields.map((field) => (
+                  item.fields.map((field) => {
+                    const minWidth = `${field.name.length * 10}px`;
+                    (
                     <div className="mt-4 ml-5 mr-5 mb-2 `order-{index}`  card-list w-full  md:w-40 lg:w-52 xl:w-52 rounded ">
                       <div
                         className="card h-20 rounded cursor-pointer "
@@ -362,7 +366,7 @@ export default function DeviceData() {
                         }}
                       >
                         <div className=" text-center ">
-                          <div className="card-body text-center p-10">
+                          <div className="card-body text-center p-10" style={{ minWidth, maxWidth: '300px', wordWrap: 'break-word' }}>
                             <p className="card-text">{field.name} </p>
                           </div>
                         </div>
@@ -372,12 +376,13 @@ export default function DeviceData() {
                       </div>
                       <div className="card-footer h-12 py-3 text-white dark:bg-white dark:text-black mb-0 text-center rounded " style={{ background: '#007c89' }}>
                         <span> {
-                          dayjs.utc(item.timestamp).format("YYYY-MM-DD HH:mm:ss")
+                          dayjs(item.timestamp).utc().format("YYYY-MM-DD HH:mm:ss")
                         }
                         </span>
                       </div>
                     </div>
-                  ))
+                  )
+})
                 )
               }</div>) : (
 
