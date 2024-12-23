@@ -113,7 +113,6 @@ const SldcDashboard = () => {
   const [graphError, setGraphError] = useState(null)
   const [widgets, setWidgets] = useState([]);
   const layoutChangeRef = useRef(false);
-  const initialLoadRef = useRef(true);
 
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
@@ -169,13 +168,12 @@ const SldcDashboard = () => {
       try {
         const response = await axios.get(`${apiKey}sldcwidgets`);
         setWidgets(response.data);
-        initialLoadRef.current = false;
       } catch (error) {
         console.error('Error fetching widgets:', error);
       }
     };
     fetchWidgets();
-  }, [apiKey]);
+  }, []);
 
   const fetchScriptNames = async (terminalId) => {
     try {
@@ -856,36 +854,62 @@ const SldcDashboard = () => {
     }
   };
 
+  const generateLayout = useCallback(() => {
+    return widgets.map((widget) => ({
+      i: widget._id,
+      x: widget.position?.x || 0,
+      y: widget.position?.y || 0,
+      w: widget.position?.w || 4,
+      h: widget.position?.h || 2,
+    }));
+  }, [widgets]);
+
   const onLayoutChange = useCallback((newLayout) => {
-    if (layoutChangeRef.current || initialLoadRef.current) return;
+    if (layoutChangeRef.current) return;
     layoutChangeRef.current = true;
 
-    const positions = newLayout.map(layout => ({
-      id: layout.i,
-      position: {
-        x: layout.x,
-        y: layout.y,
-        width: layout.w,
-        height: layout.h
-      }
-    }));
+    try {
+      // Update local state first
+      const updatedWidgets = widgets.map(widget => {
+        const layoutItem = newLayout.find(item => item.i === widget._id);
+        if (layoutItem) {
+          return {
+            ...widget,
+            position: {
+              x: layoutItem.x,
+              y: layoutItem.y,
+              w: layoutItem.w,
+              h: layoutItem.h
+            }
+          };
+        }
+        return widget;
+      });
 
-    axios.put(`${apiKey}sldcwidgets/updatepositions`, {
-      positions: positions
-    })
-    .then(() => {
-      setWidgets(prevWidgets => 
-        prevWidgets.map(widget => {
-          const newPosition = positions.find(p => p.id === widget._id)?.position;
-          return newPosition ? { ...widget, position: newPosition } : widget;
-        })
-      );
-    })
-    .finally(() => {
+      setWidgets(updatedWidgets);
+
+      // Send updates to backend
+      const updates = newLayout.map(layout => ({
+        widgetId: layout.i,
+        position: {
+          x: layout.x,
+          y: layout.y,
+          w: layout.w,
+          h: layout.h
+        }
+      }));
+
+      axios.patch(`${apiKey}sldcwidgets/positions`, { updates })
+        .catch(error => {
+          console.error('Error updating positions:', error);
+        });
+
+    } catch (error) {
+      console.error('Error in layout change:', error);
+    } finally {
       layoutChangeRef.current = false;
-    })
-    .catch(error => console.error('Error updating positions:', error));
-  }, [widgets, apiKey]);
+    }
+  }, [widgets]);
 
   return (
     <div>
@@ -945,24 +969,20 @@ const SldcDashboard = () => {
         </DialogActions>
       </Dialog>
 
-      <Box sx={{ p: 2, height: 'calc(100vh - 64px)', overflow: 'auto' }}>
+      <Box sx={{ p: 2, minHeight: 'calc(100vh - 64px)', height: 'auto', overflow: 'auto' }}>
         <GridLayout
           className="layout"
-          layout={widgets.map(widget => ({
-            i: widget._id,
-            x: widget.position?.x ?? 0,
-            y: widget.position?.y ?? 0,
-            w: widget.position?.width ?? 4,
-            h: widget.position?.height ?? 2
-          }))}
+          layout={generateLayout()}
           cols={12}
           rowHeight={100}
-          width={1200}
+          maxRows={100}
+          width={window.innerWidth - 48}
           onLayoutChange={onLayoutChange}
           isDraggable={true}
           isResizable={true}
           margin={[10, 10]}
           containerPadding={[0, 0]}
+          verticalCompact={false}
         >
           {widgets.map((widget) => (
             <div key={widget._id}>
