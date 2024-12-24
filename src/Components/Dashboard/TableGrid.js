@@ -15,7 +15,6 @@ import { Refresh } from "@mui/icons-material";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 const ALLOWED_SCRIPTS = [
-  "Block Number",
   "AvC MW",
   "SG MW",
   "AG MW",
@@ -24,16 +23,6 @@ const ALLOWED_SCRIPTS = [
   "MAE",
   "4th Block SG",
 ];
-
-const COLUMN_NAMES = {
-  "AvC MW": "AvC MW",
-  "SG MW": "SG MW",
-  "Inst MW": "AG MW",
-  "Avg MW": "Block Average MW",
-  "UI MW": "UI MW",
-  "UI Percentage": "MAE",
-  "4thBLK SG MW": "4th Block SG",
-};
 
 const StyledCard = styled(Card)(({ theme }) => ({
   height: "100vh",
@@ -160,10 +149,17 @@ const formatTimestamp = (timestamp) => {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
+const convertToBlock = (date) => {
+  let old = new Date("01/01/1970");
+  let present = date;
+  let diff = Math.floor((present - old) / 1000);
+  let blockNo = Math.floor((diff % 86400) / 900) + 1;
+  return blockNo;
+};
+
 const TableGrid = () => {
   const [terminals, setTerminals] = useState([]);
-  const [scriptsData, setScriptsData] = useState({});
-  const [scripts, setScripts] = useState([]);
+  const [availableScripts, setAvailableScripts] = useState({});
   const [rows, setRows] = useState([]);
   const [columns, setColumns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -174,120 +170,107 @@ const TableGrid = () => {
   const isDarkMode = theme.palette.mode === "dark";
 
   useEffect(() => {
-    fetchTerminals();
-    const dateTimeTimer = setInterval(() => {
+    const updateDateTime = () => {
+      const now = new Date();
       setCurrentDateTime(
-        new Date().toLocaleString("en-US", {
+        now.toLocaleString("en-US", {
+          timeZone: "Asia/Kolkata",
+          hour12: false,
           year: "numeric",
           month: "2-digit",
           day: "2-digit",
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
-          hour12: false,
         })
       );
-    }, 1000);
-
-    return () => {
-      clearInterval(dateTimeTimer);
+      setBlkNo(convertToBlock(now));
     };
+
+    updateDateTime();
+    const timer = setInterval(updateDateTime, 1000);
+    return () => clearInterval(timer);
   }, []);
 
+  // Fetch terminals and their available scripts
   useEffect(() => {
-    if (terminals.length > 0) {
-      fetchScripts(terminals[0].terminalId);
-    }
-  }, [terminals]);
+    const fetchTerminalAndScripts = async () => {
+      try {
+        const terminalsResponse = await axios.get(`${apiKey}terminal/list`);
+        const terminalsList = terminalsResponse.data;
+        setTerminals(terminalsList);
 
-  useEffect(() => {
-    if (terminals.length > 0 && scripts.length > 0) {
-      initializeGrid();
-      fetchGridData();
-      const fetchInterval = setInterval(fetchGridData, 10000);
-      return () => {
-        clearInterval(fetchInterval);
-      };
-    }
-  }, [terminals, scripts]);
+        // Fetch scripts for each terminal and store availability
+        const scriptsMap = {};
+        await Promise.all(
+          terminalsList.map(async (terminal) => {
+            try {
+              const scriptsResponse = await axios.get(
+                `${apiKey}terminal/${terminal.terminalId}/scripts`
+              );
+              scriptsMap[terminal.terminalId] = Object.keys(
+                scriptsResponse.data.scripts
+              ).filter((script) => ALLOWED_SCRIPTS.includes(script));
+            } catch (error) {
+              console.error(
+                `Failed to fetch scripts for terminal ${terminal.terminalId}:`,
+                error
+              );
+              scriptsMap[terminal.terminalId] = [];
+            }
+          })
+        );
+        setAvailableScripts(scriptsMap);
+        initializeColumns(ALLOWED_SCRIPTS);
+      } catch (error) {
+        console.error("Error fetching initial data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchTerminals = async () => {
-    try {
-      const response = await axios.get(`${apiKey}terminal/list`);
-      setTerminals(response.data);
-    } catch (error) {
-      console.error("Error fetching terminals:", error);
-    }
-  };
+    fetchTerminalAndScripts();
+  }, []);
 
-  const fetchScripts = async (terminalId) => {
-    try {
-      const response = await axios.get(
-        `${apiKey}terminal/${terminalId}/scripts`
-      );
-      // Filter scripts to only include allowed scripts
-      const filteredScripts = Object.keys(response.data.scripts).filter(
-        (script) => ALLOWED_SCRIPTS.includes(script)
-      );
-      setScripts(filteredScripts.filter((script) => script !== "Block Number"));
-      setScriptsData(response.data.scripts);
-    } catch (error) {
-      console.error("Error fetching scripts:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const initializeGrid = () => {
-    const defaultColumns = [
+  const initializeColumns = (scripts) => {
+    const columns = [
       {
         field: "terminal",
         headerName: "Site Name",
         flex: 1.5,
-        headerClassName: "header-cell",
-        cellClassName: "centered-cell",
+        headerAlign: "center",
+        align: "center",
+      },
+      ...scripts.map((script) => ({
+        field: script,
+        headerName: script,
+        flex: 1,
+        headerAlign: "center",
+        align: "center",
+        cellClassName: (params) => {
+          const value = parseFloat(params.value);
+          if (script === "MAE") {
+            if (value >= 0) return "ui-percentage-green";
+            if (value < 0 && value >= -20) return "ui-percentage-light-red";
+            if (value < -20 && value >= -28) return "ui-percentage-dark-red";
+            if (value < -28) return "ui-percentage-critical";
+          }
+          return "";
+        },
+      })),
+      {
+        field: "timestamp",
+        headerName: "Last Updated",
+        flex: 1.5,
         headerAlign: "center",
         align: "center",
       },
     ];
 
-    const scriptColumns = scripts.map((script) => ({
-      field: script,
-      headerName: COLUMN_NAMES[script] || script,
-      flex: 1,
-      headerClassName: "header-cell",
-      cellClassName: (params) => {
-        const value = parseFloat(params.value);
-        let baseClass = "centered-cell";
-
-        if (script === "UI Percentage") {
-          if (value >= 0) return `${baseClass} ui-percentage-green`;
-          if (value < 0 && value >= -20)
-            return `${baseClass} ui-percentage-light-red`;
-          if (value < -20 && value >= -28)
-            return `${baseClass} ui-percentage-dark-red`;
-          if (value < -28) return `${baseClass} ui-percentage-critical`;
-        }
-
-        return baseClass;
-      },
-      headerAlign: "center",
-      align: "center",
-    }));
-
-    const dateTimeColumn = {
-      field: "timestamp",
-      headerName: "Last Updated",
-      flex: 1.5,
-      headerClassName: "header-cell",
-      cellClassName: "centered-cell",
-      headerAlign: "center",
-      align: "center",
-    };
-
-    setColumns([...defaultColumns, ...scriptColumns, dateTimeColumn]);
+    setColumns(columns);
   };
 
+  // Fetch grid data
   const fetchGridData = async () => {
     setLoading(true);
     try {
@@ -296,45 +279,35 @@ const TableGrid = () => {
           const row = {
             id: index,
             terminal: terminal.terminalName,
+            timestamp: "N/A",
           };
 
-          let latestTimestamp = "";
-          let isCritical = false;
+          ALLOWED_SCRIPTS.forEach((script) => {
+            row[script] = "N/A";
+          });
 
-          await Promise.all(
-            ALLOWED_SCRIPTS.map(async (script) => {
-              try {
-                const response = await axios.get(
-                  `${apiKey}terminal/${terminal.terminalId}/script/${script}/currentValue`
-                );
+          // Only fetch data for available scripts
+          const terminalScripts = availableScripts[terminal.terminalId] || [];
+          const scriptPromises = terminalScripts.map(async (script) => {
+            try {
+              const response = await axios.get(
+                `${apiKey}terminal/${terminal.terminalId}/script/${script}/currentValue`
+              );
 
-                const scriptData = response.data[script];
-                latestTimestamp = formatTimestamp(response.data.timestamp);
+              row[script] =
+                typeof response.data[script] === "number"
+                  ? response.data[script].toFixed(2)
+                  : response.data[script];
+              row.timestamp = formatTimestamp(response.data.timestamp);
+            } catch (error) {
+              console.error(
+                `Error fetching ${script} for ${terminal.terminalName}:`,
+                error
+              );
+            }
+          });
 
-                if (script === "Block Number") {
-                  setBlkNo(scriptData);
-                } else if (ALLOWED_SCRIPTS.includes(script)) {
-                  row[script] =
-                    typeof scriptData === "number"
-                      ? scriptData.toFixed(2)
-                      : scriptData;
-                  if (
-                    script === "UI Percentage" &&
-                    parseFloat(row[script]) > 28
-                  ) {
-                    isCritical = true;
-                  }
-                }
-              } catch (error) {
-                console.error(
-                  `Error fetching data for terminal ${terminal.terminalName} and script ${script}:`,
-                  error
-                );
-              }
-            })
-          );
-          row.timestamp = latestTimestamp || "N/A";
-          row.isCritical = isCritical;
+          await Promise.all(scriptPromises);
           return row;
         })
       );
@@ -345,6 +318,14 @@ const TableGrid = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (terminals.length > 0 && Object.keys(availableScripts).length > 0) {
+      fetchGridData();
+      const interval = setInterval(fetchGridData, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [terminals, availableScripts]);
 
   return (
     <StyledCard>
@@ -366,7 +347,7 @@ const TableGrid = () => {
             },
           }}
         >
-          <Tooltip title="Current Time">
+          <Tooltip title="Current Time (IST)">
             <Chip
               icon={<AccessTimeIcon />}
               label={` ${currentDateTime}`}
@@ -459,7 +440,7 @@ const TableGrid = () => {
         disableColumnMenu
         loading={loading}
         getRowClassName={(params) => {
-          const uiPercentageValue = parseFloat(params.row["UI Percentage"]);
+          const uiPercentageValue = parseFloat(params.row["MAE"]);
           if (uiPercentageValue < -28) {
             return "row-critical";
           }
