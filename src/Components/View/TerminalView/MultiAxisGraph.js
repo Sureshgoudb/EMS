@@ -10,6 +10,7 @@ import {
   Area,
   Bar,
   ComposedChart,
+  ReferenceLine,
 } from "recharts";
 import {
   Box,
@@ -36,6 +37,8 @@ import {
   Alert,
   ListItemIcon,
   ListItemButton,
+  TextField,
+  DialogActions,
 } from "@mui/material";
 import { ChromePicker } from "react-color";
 
@@ -45,6 +48,7 @@ import {
   MoreVert as MoreVertIcon,
   Save as SaveIcon,
   Palette as PaletteIcon,
+  Speed as ThresholdIcon,
 } from "@mui/icons-material";
 import axios from "axios";
 import {
@@ -76,7 +80,6 @@ const MultiAxisGraph = ({
   const [selectedProfile, setSelectedProfile] = useState("trend");
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [availableScripts, setAvailableScripts] = useState([]);
-
   const [selectedScripts, setSelectedScripts] = useState([]);
   const [mergedData, setMergedData] = useState([]);
   const [chartType, setChartType] = useState("Area");
@@ -90,8 +93,6 @@ const MultiAxisGraph = ({
     useState(false);
   const [isGraphTypeDialogOpen, setIsGraphTypeDialogOpen] = useState(false);
   const chartRef = useRef(null);
-
-  const timerIntervalRef = useRef(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
@@ -118,6 +119,46 @@ const MultiAxisGraph = ({
     "#FFC107",
   ];
 
+  const [isThresholdDialogOpen, setIsThresholdDialogOpen] = useState(false);
+  const [thresholds, setThresholds] = useState({
+    min: null,
+    max: null,
+  });
+  const [tempThresholds, setTempThresholds] = useState({
+    min: "",
+    max: "",
+  });
+
+  const [timerSlot, setTimerSlot] = useState(null);
+  const [currentCycle, setCurrentCycle] = useState({
+    startTime: null,
+    endTime: null,
+  });
+
+  const timerIntervalRef = useRef(null);
+
+  const handleThresholdDialogOpen = () => {
+    setTempThresholds({
+      min: thresholds.min !== null ? thresholds.min.toString() : "",
+      max: thresholds.max !== null ? thresholds.max.toString() : "",
+    });
+    setIsThresholdDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleThresholdDialogClose = () => {
+    setIsThresholdDialogOpen(false);
+  };
+
+  const handleThresholdSave = () => {
+    const newThresholds = {
+      min: tempThresholds.min !== "" ? parseFloat(tempThresholds.min) : null,
+      max: tempThresholds.max !== "" ? parseFloat(tempThresholds.max) : null,
+    };
+    setThresholds(newThresholds);
+    setIsThresholdDialogOpen(false);
+  };
+
   // ---------------- Retrieve widget config ----------------
   useEffect(() => {
     const fetchWidgetPreferences = async () => {
@@ -135,8 +176,8 @@ const MultiAxisGraph = ({
           setSelectedProfile(preferences.selectedProfile || "trend");
           setSelectedScripts(preferences.comparisonScripts || []);
           setChartType(preferences.chartType || "Area");
+          setThresholds(preferences.thresholds || { min: null, max: null });
 
-          // Load saved script colors
           if (preferences.scriptColors) {
             setScriptColors(preferences.scriptColors);
           }
@@ -180,10 +221,6 @@ const MultiAxisGraph = ({
     setTimerAnchorEl(event.currentTarget);
   };
 
-  const handleTimerMenuClose = () => {
-    setTimerAnchorEl(null);
-  };
-
   // New method for graph type selection dropdown
   const handleGraphTypeMenuOpen = (event) => {
     setGraphTypeAnchorEl(event.currentTarget);
@@ -207,36 +244,114 @@ const MultiAxisGraph = ({
     { label: "24 hr", value: 24 * 60 * 60 },
   ];
 
-  const alignTimeToInterval = (currentTime, interval) => {
-    const date = new Date(currentTime);
+  // Start continuous timer
+  const startContinuousTimer = useCallback((slot) => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+
+    setTimerSlot(slot);
+    const times = alignTimeToInterval(slot.value);
+    setCurrentCycle(times);
+
+    timerIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      if (now >= times.endTime) {
+        const newTimes = alignTimeToInterval(slot.value);
+        setCurrentCycle(newTimes);
+      }
+    }, 1000);
+  }, []);
+
+  useEffect(() => {
+    const fetchTimerPreferences = async () => {
+      try {
+        const response = await axios.get(apiUrl + "get-widget-preferences", {
+          params: {
+            widgetId: widgetData.id,
+            customerID: widgetData.customerID,
+            scriptName: widgetData.scriptName,
+          },
+        });
+
+        const preferences = response.data.data.preferences;
+        if (preferences && preferences.timerSlot) {
+          const savedSlot = timerSlots.find(
+            (slot) => slot.value === preferences.timerSlot.value
+          );
+          if (savedSlot) {
+            startContinuousTimer(savedSlot);
+          }
+        }
+      } catch (err) {
+        console.log("No existing timer preferences found");
+      }
+    };
+
+    fetchTimerPreferences();
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [widgetData, startContinuousTimer]);
+
+  // Calculate remaining time for display
+  const getRemainingTime = useCallback(() => {
+    if (!currentCycle.endTime) return 0;
+    return Math.max(0, Math.ceil((currentCycle.endTime - Date.now()) / 1000));
+  }, [currentCycle]);
+
+  const alignTimeToInterval = (interval) => {
+    const now = new Date();
+    const alignedDate = new Date(now);
 
     switch (interval) {
-      case 1 * 60:
-        date.setSeconds(0, 0);
-        return date.getTime();
+      case 60: // 1 minute
+        alignedDate.setSeconds(0, 0);
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
 
-      case 15 * 60:
-        const minutes = date.getMinutes();
+      case 15 * 60: // 15 minutes
+        const minutes = alignedDate.getMinutes();
         const alignedMinutes = Math.floor(minutes / 15) * 15;
-        date.setMinutes(alignedMinutes, 0, 0);
-        return date.getTime();
+        alignedDate.setMinutes(alignedMinutes, 0, 0);
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
 
-      case 60 * 60:
-        date.setMinutes(0, 0, 0);
-        return date.getTime();
+      case 60 * 60: // 1 hour
+        alignedDate.setMinutes(0, 0, 0);
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
 
-      case 8 * 60 * 60:
-        const hours = date.getHours();
+      case 8 * 60 * 60: // 8 hours
+        const hours = alignedDate.getHours();
         const alignedHours = Math.floor(hours / 8) * 8;
-        date.setHours(alignedHours, 0, 0, 0);
-        return date.getTime();
+        alignedDate.setHours(alignedHours, 0, 0, 0);
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
 
-      case 24 * 60 * 60:
-        date.setHours(0, 0, 30, 0);
-        return date.getTime();
+      case 24 * 60 * 60: // 24 hours
+        alignedDate.setHours(0, 0, 0, 0);
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
 
       default:
-        return currentTime;
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
     }
   };
 
@@ -289,9 +404,19 @@ const MultiAxisGraph = ({
   };
 
   const handleTimerSlotSelect = (slot) => {
-    startTimer(slot);
-  };
+    if (slot === null) {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      setTimerSlot(null);
+      setCurrentCycle({ startTime: null, endTime: null });
+      setTimerAnchorEl(null);
+      return;
+    }
 
+    startContinuousTimer(slot);
+    setTimerAnchorEl(null);
+  };
   // --------------- Filter data by Config ----------------------
   const filterDataByConfig = useCallback(
     (data) => {
@@ -299,15 +424,13 @@ const MultiAxisGraph = ({
 
       let filteredData = data;
 
-      if (timerState && timerState.selectedSlot) {
-        const timerStartTime = new Date(timerState.alignedStartTime);
-        const timerEndTime = new Date(
-          timerStartTime.getTime() + timerState.selectedSlot.value * 1000
-        );
+      if (timerSlot) {
+        const cycleStartTime = new Date(currentCycle.startTime);
+        const cycleEndTime = new Date(currentCycle.endTime);
 
         filteredData = data.filter((item) => {
           const itemTime = new Date(item.timestamp);
-          return itemTime >= timerStartTime && itemTime <= timerEndTime;
+          return itemTime >= cycleStartTime && itemTime <= cycleEndTime;
         });
       } else {
         if (isExpanded) {
@@ -332,7 +455,13 @@ const MultiAxisGraph = ({
       const endIdx = Math.ceil(filteredData.length * (zoomRange.end / 100));
       return filteredData.slice(startIdx, endIdx);
     },
-    [widgetData.xAxisConfiguration, isExpanded, zoomRange, timerState]
+    [
+      currentCycle,
+      timerSlot,
+      zoomRange,
+      widgetData.xAxisConfiguration,
+      isExpanded,
+    ]
   );
 
   useEffect(() => {
@@ -579,43 +708,6 @@ const MultiAxisGraph = ({
     });
   }, []);
 
-  const handleResetZoom = () => {
-    setZoomRange({
-      start: 0,
-      end: 100,
-      minPoints: 5,
-    });
-  };
-
-  const handleZoomButton = (zoomIn) => {
-    setZoomRange((prevRange) => {
-      const currentRangeSize = prevRange.end - prevRange.start;
-      const rangeCenter = prevRange.start + currentRangeSize / 2;
-      const newRangeSize = Math.max(
-        5,
-        Math.min(100, currentRangeSize * (zoomIn ? 0.8 : 1.2))
-      );
-
-      let newStart = rangeCenter - newRangeSize / 2;
-      let newEnd = rangeCenter + newRangeSize / 2;
-
-      if (newStart < 0) {
-        newStart = 0;
-        newEnd = newRangeSize;
-      }
-      if (newEnd > 100) {
-        newEnd = 100;
-        newStart = 100 - newRangeSize;
-      }
-
-      return {
-        start: Math.max(0, newStart),
-        end: Math.min(100, newEnd),
-        minPoints: prevRange.minPoints,
-      };
-    });
-  };
-
   useEffect(() => {
     const chartElement = chartRef.current;
     if (chartElement) {
@@ -671,7 +763,6 @@ const MultiAxisGraph = ({
 
   // ----------------- Chart type -----------------
   const renderChartType = (dataKey, color, yAxisId) => {
-    // Use the script-specific color or fall back to the default color
     const scriptColor = scriptColors[dataKey] || color;
 
     switch (chartType) {
@@ -805,7 +896,131 @@ const MultiAxisGraph = ({
     handleMenuClose();
   };
 
-  // Modify the existing renderNonExpandedIcons function
+  const renderTimerMenu = () => (
+    <Menu
+      anchorEl={timerAnchorEl}
+      open={Boolean(timerAnchorEl)}
+      onClose={() => setTimerAnchorEl(null)}
+      PaperProps={{
+        style: {
+          maxHeight: 300,
+          width: "200px",
+        },
+      }}
+    >
+      {timerSlots.map((slot) => (
+        <MenuItem
+          key={slot.value}
+          onClick={() => handleTimerSlotSelect(slot)}
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            backgroundColor:
+              timerSlot?.value === slot.value
+                ? "rgba(25, 118, 210, 0.08)"
+                : "transparent",
+            "&:hover": {
+              backgroundColor:
+                timerSlot?.value === slot.value
+                  ? "rgba(25, 118, 210, 0.12)"
+                  : "rgba(0, 0, 0, 0.04)",
+            },
+          }}
+        >
+          <Typography>{slot.label}</Typography>
+          {timerSlot?.value === slot.value && (
+            <Box
+              sx={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                backgroundColor: "#1976d2",
+                ml: 1,
+              }}
+            />
+          )}
+        </MenuItem>
+      ))}
+      {timerSlot && (
+        <MenuItem
+          onClick={() => handleTimerSlotSelect(null)}
+          sx={{
+            borderTop: "1px solid rgba(0, 0, 0, 0.12)",
+            color: "error.main",
+          }}
+        >
+          Clear Timer
+        </MenuItem>
+      )}
+    </Menu>
+  );
+
+  // Update timer button to show active state
+  const renderTimerButton = () => (
+    <MuiTooltip title="Timer Settings">
+      <IconButton onClick={handleTimerMenuOpen}>
+        <TimerIcon
+          sx={{
+            color: timerSlot ? "#1976d2" : "inherit",
+            mt: 2,
+            ml: 2,
+          }}
+        />
+        {timerSlot && (
+          <Typography
+            variant="caption"
+            sx={{
+              color: "#1976d2",
+              mt: 2,
+              ml: 2,
+            }}
+          >
+            {formatRemainingTime(getRemainingTime())}
+          </Typography>
+        )}
+      </IconButton>
+    </MuiTooltip>
+  );
+
+  // Update timer display in menu
+  const renderMenuTimerItem = () => (
+    <ListItem disablePadding>
+      <ListItemButton
+        onClick={openTimerMenu}
+        sx={{
+          bgcolor: timerSlot ? "rgba(25, 118, 210, 0.08)" : "transparent",
+        }}
+      >
+        <ListItemIcon>
+          <TimerIcon
+            fontSize="small"
+            sx={{
+              color: timerSlot ? "#1976d2" : "inherit",
+            }}
+          />
+        </ListItemIcon>
+        <ListItemText
+          primary="Timer Settings"
+          secondary={
+            timerSlot
+              ? `Active: ${timerSlot.label} (${formatRemainingTime(
+                  getRemainingTime()
+                )})`
+              : "Set Timer"
+          }
+          secondaryTypographyProps={{
+            sx: {
+              color: timerSlot ? "#1976d2" : "inherit",
+              fontWeight: timerSlot ? "medium" : "normal",
+            },
+          }}
+        />
+      </ListItemButton>
+    </ListItem>
+  );
+
+  //  renderNonExpandedIcons function
   const renderNonExpandedIcons = () => {
     if (isExpanded) return null;
 
@@ -823,7 +1038,6 @@ const MultiAxisGraph = ({
           p: 1,
         }}
       >
-        {" "}
         <MuiTooltip title="Save Preferences">
           <IconButton
             size="small"
@@ -832,7 +1046,6 @@ const MultiAxisGraph = ({
                 ? "#fff"
                 : "#000",
               mr: 1,
-
               position: "absolute",
               top: 4,
               right: 20,
@@ -877,6 +1090,26 @@ const MultiAxisGraph = ({
             },
           }}
         >
+          {" "}
+          {renderMenuTimerItem()}
+          {/* Add Threshold Settings menu item */}
+          <ListItem disablePadding>
+            <ListItemButton onClick={handleThresholdDialogOpen}>
+              <ListItemIcon>
+                <ThresholdIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText
+                primary="Bandwidth Thresholds"
+                secondary={
+                  thresholds.min !== null || thresholds.max !== null
+                    ? `Min: ${thresholds.min || "none"}, Max: ${
+                        thresholds.max || "none"
+                      }`
+                    : "Not set"
+                }
+              />
+            </ListItemButton>
+          </ListItem>
           {/* Profile Settings */}
           <ListItem disablePadding>
             <ListItemButton onClick={openProfileDialog}>
@@ -892,24 +1125,6 @@ const MultiAxisGraph = ({
               />
             </ListItemButton>
           </ListItem>
-
-          {/* Timer Settings */}
-          <ListItem disablePadding>
-            <ListItemButton onClick={openTimerMenu}>
-              <ListItemIcon>
-                <TimerIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText
-                primary="Timer Settings"
-                secondary={
-                  timerState && timerState.selectedSlot
-                    ? formatRemainingTime(timerState.remainingTime)
-                    : "Set Timer"
-                }
-              />
-            </ListItemButton>
-          </ListItem>
-
           {/* Graph Type */}
           <ListItem disablePadding>
             <ListItemButton onClick={openGraphTypeDialog}>
@@ -919,7 +1134,6 @@ const MultiAxisGraph = ({
               <ListItemText primary="Change Graph Type" secondary={chartType} />
             </ListItemButton>
           </ListItem>
-
           {/* Compare Scripts */}
           <ListItem disablePadding>
             <ListItemButton onClick={openCompareScriptsDialog}>
@@ -932,24 +1146,6 @@ const MultiAxisGraph = ({
               />
             </ListItemButton>
           </ListItem>
-        </Menu>
-        {/* Timer Menu for Non-Expanded View */}
-        <Menu
-          anchorEl={timerAnchorEl}
-          open={Boolean(timerAnchorEl)}
-          onClose={() => setTimerAnchorEl(null)}
-        >
-          {timerSlots.map((slot) => (
-            <MenuItem
-              key={slot.value}
-              onClick={() => {
-                handleTimerSlotSelect(slot);
-                setTimerAnchorEl(null);
-              }}
-            >
-              {slot.label}
-            </MenuItem>
-          ))}
         </Menu>
       </Box>
     );
@@ -1225,14 +1421,8 @@ const MultiAxisGraph = ({
           selectedProfile,
           comparisonScripts: selectedScripts,
           scriptColors,
-          timerState: timerState
-            ? {
-                selectedSlot: timerState.selectedSlot,
-                startTime: new Date(timerState.startTime),
-                endTime: new Date(timerState.endTime),
-                alignedStartTime: new Date(timerState.alignedStartTime),
-              }
-            : null,
+          thresholds,
+          timerSlot,
           chartType,
         },
       };
@@ -1251,6 +1441,76 @@ const MultiAxisGraph = ({
       setSnackbarOpen(true);
     }
   };
+
+  // Add Threshold Dialog component
+  const renderThresholdDialog = () => (
+    <Dialog
+      open={isThresholdDialogOpen}
+      onClose={handleThresholdDialogClose}
+      sx={{
+        "& .MuiDialog-paper": {
+          width: "400px",
+          padding: "20px",
+          backgroundColor: "#eef4fa",
+          borderRadius: "16px",
+        },
+      }}
+    >
+      <DialogTitle
+        sx={{
+          fontSize: "1.4rem",
+          textAlign: "center",
+          color: "#1a73e8",
+          borderBottom: "2px solid #d0e1f9",
+          paddingBottom: "12px",
+        }}
+      >
+        Set Bandwidth Thresholds
+      </DialogTitle>
+      <DialogContent sx={{ mt: 2 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+          <TextField
+            label="Minimum Threshold"
+            type="number"
+            value={tempThresholds.min}
+            onChange={(e) =>
+              setTempThresholds({ ...tempThresholds, min: e.target.value })
+            }
+            fullWidth
+            variant="outlined"
+            sx={{ backgroundColor: "white" }}
+          />
+          <TextField
+            label="Maximum Threshold"
+            type="number"
+            value={tempThresholds.max}
+            onChange={(e) =>
+              setTempThresholds({ ...tempThresholds, max: e.target.value })
+            }
+            fullWidth
+            variant="outlined"
+            sx={{ backgroundColor: "white" }}
+          />
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ padding: "20px" }}>
+        <Button
+          onClick={handleThresholdDialogClose}
+          variant="outlined"
+          color="primary"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleThresholdSave}
+          variant="contained"
+          color="primary"
+        >
+          Save
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 
   const handleSnackbarClose = (event, reason) => {
     if (reason === "clickaway") {
@@ -1280,7 +1540,9 @@ const MultiAxisGraph = ({
       {renderNonExpandedIcons()}
       {renderProfileDialog()}
       {renderGraphTypeDialog()}
-      {renderCompareScriptsDialog()} {renderSnackbar()}
+      {renderCompareScriptsDialog()}
+      {renderThresholdDialog()} {renderTimerMenu()}
+      {renderSnackbar()}
       {isExpanded && (
         <Box
           sx={{
@@ -1300,7 +1562,8 @@ const MultiAxisGraph = ({
                   selectedProfile.slice(1)}
               </Typography>
             </IconButton>
-          </MuiTooltip>
+          </MuiTooltip>{" "}
+          {renderTimerButton()}
           {/* Profile Selection Dropdown */}
           <Menu
             anchorEl={profileAnchorEl}
@@ -1314,34 +1577,6 @@ const MultiAxisGraph = ({
                 selected={selectedProfile === profile}
               >
                 {profile.charAt(0).toUpperCase() + profile.slice(1)}
-              </MenuItem>
-            ))}
-          </Menu>
-          {/* Timer Selection Dropdown */}
-          <MuiTooltip title="Timer Settings">
-            <IconButton onClick={handleTimerMenuOpen} sx={{ mt: 2 }}>
-              <TimerIcon />
-              {timerState && timerState.selectedSlot && (
-                <Typography variant="caption" sx={{ ml: 1 }}>
-                  {formatRemainingTime(timerState.remainingTime)}
-                </Typography>
-              )}
-            </IconButton>
-          </MuiTooltip>
-          <Menu
-            anchorEl={timerAnchorEl}
-            open={Boolean(timerAnchorEl)}
-            onClose={handleTimerMenuClose}
-          >
-            {timerSlots.map((slot) => (
-              <MenuItem
-                key={slot.value}
-                onClick={() => {
-                  handleTimerSlotSelect(slot);
-                  handleTimerMenuClose();
-                }}
-              >
-                {slot.label}
               </MenuItem>
             ))}
           </Menu>
@@ -1418,10 +1653,52 @@ const MultiAxisGraph = ({
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="timestamp" hide={!showXAxis} />
-
-            {/* Render Y-axes */}
             {renderYAxis(widgetData.scriptName)}
             {selectedScripts.map((script, index) => renderYAxis(script, index))}
+
+            {/* Updated ReferenceLine components with explicit yAxisId */}
+            {thresholds.min !== null && (
+              <ReferenceLine
+                y={thresholds.min}
+                stroke="orange"
+                strokeDasharray="3 3"
+                label={{
+                  value: `Min: ${thresholds.min}`,
+                  position: "insideBottomLeft",
+                  style: {
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    color: "#ff0000",
+                    backgroundColor: "rgba(255, 255, 255, 0.8)",
+                    padding: "2px 4px",
+                    borderRadius: "4px",
+                    border: "1px solid #ff0000",
+                  },
+                }}
+                yAxisId="primary"
+              />
+            )}
+            {thresholds.max !== null && (
+              <ReferenceLine
+                y={thresholds.max}
+                stroke="Red"
+                strokeDasharray="3 3"
+                label={{
+                  value: `Max: ${thresholds.max}`,
+                  position: "insideTopLeft",
+                  style: {
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    color: "#ff0000",
+                    backgroundColor: "rgba(255, 255, 255, 0.8)",
+                    padding: "2px 4px",
+                    borderRadius: "4px",
+                    border: "1px solid #ff0000",
+                  },
+                }}
+                yAxisId="primary"
+              />
+            )}
 
             <Tooltip
               content={<CustomTooltip />}
@@ -1430,7 +1707,6 @@ const MultiAxisGraph = ({
             <Legend />
 
             {renderChartType(widgetData.scriptName, colors[0], "primary")}
-
             {selectedScripts.map((script, index) =>
               renderChartType(
                 script,

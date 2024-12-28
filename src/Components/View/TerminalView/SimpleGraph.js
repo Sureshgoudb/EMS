@@ -10,6 +10,7 @@ import {
   Area,
   Bar,
   ComposedChart,
+  ReferenceLine,
 } from "recharts";
 import {
   Box,
@@ -36,6 +37,8 @@ import {
   Alert,
   ListItemIcon,
   ListItemButton,
+  TextField,
+  DialogActions,
 } from "@mui/material";
 import { ChromePicker } from "react-color";
 
@@ -45,6 +48,7 @@ import {
   MoreVert as MoreVertIcon,
   Save as SaveIcon,
   Palette as PaletteIcon,
+  Speed as ThresholdIcon,
 } from "@mui/icons-material";
 import axios from "axios";
 import {
@@ -72,7 +76,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
   const [selectedProfile, setSelectedProfile] = useState("trend");
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [availableScripts, setAvailableScripts] = useState([]);
-
   const [selectedScripts, setSelectedScripts] = useState([]);
   const [mergedData, setMergedData] = useState([]);
   const [chartType, setChartType] = useState("Area");
@@ -86,8 +89,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     useState(false);
   const [isGraphTypeDialogOpen, setIsGraphTypeDialogOpen] = useState(false);
   const chartRef = useRef(null);
-
-  const timerIntervalRef = useRef(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
@@ -114,6 +115,24 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     "#FFC107",
   ];
 
+  const [thresholds, setThresholds] = useState({
+    min: null,
+    max: null,
+  });
+  const [isThresholdDialogOpen, setIsThresholdDialogOpen] = useState(false);
+  const [tempThresholds, setTempThresholds] = useState({
+    min: "",
+    max: "",
+  });
+
+  const [timerSlot, setTimerSlot] = useState(null);
+  const [currentCycle, setCurrentCycle] = useState({
+    startTime: null,
+    endTime: null,
+  });
+
+  const timerIntervalRef = useRef(null);
+
   // ---------------- Retrieve widget config ----------------
   useEffect(() => {
     const fetchWidgetPreferences = async () => {
@@ -131,8 +150,8 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
           setSelectedProfile(preferences.selectedProfile || "trend");
           setSelectedScripts(preferences.comparisonScripts || []);
           setChartType(preferences.chartType || "Area");
+          setThresholds(preferences.thresholds || { min: null, max: null });
 
-          // Load saved script colors
           if (preferences.scriptColors) {
             setScriptColors(preferences.scriptColors);
           }
@@ -157,6 +176,27 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     fetchWidgetPreferences();
   }, [widgetData]);
 
+  const handleThresholdDialogOpen = () => {
+    setTempThresholds({
+      min: thresholds.min || "",
+      max: thresholds.max || "",
+    });
+    setIsThresholdDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleThresholdDialogClose = () => {
+    setIsThresholdDialogOpen(false);
+  };
+
+  const handleThresholdSave = () => {
+    setThresholds({
+      min: tempThresholds.min === "" ? null : Number(tempThresholds.min),
+      max: tempThresholds.max === "" ? null : Number(tempThresholds.max),
+    });
+    setIsThresholdDialogOpen(false);
+  };
+
   // ----------------- Profile selection -------------------
   const handleProfileMenuOpen = (event) => {
     setProfileAnchorEl(event.currentTarget);
@@ -173,10 +213,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
 
   const handleTimerMenuOpen = (event) => {
     setTimerAnchorEl(event.currentTarget);
-  };
-
-  const handleTimerMenuClose = () => {
-    setTimerAnchorEl(null);
   };
 
   const handleGraphTypeMenuOpen = (event) => {
@@ -201,36 +237,114 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     { label: "24 hr", value: 24 * 60 * 60 },
   ];
 
-  const alignTimeToInterval = (currentTime, interval) => {
-    const date = new Date(currentTime);
+  // Start continuous timer
+  const startContinuousTimer = useCallback((slot) => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+
+    setTimerSlot(slot);
+    const times = alignTimeToInterval(slot.value);
+    setCurrentCycle(times);
+
+    timerIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      if (now >= times.endTime) {
+        const newTimes = alignTimeToInterval(slot.value);
+        setCurrentCycle(newTimes);
+      }
+    }, 1000);
+  }, []);
+
+  useEffect(() => {
+    const fetchTimerPreferences = async () => {
+      try {
+        const response = await axios.get(apiUrl + "get-widget-preferences", {
+          params: {
+            widgetId: widgetData.id,
+            customerID: widgetData.customerID,
+            scriptName: widgetData.scriptName,
+          },
+        });
+
+        const preferences = response.data.data.preferences;
+        if (preferences && preferences.timerSlot) {
+          const savedSlot = timerSlots.find(
+            (slot) => slot.value === preferences.timerSlot.value
+          );
+          if (savedSlot) {
+            startContinuousTimer(savedSlot);
+          }
+        }
+      } catch (err) {
+        console.log("No existing timer preferences found");
+      }
+    };
+
+    fetchTimerPreferences();
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [widgetData, startContinuousTimer]);
+
+  // Calculate remaining time for display
+  const getRemainingTime = useCallback(() => {
+    if (!currentCycle.endTime) return 0;
+    return Math.max(0, Math.ceil((currentCycle.endTime - Date.now()) / 1000));
+  }, [currentCycle]);
+
+  const alignTimeToInterval = (interval) => {
+    const now = new Date();
+    const alignedDate = new Date(now);
 
     switch (interval) {
-      case 1 * 60:
-        date.setSeconds(0, 0);
-        return date.getTime();
+      case 60: // 1 minute
+        alignedDate.setSeconds(0, 0);
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
 
-      case 15 * 60:
-        const minutes = date.getMinutes();
+      case 15 * 60: // 15 minutes
+        const minutes = alignedDate.getMinutes();
         const alignedMinutes = Math.floor(minutes / 15) * 15;
-        date.setMinutes(alignedMinutes, 0, 0);
-        return date.getTime();
+        alignedDate.setMinutes(alignedMinutes, 0, 0);
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
 
-      case 60 * 60:
-        date.setMinutes(0, 0, 0);
-        return date.getTime();
+      case 60 * 60: // 1 hour
+        alignedDate.setMinutes(0, 0, 0);
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
 
-      case 8 * 60 * 60:
-        const hours = date.getHours();
+      case 8 * 60 * 60: // 8 hours
+        const hours = alignedDate.getHours();
         const alignedHours = Math.floor(hours / 8) * 8;
-        date.setHours(alignedHours, 0, 0, 0);
-        return date.getTime();
+        alignedDate.setHours(alignedHours, 0, 0, 0);
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
 
-      case 24 * 60 * 60:
-        date.setHours(0, 0, 30, 0);
-        return date.getTime();
+      case 24 * 60 * 60: // 24 hours
+        alignedDate.setHours(0, 0, 0, 0);
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
 
       default:
-        return currentTime;
+        return {
+          startTime: alignedDate.getTime(),
+          endTime: alignedDate.getTime() + interval * 1000,
+        };
     }
   };
 
@@ -283,9 +397,19 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
   };
 
   const handleTimerSlotSelect = (slot) => {
-    startTimer(slot);
-  };
+    if (slot === null) {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      setTimerSlot(null);
+      setCurrentCycle({ startTime: null, endTime: null });
+      setTimerAnchorEl(null);
+      return;
+    }
 
+    startContinuousTimer(slot);
+    setTimerAnchorEl(null);
+  };
   // --------------- Filter data by Config ----------------------
   const filterDataByConfig = useCallback(
     (data) => {
@@ -293,15 +417,13 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
 
       let filteredData = data;
 
-      if (timerState && timerState.selectedSlot) {
-        const timerStartTime = new Date(timerState.alignedStartTime);
-        const timerEndTime = new Date(
-          timerStartTime.getTime() + timerState.selectedSlot.value * 1000
-        );
+      if (timerSlot) {
+        const cycleStartTime = new Date(currentCycle.startTime);
+        const cycleEndTime = new Date(currentCycle.endTime);
 
         filteredData = data.filter((item) => {
           const itemTime = new Date(item.timestamp);
-          return itemTime >= timerStartTime && itemTime <= timerEndTime;
+          return itemTime >= cycleStartTime && itemTime <= cycleEndTime;
         });
       } else {
         if (isExpanded) {
@@ -326,7 +448,13 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
       const endIdx = Math.ceil(filteredData.length * (zoomRange.end / 100));
       return filteredData.slice(startIdx, endIdx);
     },
-    [widgetData.xAxisConfiguration, isExpanded, zoomRange, timerState]
+    [
+      currentCycle,
+      timerSlot,
+      zoomRange,
+      widgetData.xAxisConfiguration,
+      isExpanded,
+    ]
   );
 
   useEffect(() => {
@@ -716,6 +844,130 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     handleMenuClose();
   };
 
+  const renderTimerMenu = () => (
+    <Menu
+      anchorEl={timerAnchorEl}
+      open={Boolean(timerAnchorEl)}
+      onClose={() => setTimerAnchorEl(null)}
+      PaperProps={{
+        style: {
+          maxHeight: 300,
+          width: "200px",
+        },
+      }}
+    >
+      {timerSlots.map((slot) => (
+        <MenuItem
+          key={slot.value}
+          onClick={() => handleTimerSlotSelect(slot)}
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            backgroundColor:
+              timerSlot?.value === slot.value
+                ? "rgba(25, 118, 210, 0.08)"
+                : "transparent",
+            "&:hover": {
+              backgroundColor:
+                timerSlot?.value === slot.value
+                  ? "rgba(25, 118, 210, 0.12)"
+                  : "rgba(0, 0, 0, 0.04)",
+            },
+          }}
+        >
+          <Typography>{slot.label}</Typography>
+          {timerSlot?.value === slot.value && (
+            <Box
+              sx={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                backgroundColor: "#1976d2",
+                ml: 1,
+              }}
+            />
+          )}
+        </MenuItem>
+      ))}
+      {timerSlot && (
+        <MenuItem
+          onClick={() => handleTimerSlotSelect(null)}
+          sx={{
+            borderTop: "1px solid rgba(0, 0, 0, 0.12)",
+            color: "error.main",
+          }}
+        >
+          Clear Timer
+        </MenuItem>
+      )}
+    </Menu>
+  );
+
+  // Update timer button to show active state
+  const renderTimerButton = () => (
+    <MuiTooltip title="Timer Settings">
+      <IconButton onClick={handleTimerMenuOpen}>
+        <TimerIcon
+          sx={{
+            color: timerSlot ? "#1976d2" : "inherit",
+            mt: 2,
+            ml: 2,
+          }}
+        />
+        {timerSlot && (
+          <Typography
+            variant="caption"
+            sx={{
+              color: "#1976d2",
+              mt: 2,
+              ml: 2,
+            }}
+          >
+            {formatRemainingTime(getRemainingTime())}
+          </Typography>
+        )}
+      </IconButton>
+    </MuiTooltip>
+  );
+
+  // Update timer display in menu
+  const renderMenuTimerItem = () => (
+    <ListItem disablePadding>
+      <ListItemButton
+        onClick={openTimerMenu}
+        sx={{
+          bgcolor: timerSlot ? "rgba(25, 118, 210, 0.08)" : "transparent",
+        }}
+      >
+        <ListItemIcon>
+          <TimerIcon
+            fontSize="small"
+            sx={{
+              color: timerSlot ? "#1976d2" : "inherit",
+            }}
+          />
+        </ListItemIcon>
+        <ListItemText
+          primary="Timer Settings"
+          secondary={
+            timerSlot
+              ? `Active: ${timerSlot.label} (${formatRemainingTime(
+                  getRemainingTime()
+                )})`
+              : "Set Timer"
+          }
+          secondaryTypographyProps={{
+            sx: {
+              color: timerSlot ? "#1976d2" : "inherit",
+              fontWeight: timerSlot ? "medium" : "normal",
+            },
+          }}
+        />
+      </ListItemButton>
+    </ListItem>
+  );
+
   // Modify the existing renderNonExpandedIcons function
   const renderNonExpandedIcons = () => {
     if (isExpanded) return null;
@@ -734,7 +986,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
           p: 1,
         }}
       >
-        {" "}
         <MuiTooltip title="Save Preferences">
           <IconButton
             size="small"
@@ -743,7 +994,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
                 ? "#fff"
                 : "#000",
               mr: 1,
-
               position: "absolute",
               top: 4,
               right: 20,
@@ -788,6 +1038,25 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
             },
           }}
         >
+          {" "}
+          {renderMenuTimerItem()}
+          <ListItem disablePadding>
+            <ListItemButton onClick={handleThresholdDialogOpen}>
+              <ListItemIcon>
+                <ThresholdIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText
+                primary="Threshold Settings"
+                secondary={
+                  thresholds.min || thresholds.max
+                    ? `Min: ${thresholds.min || "none"}, Max: ${
+                        thresholds.max || "none"
+                      }`
+                    : "Not set"
+                }
+              />
+            </ListItemButton>
+          </ListItem>
           {/* Profile Settings */}
           <ListItem disablePadding>
             <ListItemButton onClick={openProfileDialog}>
@@ -803,24 +1072,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
               />
             </ListItemButton>
           </ListItem>
-
-          {/* Timer Settings */}
-          <ListItem disablePadding>
-            <ListItemButton onClick={openTimerMenu}>
-              <ListItemIcon>
-                <TimerIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText
-                primary="Timer Settings"
-                secondary={
-                  timerState && timerState.selectedSlot
-                    ? formatRemainingTime(timerState.remainingTime)
-                    : "Set Timer"
-                }
-              />
-            </ListItemButton>
-          </ListItem>
-
           {/* Graph Type */}
           <ListItem disablePadding>
             <ListItemButton onClick={openGraphTypeDialog}>
@@ -830,7 +1081,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
               <ListItemText primary="Change Graph Type" secondary={chartType} />
             </ListItemButton>
           </ListItem>
-
           {/* Compare Scripts */}
           <ListItem disablePadding>
             <ListItemButton onClick={openCompareScriptsDialog}>
@@ -843,24 +1093,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
               />
             </ListItemButton>
           </ListItem>
-        </Menu>
-        {/* Timer Menu for Non-Expanded View */}
-        <Menu
-          anchorEl={timerAnchorEl}
-          open={Boolean(timerAnchorEl)}
-          onClose={() => setTimerAnchorEl(null)}
-        >
-          {timerSlots.map((slot) => (
-            <MenuItem
-              key={slot.value}
-              onClick={() => {
-                handleTimerSlotSelect(slot);
-                setTimerAnchorEl(null);
-              }}
-            >
-              {slot.label}
-            </MenuItem>
-          ))}
         </Menu>
       </Box>
     );
@@ -1137,14 +1369,8 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
           selectedProfile,
           comparisonScripts: selectedScripts,
           scriptColors,
-          timerState: timerState
-            ? {
-                selectedSlot: timerState.selectedSlot,
-                startTime: new Date(timerState.startTime),
-                endTime: new Date(timerState.endTime),
-                alignedStartTime: new Date(timerState.alignedStartTime),
-              }
-            : null,
+          thresholds,
+          timerSlot,
           chartType,
         },
       };
@@ -1171,6 +1397,74 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     setSnackbarOpen(false);
   };
 
+  const renderThresholdDialog = () => (
+    <Dialog
+      open={isThresholdDialogOpen}
+      onClose={handleThresholdDialogClose}
+      PaperProps={{
+        sx: {
+          width: "400px",
+          padding: "20px",
+          borderRadius: "12px",
+        },
+      }}
+    >
+      <DialogTitle
+        sx={{
+          fontSize: "1.4rem",
+          textAlign: "center",
+          color: "#1a73e8",
+          borderBottom: "2px solid #d0e1f9",
+          paddingBottom: "12px",
+        }}
+      >
+        Set Bandwidth Thresholds
+      </DialogTitle>
+      <DialogContent sx={{ mt: 2 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
+          <TextField
+            label="Minimum Threshold"
+            type="number"
+            value={tempThresholds.min}
+            onChange={(e) =>
+              setTempThresholds({ ...tempThresholds, min: e.target.value })
+            }
+            fullWidth
+            variant="outlined"
+            helperText="Leave empty to remove minimum threshold"
+          />
+          <TextField
+            label="Maximum Threshold"
+            type="number"
+            value={tempThresholds.max}
+            onChange={(e) =>
+              setTempThresholds({ ...tempThresholds, max: e.target.value })
+            }
+            fullWidth
+            variant="outlined"
+            helperText="Leave empty to remove maximum threshold"
+          />
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ padding: "20px" }}>
+        <Button
+          onClick={handleThresholdDialogClose}
+          variant="outlined"
+          color="error"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleThresholdSave}
+          variant="contained"
+          color="primary"
+        >
+          Save Thresholds
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
   const renderSnackbar = () => (
     <Snackbar
       open={snackbarOpen}
@@ -1192,7 +1486,10 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
       {renderNonExpandedIcons()}
       {renderProfileDialog()}
       {renderGraphTypeDialog()}
-      {renderCompareScriptsDialog()} {renderSnackbar()}
+      {renderCompareScriptsDialog()}
+      {renderThresholdDialog()}
+      {renderTimerMenu()}
+      {renderSnackbar()}
       {isExpanded && (
         <Box
           sx={{
@@ -1203,9 +1500,9 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
             ml: 2,
           }}
         >
-          {" "}
+          {renderTimerButton()}
           <MuiTooltip title="Select Profile">
-            <IconButton onClick={handleProfileMenuOpen} sx={{ mt: 2, ml: 2 }}>
+            <IconButton onClick={handleProfileMenuOpen} sx={{ mt: 2 }}>
               <ProfileIcon />
               <Typography variant="caption" sx={{ ml: 1 }}>
                 {selectedProfile.charAt(0).toUpperCase() +
@@ -1229,35 +1526,6 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
               </MenuItem>
             ))}
           </Menu>
-          {/* Timer Selection Dropdown */}
-          <MuiTooltip title="Timer Settings">
-            <IconButton onClick={handleTimerMenuOpen} sx={{ mt: 2 }}>
-              <TimerIcon />
-              {timerState && timerState.selectedSlot && (
-                <Typography variant="caption" sx={{ ml: 1 }}>
-                  {formatRemainingTime(timerState.remainingTime)}
-                </Typography>
-              )}
-            </IconButton>
-          </MuiTooltip>
-          <Menu
-            anchorEl={timerAnchorEl}
-            open={Boolean(timerAnchorEl)}
-            onClose={handleTimerMenuClose}
-          >
-            {timerSlots.map((slot) => (
-              <MenuItem
-                key={slot.value}
-                onClick={() => {
-                  handleTimerSlotSelect(slot);
-                  handleTimerMenuClose();
-                }}
-              >
-                {slot.label}
-              </MenuItem>
-            ))}
-          </Menu>
-          {/* Graph Type Selection Dropdown */}
           <MuiTooltip title="Change Graph Type">
             <IconButton onClick={handleGraphTypeMenuOpen} sx={{ mt: 2 }}>
               <GraphTypeIcon />
@@ -1333,6 +1601,48 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
             <YAxis tick={{ fontSize: 12 }} domain={["auto", "auto"]} />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
+
+            {/* Add threshold reference lines */}
+            {thresholds.max !== null && (
+              <ReferenceLine
+                y={thresholds.max}
+                stroke="red"
+                strokeDasharray="3 3"
+                label={{
+                  value: `Max: ${thresholds.max}`,
+                  position: "insideTopLeft",
+                  style: {
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    color: "#ff0000",
+                    backgroundColor: "rgba(255, 255, 255, 0.8)",
+                    padding: "2px 4px",
+                    borderRadius: "4px",
+                    border: "1px solid #ff0000",
+                  },
+                }}
+              />
+            )}
+            {thresholds.min !== null && (
+              <ReferenceLine
+                y={thresholds.min}
+                stroke="orange"
+                strokeDasharray="3 3"
+                label={{
+                  value: `Min: ${thresholds.min}`,
+                  position: "insideTopLeft",
+                  style: {
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    color: "#ff9800",
+                    backgroundColor: "rgba(255, 255, 255, 0.8)",
+                    padding: "2px 4px",
+                    borderRadius: "4px",
+                    border: "1px solid #ff9800",
+                  },
+                }}
+              />
+            )}
 
             {renderChartType(widgetData.scriptName, scriptColors[0])}
             {selectedScripts.map((script, index) =>
