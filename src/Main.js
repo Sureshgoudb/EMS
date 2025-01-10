@@ -48,7 +48,7 @@ const Main = () => {
       <Provider store={appStore}>
         <div className="flex flex-col min-h-screen">
           <Header />
-          <div className="flex-grow my-7 mx-5">
+          <div className="flex-grow mx-5 my-7">
             <Outlet />
           </div>
           <Footer />
@@ -102,7 +102,7 @@ const Main = () => {
           element: <Dashboard />,
         },
         {
-          path: "SldcDashboard",
+          path: "/dashboard",
           element: <SldcDashboard />,
         },
         {

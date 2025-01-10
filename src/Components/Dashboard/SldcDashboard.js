@@ -39,6 +39,7 @@ import DataGridWidget from "./DataGridWidget";
 import GridLayout from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
+const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 const SldcDashboard = () => {
   const [open, setOpen] = useState(false);
@@ -398,10 +399,9 @@ const SldcDashboard = () => {
       };
 
       const response = await axios.post(
-        "http://localhost:4001/sldscreatewidget",
+        `${apiKey}sldscreatewidget`,
         dataToSubmit,
       );
-      
       // Update widgets state with the new widget
       setWidgets(prev => [...prev, response.data]);
       handleClose();

@@ -56,7 +56,7 @@ import {
   CompareArrows as CompareScriptsIcon,
 } from "@mui/icons-material";
 
-const apiUrl = process.env.REACT_APP_API_LOCAL_URL;
+const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "";
@@ -137,7 +137,7 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
   useEffect(() => {
     const fetchWidgetPreferences = async () => {
       try {
-        const response = await axios.get(apiUrl + "get-widget-preferences", {
+        const response = await axios.get(apiKey + "get-widget-preferences", {
           params: {
             widgetId: widgetData.id,
             customerID: widgetData.customerID,
@@ -259,7 +259,7 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
   useEffect(() => {
     const fetchTimerPreferences = async () => {
       try {
-        const response = await axios.get(apiUrl + "get-widget-preferences", {
+        const response = await axios.get(apiKey + "get-widget-preferences", {
           params: {
             widgetId: widgetData.id,
             customerID: widgetData.customerID,
@@ -476,7 +476,7 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     const fetchAvailableScripts = async () => {
       try {
         const response = await fetch(
-          `${apiUrl}terminal/${widgetData.terminalID}/scripts`
+          `${apiKey}terminal/${widgetData.terminalID}/scripts`
         );
         if (!response.ok) throw new Error("Failed to fetch scripts");
         const data = await response.json();
@@ -497,30 +497,41 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
     isExpanded,
     isCompareScriptsDialogOpen,
   ]);
+  const [historicalDataCache, setHistoricalDataCache] = useState({}); // Cache for historical data
 
   // ---------------- Fetch history data ----------------
-  const fetchScriptData = async (scriptName, profile = "trend") => {
+  const fetchScriptData = async (scriptName, profile) => {
+    const cacheKey = `${widgetData.terminalID}-${scriptName}-${profile}`;
+    if (historicalDataCache[cacheKey]) {
+      return historicalDataCache[cacheKey];
+    }
+
     try {
       const response = await fetch(
-        `${apiUrl}terminal/${widgetData.terminalID}/script/${encodeURIComponent(
+        `${apiKey}terminal/${widgetData.terminalID}/script/${encodeURIComponent(
           scriptName
         )}/cddhistory/${profile}`
       );
 
-      if (!response.ok)
-        throw new Error(`Failed to fetch data for ${scriptName}`);
+      if (!response.ok) throw new Error(`Failed to fetch data for ${scriptName}`);
 
       const data = await response.json();
-      return [...data].map((item) => ({
+      const formattedData = data.map((item) => ({
         timestamp: formatTimestamp(item.timestamp),
         [scriptName]: item[scriptName],
       }));
+
+      setHistoricalDataCache((prev) => ({
+        ...prev,
+        [cacheKey]: formattedData,
+      }));
+
+      return formattedData;
     } catch (err) {
       console.error(`Error fetching data for ${scriptName}:`, err);
       return [];
     }
   };
-
   // ------------Update useEffect to pass profile -----------
   useEffect(() => {
     let isMounted = true;
@@ -953,8 +964,8 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
           secondary={
             timerSlot
               ? `Active: ${timerSlot.label} (${formatRemainingTime(
-                  getRemainingTime()
-                )})`
+                getRemainingTime()
+              )})`
               : "Set Timer"
           }
           secondaryTypographyProps={{
@@ -1049,9 +1060,8 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
                 primary="Threshold Settings"
                 secondary={
                   thresholds.min || thresholds.max
-                    ? `Min: ${thresholds.min || "none"}, Max: ${
-                        thresholds.max || "none"
-                      }`
+                    ? `Min: ${thresholds.min || "none"}, Max: ${thresholds.max || "none"
+                    }`
                     : "Not set"
                 }
               />
@@ -1285,7 +1295,7 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
                         color:
                           scriptColors[script] ||
                           colors[
-                            selectedScripts.indexOf(script) % colors.length
+                          selectedScripts.indexOf(script) % colors.length
                           ],
                       }}
                     />
@@ -1314,8 +1324,8 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
               color={
                 scriptColors[currentColorPickerScript] ||
                 colors[
-                  selectedScripts.indexOf(currentColorPickerScript) %
-                    colors.length
+                selectedScripts.indexOf(currentColorPickerScript) %
+                colors.length
                 ]
               }
               onChange={handleScriptColorChange.bind(
@@ -1376,7 +1386,7 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
       };
 
       const response = await axios.post(
-        apiUrl + "widget-preferences",
+        apiKey + "widget-preferences",
         preferences
       );
       setSnackbarMessage("Preferences saved successfully!");
@@ -1481,6 +1491,7 @@ const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
       </Alert>
     </Snackbar>
   );
+
   return (
     <Box sx={{ width: "100%", height: "100%" }} ref={chartRef}>
       {renderNonExpandedIcons()}

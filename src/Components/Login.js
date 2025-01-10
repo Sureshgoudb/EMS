@@ -73,7 +73,7 @@ const Login = () => {
           dispatch(addUser(user));
 
           if (user.user_Type === "Admin") {
-            navigate("/sldcview");
+            navigate("/dashboard");
           } else {
             navigate("/view/terminal");
           }

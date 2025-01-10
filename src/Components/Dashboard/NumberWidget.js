@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Paper } from '@mui/material';
+const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 function NumberWidget({ widget }) {
   const [value, setValue] = useState(null);
@@ -26,7 +27,7 @@ function NumberWidget({ widget }) {
         const scriptName = script.scriptName;
 
         try {
-          const response = await fetch(`http://localhost:4001/terminal/${terminalID}/script/${scriptName}/currentValue`);
+          const response = await fetch(`${apiKey}terminal/${terminalID}/script/${scriptName}/currentValue`);
           if (!response.ok) {
             throw new Error('Network response was not ok');
           }
@@ -41,8 +42,8 @@ function NumberWidget({ widget }) {
     };
 
     fetchValue();
-    
-    const interval = setInterval(fetchValue, 10000); 
+
+    const interval = setInterval(fetchValue, 10000);
 
     // Cleanup interval on unmount
     return () => clearInterval(interval);
@@ -72,7 +73,7 @@ function NumberWidget({ widget }) {
       }}
     >
       {/* Display Name */}
-      <div style={{ 
+      <div style={{
         width: '100%',
         textAlign: 'center',
         marginBottom: '8px',

@@ -56,7 +56,7 @@ import {
   CompareArrows as CompareScriptsIcon,
 } from "@mui/icons-material";
 
-const apiUrl = process.env.REACT_APP_API_LOCAL_URL;
+const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "";
@@ -163,7 +163,7 @@ const MultiAxisGraph = ({
   useEffect(() => {
     const fetchWidgetPreferences = async () => {
       try {
-        const response = await axios.get(apiUrl + "get-widget-preferences", {
+        const response = await axios.get(apiKey + "get-widget-preferences", {
           params: {
             widgetId: widgetData.id,
             customerID: widgetData.customerID,
@@ -266,7 +266,7 @@ const MultiAxisGraph = ({
   useEffect(() => {
     const fetchTimerPreferences = async () => {
       try {
-        const response = await axios.get(apiUrl + "get-widget-preferences", {
+        const response = await axios.get(apiKey + "get-widget-preferences", {
           params: {
             widgetId: widgetData.id,
             customerID: widgetData.customerID,
@@ -483,7 +483,7 @@ const MultiAxisGraph = ({
     const fetchAvailableScripts = async () => {
       try {
         const response = await fetch(
-          `${apiUrl}terminal/${widgetData.terminalID}/scripts`
+          `${apiKey}terminal/${widgetData.terminalID}/scripts`
         );
         if (!response.ok) throw new Error("Failed to fetch scripts");
         const data = await response.json();
@@ -509,7 +509,7 @@ const MultiAxisGraph = ({
   const fetchScriptData = async (scriptName, profile = "trend") => {
     try {
       const response = await fetch(
-        `${apiUrl}terminal/${widgetData.terminalID}/script/${encodeURIComponent(
+        `${apiKey}terminal/${widgetData.terminalID}/script/${encodeURIComponent(
           scriptName
         )}/cddhistory/${profile}`
       );
@@ -820,8 +820,8 @@ const MultiAxisGraph = ({
           scriptName === widgetData.scriptName
             ? "left"
             : index % 2 === 0
-            ? "right"
-            : "left"
+              ? "right"
+              : "left"
         }
         stroke={scriptColor}
         tick={{ fontSize: 12, fill: scriptColor }}
@@ -831,8 +831,8 @@ const MultiAxisGraph = ({
             scriptName === widgetData.scriptName
               ? "insideLeft"
               : index % 2 === 0
-              ? "insideRight"
-              : "insideLeft",
+                ? "insideRight"
+                : "insideLeft",
           offset: -10,
           fill: scriptColor,
         }}
@@ -1005,8 +1005,8 @@ const MultiAxisGraph = ({
           secondary={
             timerSlot
               ? `Active: ${timerSlot.label} (${formatRemainingTime(
-                  getRemainingTime()
-                )})`
+                getRemainingTime()
+              )})`
               : "Set Timer"
           }
           secondaryTypographyProps={{
@@ -1102,9 +1102,8 @@ const MultiAxisGraph = ({
                 primary="Bandwidth Thresholds"
                 secondary={
                   thresholds.min !== null || thresholds.max !== null
-                    ? `Min: ${thresholds.min || "none"}, Max: ${
-                        thresholds.max || "none"
-                      }`
+                    ? `Min: ${thresholds.min || "none"}, Max: ${thresholds.max || "none"
+                    }`
                     : "Not set"
                 }
               />
@@ -1337,7 +1336,7 @@ const MultiAxisGraph = ({
                         color:
                           scriptColors[script] ||
                           colors[
-                            selectedScripts.indexOf(script) % colors.length
+                          selectedScripts.indexOf(script) % colors.length
                           ],
                       }}
                     />
@@ -1366,8 +1365,8 @@ const MultiAxisGraph = ({
               color={
                 scriptColors[currentColorPickerScript] ||
                 colors[
-                  selectedScripts.indexOf(currentColorPickerScript) %
-                    colors.length
+                selectedScripts.indexOf(currentColorPickerScript) %
+                colors.length
                 ]
               }
               onChange={handleScriptColorChange.bind(
@@ -1428,7 +1427,7 @@ const MultiAxisGraph = ({
       };
 
       const response = await axios.post(
-        apiUrl + "widget-preferences",
+        apiKey + "widget-preferences",
         preferences
       );
       setSnackbarMessage("Preferences saved successfully!");
