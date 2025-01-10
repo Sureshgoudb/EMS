@@ -25,6 +25,7 @@ import Reports from "./Components/Reports";
 import TerminalView from "./Components/View/TerminalView/TerminalView";
 import TerminalDetailPage from "./Components/View/TerminalView/TerminalDetailPage";
 import DataTable from "./Components/View/TerminalView/HistoricalData/DataTable";
+import SldcDashboard from "./Components/Dashboard/SldcDashboard";
 
 const Main = () => {
   const HeaderLayout = () => {
@@ -99,6 +100,10 @@ const Main = () => {
         {
           path: "/sldcview",
           element: <Dashboard />,
+        },
+        {
+          path: "SldcDashboard",
+          element: <SldcDashboard />,
         },
         {
           path: "/view/terminal",
