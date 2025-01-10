@@ -42,8 +42,7 @@ function NumberWidget({ widget }) {
 
     fetchValue();
     
-    // Add interval for periodic updates
-    const interval = setInterval(fetchValue, 5000); // Update every 5 seconds
+    const interval = setInterval(fetchValue, 10000); 
 
     // Cleanup interval on unmount
     return () => clearInterval(interval);

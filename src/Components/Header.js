@@ -54,7 +54,7 @@ function Header() {
         memoizedUser.user_Type === "Admin" ||
         memoizedUser.user_Type === "Super User"
       ) {
-      //links.push({ id: 0, name: "SldcDashboard", to: "/SldcDashboard" });
+        links.push({ id: 0, name: "Dashboard", to: "/SldcDashboard" });
         links.push({ id: 1, name: "SLDC View", to: "/sldcview" });
         links.push({
           id: 2,
