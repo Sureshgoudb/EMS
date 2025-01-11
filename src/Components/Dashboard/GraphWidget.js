@@ -24,7 +24,7 @@ function GraphWidget({ widget }) {
         if (widget?.terminal?.terminalId && widget?.script?.length > 0) {
           const promises = widget.script.map((script) =>
             axios.get(
-              `${process.env.REACT_APP_API_LOCAL_URL}/terminal/${widget.terminal.terminalId}/script/${script.scriptName}/currentValue`
+              `${process.env.REACT_APP_API_LOCAL_URL}terminal/${widget.terminal.terminalId}/script/${script.scriptName}/currentValue`
             )
           );
 
