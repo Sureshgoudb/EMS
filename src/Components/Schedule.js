@@ -7,6 +7,10 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
+import SettingsIcon from '@mui/icons-material/Settings';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import DeviceScheduleManager from "./DeviceScheduleManager";
 import Backdrop from '@mui/material/Backdrop';
 import axios from "axios";
 import {
@@ -33,42 +37,42 @@ import useDialogActions from "../common/useDialogActions";
 import CardTitleBar from "../common/CardTitleBar";
 
 const columns = [
-  { field: "id", headerName: "ID", width: 90, hide: true,flex:1 },
+  { field: "id", headerName: "ID", width: 90, hide: true, flex: 1 },
   {
     field: "revisionno",
     headerName: "Revision No",
     width: 150,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
   {
     field: "blockno",
     headerName: "Block",
     width: 150,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
   {
     field: "date",
     headerName: "Date",
     width: 250,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
   {
     field: "deviceid",
     headerName: "Device",
     width: 250,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
   {
     field: "avc",
     headerName: "AVC",
     width: 200,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
   {
     field: "sg",
     headerName: "SG",
     width: 200,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
 ];
 
@@ -82,36 +86,33 @@ function Schedule() {
   const [adddcsgs, setadddcsgs] = useState(false);
   const [selectedOption, setSelectedOption] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [openSettings, setOpenSettings] = useState(false);
+
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
   const user = useSelector((store) => store.user);
   const customerID =
-  user != null || user != undefined
-    ? user.customerID
-    : JSON.parse(localStorage.getItem("user")).customerID;
+    user != null || user != undefined
+      ? user.customerID
+      : JSON.parse(localStorage.getItem("user")).customerID;
 
   const getDeviceList = async (add) => {
     let url;
-    if(user !=null){
-      if(user.parentId != null || user.parentId  != undefined)
-      {
-          url = apiKey + "device/list/" + customerID
+    if (user != null) {
+      if (user.parentId != null || user.parentId != undefined) {
+        url = apiKey + "device/list/" + customerID
       }
-      else
-      {
+      else {
         url = apiKey + "device/list/"
       }
     }
-    else
-    {
+    else {
       let localData = JSON.parse(localStorage.getItem("user"));
-      if(localData.parentId != null || localData.parentId  != undefined)
-        {
-            url = apiKey + "device/list/" + localData.customerID
-        }
-        else
-        {
-          url = apiKey + "device/list/"
-        }
+      if (localData.parentId != null || localData.parentId != undefined) {
+        url = apiKey + "device/list/" + localData.customerID
+      }
+      else {
+        url = apiKey + "device/list/"
+      }
     }
     await axios
       .get(url)
@@ -134,57 +135,56 @@ function Schedule() {
   };
 
   const handleDCSGPull = async (e) => {
-    
-    await getDCSGData(e.target.form.device.value,e.target.form.date.value);
+
+    await getDCSGData(e.target.form.device.value, e.target.form.date.value);
   };
 
-  const getDCSGData = async(deviceid,date)=>{
-    let url = apiKey +"dcsg/" +deviceid +"/" +date
+  const getDCSGData = async (deviceid, date) => {
+    let url = apiKey + "dcsg/" + deviceid + "/" + date
     setLoading(true);
     await axios
-    .get(
-      url
-    )
-    .then(async (response) => {
-      setLoading(false);
-      let devicename = devices.filter(x=>x.deviceid === deviceid)[0].devicename;
-      let dcsgInfo = response.data.map((item) => {
-        return item.data.map((record, index) => {
-          let block = record.blockno;
-        let today = new Date(item.date);
-          today.setSeconds(record.blockno * 900);
-          if (today.getTimezoneOffset() == -330) {
-            today.setHours(today.getHours() - 5);
-            today.setMinutes(today.getMinutes() - 30);
-            console.log("After adding 5:30 hours today: " + JSON.stringify(today));
-           }
-          return {
-            id: index + 1,
-            deviceid: devicename,
-            date: today.toLocaleTimeString([], {year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'}),
-            revisionno: item.revisionno,
-            blockno: record.blockno,
-            avc: record.avc,
-            sg: record.sg,
-          };
+      .get(
+        url
+      )
+      .then(async (response) => {
+        setLoading(false);
+        let devicename = devices.filter(x => x.deviceid === deviceid)[0].devicename;
+        let dcsgInfo = response.data.map((item) => {
+          return item.data.map((record, index) => {
+            let block = record.blockno;
+            let today = new Date(item.date);
+            today.setSeconds(record.blockno * 900);
+            if (today.getTimezoneOffset() == -330) {
+              today.setHours(today.getHours() - 5);
+              today.setMinutes(today.getMinutes() - 30);
+              console.log("After adding 5:30 hours today: " + JSON.stringify(today));
+            }
+            return {
+              id: index + 1,
+              deviceid: devicename,
+              date: today.toLocaleTimeString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+              revisionno: item.revisionno,
+              blockno: record.blockno,
+              avc: record.avc,
+              sg: record.sg,
+            };
+          });
         });
-      });
-     if(dcsgInfo.length>0){
-      setdcsgData(dcsgInfo[0]);
-      setRevisionNo(dcsgInfo[0][0].revisionno + 1);
-     }
-     else
-     {
-      setdcsgData([]);
-      setRevisionNo(1);
-     }
-    })
-    .catch((error) => {});
+        if (dcsgInfo.length > 0) {
+          setdcsgData(dcsgInfo[0]);
+          setRevisionNo(dcsgInfo[0][0].revisionno + 1);
+        }
+        else {
+          setdcsgData([]);
+          setRevisionNo(1);
+        }
+      })
+      .catch((error) => { });
   }
 
   const handleOptionChange = (event) => {
     setSelectedOption(event.target.value);
-    
+
   };
 
   const handleDateChange = (event) => {
@@ -192,96 +192,95 @@ function Schedule() {
   };
 
   const handleUploadFile = async (file, deviceid, date) => {
-    let url =  apiKey +"dcsg/" +deviceid +"/" +date
+    let url = apiKey + "dcsg/" + deviceid + "/" + date
     await axios
-    .get(
-      url
-    )
-    .then(async (response) => {
-      let dcsgInfo = response.data.map((item) => {
-        return item.data.map((record, index) => {
-          return {
-            id: index + 1,
-            deviceid: item.deviceid,
-            date: item.date,
-            revisionno: item.revisionno,
-            blockno: record.blockno,
-            avc: record.avc,
-            sg: record.sg,
-          };
+      .get(
+        url
+      )
+      .then(async (response) => {
+        let dcsgInfo = response.data.map((item) => {
+          return item.data.map((record, index) => {
+            return {
+              id: index + 1,
+              deviceid: item.deviceid,
+              date: item.date,
+              revisionno: item.revisionno,
+              blockno: record.blockno,
+              avc: record.avc,
+              sg: record.sg,
+            };
+          });
         });
-      });
-      let revisionNumber = 1;
-     if(dcsgInfo.length>0){
-      revisionNumber = dcsgInfo[0][0].revisionno + 1;
-      setRevisionNo(revisionNumber);
-     }
-     else
-     {
-      revisionNumber = 1;
-      setRevisionNo(revisionNumber);
-     }
+        let revisionNumber = 1;
+        if (dcsgInfo.length > 0) {
+          revisionNumber = dcsgInfo[0][0].revisionno + 1;
+          setRevisionNo(revisionNumber);
+        }
+        else {
+          revisionNumber = 1;
+          setRevisionNo(revisionNumber);
+        }
 
-     const reader = new FileReader();
-     reader.onload = (evt) => {
-       const bstr = evt.target.result;
-       const wb = XLSX.read(bstr, { type: "binary" });
-       const wsname = wb.SheetNames[0];
-       const ws = wb.Sheets[wsname];
-       let dcsgDataValue = {
-         deviceid: deviceid,
-         date: date,
-         revisionno: revisionNumber,
-         data: [],
-       };
-       for (let rowNum = 1; rowNum < 97; rowNum++) {
-         const rowAddress = XLSX.utils.encode_row(rowNum);
-         dcsgDataValue.data.push({
-           blockno: ws[`A${rowAddress}`]?.w,
-           avc: ws[`D${rowAddress}`]?.w,
-           sg: ws[`C${rowAddress}`]?.w,
-         });
-         console.log({
-           blockno: ws[`A${rowAddress}`]?.w,
-           avc: ws[`D${rowAddress}`]?.w,
-           sg: ws[`E${rowAddress}`]?.w,
-         });
-       }
-       if (dcsgDataValue.data !== undefined && dcsgDataValue.data.length > 0) {
-         let dcsgList = [];
-         dcsgList.push(dcsgDataValue);
-         const uploadDCSG = async () => {
-           await axios
-             .post(apiKey + "dcsg/upload", dcsgList)
-             .then((response) => {
-               if (response.data.message === "Data inserted successfully") {
-                 setStatus(response.data.message);
-                 closeDialog();
-               }
-             })
-             .catch((error) => {
-               setStatus("Data insertion unsuccessfull:", error);
-             });
-         };
-         uploadDCSG();
-         setRevisionNo(1);
-       }
-     };
-     reader.readAsBinaryString(file);
-     setLoader(false);
-    })
-    .catch((error) => {
-      setLoader(false);
-    });
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const bstr = evt.target.result;
+          const wb = XLSX.read(bstr, { type: "binary" });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          let dcsgDataValue = {
+            deviceid: deviceid,
+            date: date,
+            revisionno: revisionNumber,
+            data: [],
+          };
+          for (let rowNum = 1; rowNum < 97; rowNum++) {
+            const rowAddress = XLSX.utils.encode_row(rowNum);
+            dcsgDataValue.data.push({
+              blockno: ws[`A${rowAddress}`]?.w,
+              avc: ws[`D${rowAddress}`]?.w,
+              sg: ws[`C${rowAddress}`]?.w,
+            });
+            console.log({
+              blockno: ws[`A${rowAddress}`]?.w,
+              avc: ws[`D${rowAddress}`]?.w,
+              sg: ws[`E${rowAddress}`]?.w,
+            });
+          }
+          if (dcsgDataValue.data !== undefined && dcsgDataValue.data.length > 0) {
+            let dcsgList = [];
+            dcsgList.push(dcsgDataValue);
+            const uploadDCSG = async () => {
+              await axios
+                .post(apiKey + "dcsg/upload", dcsgList)
+                .then((response) => {
+                  if (response.data.message === "Data inserted successfully") {
+                    setStatus(response.data.message);
+                    closeDialog();
+                  }
+                })
+                .catch((error) => {
+                  setStatus("Data insertion unsuccessfull:", error);
+                });
+            };
+            uploadDCSG();
+            setRevisionNo(1);
+          }
+        };
+        reader.readAsBinaryString(file);
+        setLoader(false);
+      })
+      .catch((error) => {
+        setLoader(false);
+      });
   };
 
   const handleUpload = async (e) => {
     setLoader(true);
-    setStatus("");  
+    setStatus("");
     const [file] = e.target.form.dcsgfile.files;
     let date = e.target.form.date.value;
-    await getDCSGData(e.target.form.device.value,date);
-    handleUploadFile(file, e.target.form.device.value,date);
+    await getDCSGData(e.target.form.device.value, date);
+    handleUploadFile(file, e.target.form.device.value, date);
   };
 
   const initState = {
@@ -301,22 +300,55 @@ function Schedule() {
     Object.values(errors).filter((error) => typeof error !== "undefined")
       .length === 0;
   const { open, openDialog, closeDialog } = useDialogActions();
+
+  const handleSettingsOpen = () => {
+    setOpenSettings(true);
+  };
+
+  const handleSettingsClose = () => {
+    setOpenSettings(false);
+  };
+
   return (
     <div>
       <CardTitleBar title={"Schedule"} />
       <CardLayout
         title="AVC-SG"
         action={
-          <Fab
-            onClick={openDialog}
-            aria-label="add"
-            className="add_from_section"
-            size="medium"
-          >
-            <AddIcon className="add_from_Icon" />
-          </Fab>
+          <div >
+            <Tooltip title="Schedule Settings">
+              <IconButton
+                onClick={handleSettingsOpen}
+                size="small"
+                sx={{
+                  color: 'rgba(0, 0, 0, 0.54)',
+                  mr: 1,
+                  '&:hover': {
+                    backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                  }
+                }}
+              >
+                <SettingsIcon />
+              </IconButton>
+            </Tooltip>
+            <Fab
+              onClick={openDialog}
+              aria-label="add"
+              className="add_from_section"
+              size="medium"
+            >
+              <AddIcon className="add_from_Icon" />
+            </Fab>
+          </div>
         }
+      >    <CenterDialog
+        open={openSettings}
+        onClose={handleSettingsClose}
+        title="Schedule Settings"
       >
+          <DeviceScheduleManager onClose={handleSettingsClose} />
+        </CenterDialog>
+
         <form>
           <Grid container spacing={2} mb={1}>
             <Grid item xs={2}>
@@ -328,7 +360,7 @@ function Schedule() {
                   autoFocus
                   labelId="demo-simple-select-label"
                   id="device"
-                  name = "device"
+                  name="device"
                   value={selectedOption}
                   label="Select Device"
                   onChange={handleOptionChange}
@@ -346,10 +378,10 @@ function Schedule() {
               </FormControl>
             </Grid>
             <Grid item xs={2}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DatePicker fullWidth id="date" label="Select Date"    format="YYYY-MM-DD"
-                            name="date" slotProps={{ textField: { size: 'small' } }} />
-                        </LocalizationProvider>
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker fullWidth id="date" label="Select Date" format="YYYY-MM-DD"
+                  name="date" slotProps={{ textField: { size: 'small' } }} />
+              </LocalizationProvider>
 
             </Grid>
             <Grid item xs={2}>
@@ -364,52 +396,52 @@ function Schedule() {
           </Grid>
         </form>
         {loading ? <LinearProgress /> :
-        <DataGrid
-          slots={{ toolbar: GridToolbar }}
-          rows={dcsgData}
-          columns={columns}
-          initialState={{
-            pagination: {
-              paginationModel: {
-                pageSize: 16,
+          <DataGrid
+            slots={{ toolbar: GridToolbar }}
+            rows={dcsgData}
+            columns={columns}
+            initialState={{
+              pagination: {
+                paginationModel: {
+                  pageSize: 16,
+                },
               },
-            },
-            columns: {
-              columnVisibilityModel: {
-                // Hide the 'id' column
-                id: false,
+              columns: {
+                columnVisibilityModel: {
+                  // Hide the 'id' column
+                  id: false,
+                },
               },
-            },
-          }}
-          pageSizeOptions={[16, 32, 48, 64, 80, 96]}
-          disableRowSelectionOnClick
-          slotProps={{ toolbar: { showQuickFilter: true } }}
-          sx={{ "&, [class^=MuiDataGrid-root ]": { border: "none" } }}
-        />
-}
+            }}
+            pageSizeOptions={[16, 32, 48, 64, 80, 96]}
+            disableRowSelectionOnClick
+            slotProps={{ toolbar: { showQuickFilter: true } }}
+            sx={{ "&, [class^=MuiDataGrid-root ]": { border: "none" } }}
+          />
+        }
       </CardLayout>
       {/*** add Schedule */}
       <CenterDialog open={open} onClose={closeDialog} title=" Upload DCSG">
         <form autoComplete="off" onSubmit={(e) => e.preventDefault()}>
-          <Grid container spacing={3} alignItems="center" my={1}> 
-          <Grid item xs={6} md={6}>
-          <Typography>Download DCSGs Template</Typography>
-          <Link
-            href={process.env.PUBLIC_URL + "/dcsg_template_file.xlsx"}
-            download="dcsg_template_file.xlsx"
-          >
-            Download File
-          </Link>
-          </Grid>
-          <Grid item xs={6} md={6}>
-
-                       <LocalizationProvider dateAdapter={AdapterDayjs}> 
-            <DatePicker fullWidth id="date" label="Select Date"    format="YYYY-MM-DD" disablePast
-                            name="date" slotProps={{ textField: { size: 'small' } }} />
-                        </LocalizationProvider>
-          </Grid>
+          <Grid container spacing={3} alignItems="center" my={1}>
             <Grid item xs={6} md={6}>
-            <Grid item xs={12} sx={{m: 1}}>
+              <Typography>Download DCSGs Template</Typography>
+              <Link
+                href={process.env.PUBLIC_URL + "/dcsg_template_file.xlsx"}
+                download="dcsg_template_file.xlsx"
+              >
+                Download File
+              </Link>
+            </Grid>
+            <Grid item xs={6} md={6}>
+
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker fullWidth id="date" label="Select Date" format="YYYY-MM-DD" disablePast
+                  name="date" slotProps={{ textField: { size: 'small' } }} />
+              </LocalizationProvider>
+            </Grid>
+            <Grid item xs={6} md={6}>
+              <Grid item xs={12} sx={{ m: 1 }}>
                 <Typography>Select Device</Typography>
               </Grid>
               <FormControl fullWidth>
@@ -417,7 +449,7 @@ function Schedule() {
                 <Select
                   labelId="device"
                   id="device"
-                  name = "device"
+                  name="device"
                   label="device"
                   value={selectedDate}
                   onChange={handleDateChange}
@@ -435,7 +467,7 @@ function Schedule() {
               </FormControl>
             </Grid>
             <Grid item xs={6} md={6}>
-              <Grid item xs={12} sx={{m: 1}}>
+              <Grid item xs={12} sx={{ m: 1 }}>
                 <Typography>Upload DCSG File</Typography>
               </Grid>
               <TextField
@@ -467,13 +499,13 @@ function Schedule() {
               Upload
             </Button>
           </DialogActions>
-        </form>   
+        </form>
         <Backdrop
-        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
-        open={loader}
-      >
-        <CircularProgress color="inherit" />
-      </Backdrop>
+          sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
+          open={loader}
+        >
+          <CircularProgress color="inherit" />
+        </Backdrop>
       </CenterDialog>
 
     </div>
