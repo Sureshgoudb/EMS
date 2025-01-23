@@ -24,32 +24,21 @@ const ToastNotification = () => {
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [snoozedNotifications, setSnoozedNotifications] = useState(new Map());
   const [blocksModalOpen, setBlocksModalOpen] = useState(false);
-  
-  const apiKey = process.env.REACT_APP_API_LOCAL_URL;
-  const STORAGE_KEY = 'snoozed_notifications';
 
+  const apiKey = process.env.REACT_APP_API_LOCAL_URL;
+  const STORAGE_KEY = "snoozed_notifications";
+
+  // --------------- ( Snooze Options for Notifications ) -------------
   const snoozeOptions = [
-    { label: '10 seconds', value: 10 / 60 },
-    { label: '5 minutes', value: 5 },
-    { label: '10 minutes', value: 10 },
-    { label: '30 minutes', value: 30 },
-    { label: '1 hour', value: 60 },
-    { label: '4 hours', value: 240 }
+    { label: "10 seconds", value: 10 / 60 },
+    { label: "5 minutes", value: 5 },
+    { label: "10 minutes", value: 10 },
+    { label: "30 minutes", value: 30 },
+    { label: "1 hour", value: 60 },
+    { label: "4 hours", value: 240 },
   ];
 
-  const getUserInfo = () => {
-    const userInfo = localStorage.getItem("user");
-    return userInfo ? JSON.stringify(JSON.parse(userInfo)) : null;
-  };
-
-  const api = axios.create({
-    baseURL: apiKey,
-    headers: {
-      "Content-Type": "application/json",
-      user: getUserInfo(),
-    },
-  });
-
+  // --------------- ( Function to Load Snoozed Notifications from Local Storage ) -------------
   const loadSnoozedNotifications = () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -62,6 +51,7 @@ const ToastNotification = () => {
     }
   };
 
+  // --------------- ( Function to Save Snoozed Notifications to Local Storage ) -------------
   const saveSnoozedNotifications = (notificationsMap) => {
     try {
       const notificationsObj = Object.fromEntries(notificationsMap);
@@ -71,6 +61,7 @@ const ToastNotification = () => {
     }
   };
 
+  // --------------- ( Function to Remove Notification from Local Storage ) -------------
   const removeFromLocalStorage = (notificationId) => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -78,7 +69,7 @@ const ToastNotification = () => {
         const parsed = JSON.parse(stored);
         delete parsed[notificationId];
         localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-        
+
         setSnoozedNotifications(new Map(Object.entries(parsed)));
       }
     } catch (error) {
@@ -86,28 +77,34 @@ const ToastNotification = () => {
     }
   };
 
+  // --------------- ( useEffect to Load Snoozed Notifications on Component Mount ) -------------
   useEffect(() => {
     loadSnoozedNotifications();
   }, []);
 
+  // --------------- ( Function to Handle Notification Close ) -------------
   const handleClose = async (notification) => {
     try {
       removeFromLocalStorage(notification._id);
 
       // Only update status if the notification is not approved and was snoozed
-      if (!notification.status === "approved" && snoozedNotifications.has(notification._id)) {
-        await api.patch(`notification/${notification._id}/status`, {
-          status: 'new',
-          snoozeUntil: null
+      if (
+        notification.status !== "approved" &&
+        snoozedNotifications.has(notification._id)
+      ) {
+        await axios.patch(`${apiKey}notification/${notification._id}/status`, {
+          status: "new",
+          snoozeUntil: null,
         });
       }
-      await api.patch(`notification/${notification._id}/mark-shown`);
-      
+      await axios.patch(`${apiKey}notification/${notification._id}/mark-shown`);
+
       handleNotificationRemoval(notification._id);
-      
     } catch (error) {
       console.error("Error handling notification close:", error);
-      setError(error.response?.data?.message || "Failed to handle notification close");
+      setError(
+        error.response?.data?.message || "Failed to handle notification close"
+      );
     }
   };
 
@@ -115,11 +112,11 @@ const ToastNotification = () => {
     const interval = setInterval(() => {
       const currentTime = new Date().getTime();
       let hasChanges = false;
-      
+
       snoozedNotifications.forEach((snoozeData, notificationId) => {
         if (currentTime >= snoozeData.showAt) {
           resetNotificationStatus(notificationId);
-          setSnoozedNotifications(prev => {
+          setSnoozedNotifications((prev) => {
             const newMap = new Map(prev);
             newMap.delete(notificationId);
             hasChanges = true;
@@ -136,85 +133,92 @@ const ToastNotification = () => {
     return () => clearInterval(interval);
   }, [snoozedNotifications]);
 
+  // --------------- ( Function to Reset Notification Status ) -------------
   const resetNotificationStatus = async (notificationId) => {
     try {
-      await api.patch(`notification/${notificationId}/status`, {
-        status: 'new',
-        snoozeUntil: null
+      await axios.patch(`${apiKey}notification/${notificationId}/status`, {
+        status: "new",
+        snoozeUntil: null,
       });
-      fetchNotifications(); 
+      fetchNotifications();
     } catch (error) {
       console.error("Error resetting notification status:", error);
-      setError("Failed to reset notification status");
     }
   };
 
-
-
+  // --------------- ( Function to Handle Snooze Selection ) -------------
   const handleSnoozeSelect = async (minutes) => {
     if (!selectedNotification) return;
-    
+
     try {
-      const showAt = new Date().getTime() + (minutes * 60 * 1000);
-      
-      await api.patch(`notification/${selectedNotification._id}/status`, {
-        status: 'snoozed',
-        snoozeUntil: new Date(showAt)
-      });
+      const showAt = new Date().getTime() + minutes * 60 * 1000;
+
+      await axios.patch(
+        `${apiKey}notification/${selectedNotification._id}/status`,
+        {
+          status: "snoozed",
+          snoozeUntil: new Date(showAt),
+        }
+      );
 
       const newMap = new Map(snoozedNotifications);
       newMap.set(selectedNotification._id, {
         notification: selectedNotification,
-        showAt: showAt
+        showAt: showAt,
       });
       saveSnoozedNotifications(newMap);
       setSnoozedNotifications(newMap);
 
       handleNotificationRemoval(selectedNotification._id);
-
     } catch (error) {
       console.error("Error snoozing notification:", error);
-      setError(error.response?.data?.message || "Failed to snooze notification");
+      setError(
+        error.response?.data?.message || "Failed to snooze notification"
+      );
     }
-    
+
     handleSnoozeClose();
   };
 
+  // --------------- ( Function to Fetch Notifications from API ) -------------
   const fetchNotifications = async () => {
     try {
-      const userInfo = getUserInfo();
-      if (!userInfo) return;
+      const userInfo = JSON.parse(localStorage.getItem("user"));
+      if (!userInfo || userInfo.user_Type !== "Admin") return;
 
-      const response = await api.get("notifications/unshown");
+      const response = await axios.get(`${apiKey}notifications/unshown`);
       if (response.data.success) {
-        const newNotifs = response.data.data.filter(notif => 
-          notif.status === 'new' || 
-          (notif.status === 'snoozed' && new Date(notif.snoozeUntil) <= new Date())
+        const newNotifs = response.data.data.filter(
+          (notif) =>
+            notif.status === "new" ||
+            (notif.status === "snoozed" &&
+              new Date(notif.snoozeUntil) <= new Date())
         );
-        
-        setNotifications(prev => {
+
+        setNotifications((prev) => {
           const filteredNew = newNotifs.filter(
-            newNotif => !prev.some(existingNotif => existingNotif._id === newNotif._id)
+            (newNotif) =>
+              !prev.some((existingNotif) => existingNotif._id === newNotif._id)
           );
           return [...prev, ...filteredNew];
         });
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);
-      setError(error.response?.data?.message || "Failed to fetch notifications");
+      setError(
+        error.response?.data?.message || "Failed to fetch notifications"
+      );
     }
   };
 
   useEffect(() => {
-    if (getUserInfo()) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 30000);
-      return () => clearInterval(interval);
-    }
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleNotificationRemoval = (id) => {
-    setNotifications(prev => prev.filter(n => n._id !== id));
+    setNotifications((prev) => prev.filter((n) => n._id !== id));
   };
 
   const handleViewBlocks = (notification) => {
@@ -285,33 +289,34 @@ const ToastNotification = () => {
               <Alert
                 severity={notification.severity || "info"}
                 action={
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    {notification.blocks?.length > 0 && notification.status !== "approved" && (
-                      <Button
-                        size="small"
-                        onClick={() => handleViewBlocks(notification)}
-                        sx={{
-                          minWidth: 'auto',
-                          mr: 1,
-                          color: 'inherit',
-                          '&:hover': {
-                            backgroundColor: theme.palette.grey[800],
-                          },
-                        }}
-                        startIcon={<VisibilityIcon />}
-                      >
-                        View
-                      </Button>
-                    )}
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    {notification.blocks?.length > 0 &&
+                      notification.status !== "approved" && (
+                        <Button
+                          size="small"
+                          onClick={() => handleViewBlocks(notification)}
+                          sx={{
+                            minWidth: "auto",
+                            mr: 1,
+                            color: "inherit",
+                            "&:hover": {
+                              backgroundColor: theme.palette.grey[800],
+                            },
+                          }}
+                          startIcon={<VisibilityIcon />}
+                        >
+                          View
+                        </Button>
+                      )}
                     {notification.status !== "approved" && (
                       <Button
                         size="small"
                         onClick={(e) => handleSnoozeClick(e, notification)}
                         sx={{
-                          minWidth: 'auto',
+                          minWidth: "auto",
                           mr: 1,
-                          color: 'inherit',
-                          '&:hover': {
+                          color: "inherit",
+                          "&:hover": {
                             backgroundColor: theme.palette.grey[800],
                           },
                         }}
@@ -331,12 +336,12 @@ const ToastNotification = () => {
                   </Box>
                 }
                 sx={{
-                  width: '100%',
+                  width: "100%",
                   backgroundColor: theme.palette.grey[900],
                   color: theme.palette.getContrastText(theme.palette.grey[900]),
-                  '.MuiAlert-message': {
-                    width: '100%',
-                    color: 'inherit',
+                  ".MuiAlert-message": {
+                    width: "100%",
+                    color: "inherit",
                   },
                 }}
               >
@@ -345,7 +350,7 @@ const ToastNotification = () => {
                     sx={{
                       fontSize: "0.95rem",
                       fontWeight: 500,
-                      color: 'inherit',
+                      color: "inherit",
                     }}
                   >
                     {notification.title}
@@ -353,7 +358,7 @@ const ToastNotification = () => {
                   <Typography
                     sx={{
                       fontSize: "0.8rem",
-                      color: 'inherit',
+                      color: "inherit",
                     }}
                   >
                     {notification.message}
@@ -369,7 +374,10 @@ const ToastNotification = () => {
           onClose={handleSnoozeClose}
         >
           {snoozeOptions.map((option) => (
-            <MenuItem key={option.value} onClick={() => handleSnoozeSelect(option.value)}>
+            <MenuItem
+              key={option.value}
+              onClick={() => handleSnoozeSelect(option.value)}
+            >
               {option.label}
             </MenuItem>
           ))}
@@ -392,9 +400,11 @@ const ToastNotification = () => {
         onClose={handleBlocksModalClose}
         notification={selectedNotification}
         onStatusChange={(updatedNotification) => {
-          setNotifications(prev =>
-            prev.map(notif =>
-              notif._id === updatedNotification._id ? updatedNotification : notif
+          setNotifications((prev) =>
+            prev.map((notif) =>
+              notif._id === updatedNotification._id
+                ? updatedNotification
+                : notif
             )
           );
         }}

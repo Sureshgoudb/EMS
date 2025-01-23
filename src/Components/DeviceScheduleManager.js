@@ -26,6 +26,7 @@ import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import CircularProgress from "@mui/material/CircularProgress";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
@@ -39,6 +40,30 @@ const theme = createTheme({
   },
 });
 
+// ---------- Funtion to get time from block number ----------
+const getTimeFromBlock = (blockNo) => {
+  const minutes = (blockNo - 1) * 15;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  let period = "AM";
+  let displayHours = hours;
+
+  if (hours >= 12) {
+    period = "PM";
+    if (hours > 12) {
+      displayHours = hours - 12;
+    }
+  }
+  if (hours === 0) {
+    displayHours = 12;
+  }
+
+  return `${displayHours}:${remainingMinutes
+    .toString()
+    .padStart(2, "0")} ${period}`;
+};
+
 const columns = [
   {
     field: "blockno",
@@ -46,6 +71,20 @@ const columns = [
     width: 120,
     headerAlign: "center",
     align: "center",
+  },
+  {
+    field: "time",
+    headerName: "Time",
+    width: 120,
+    headerAlign: "center",
+    align: "center",
+    renderHeader: () => (
+      <Stack direction="row" spacing={1} alignItems="center">
+        <AccessTimeIcon sx={{ fontSize: 20 }} />
+        <Typography>Time</Typography>
+      </Stack>
+    ),
+    valueGetter: (params) => getTimeFromBlock(params.row.blockno),
   },
   {
     field: "avc",
@@ -64,20 +103,21 @@ const columns = [
 
 function DeviceScheduleManager() {
   const [selectedDevice, setSelectedDevice] = useState("");
-  const [selectedDate, setSelectedDate] = useState(null);
   const [startTime, setStartTime] = useState(null);
   const [numBlocks, setNumBlocks] = useState(95);
   const [defaultAvcValue, setDefaultAvcValue] = useState(0);
   const [devices, setDevices] = useState([]);
   const [rows, setRows] = useState([]);
-  const [openDialog, setOpenDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [alert, setAlert] = useState({
     open: false,
     message: "",
     severity: "error",
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ---------- Function to calculate starting block ----------
   const calculateStartingBlock = (time) => {
     if (!time) return 1;
     const hours = time.hour();
@@ -85,6 +125,7 @@ function DeviceScheduleManager() {
     return hours * 4 + Math.floor(minutes / 15) + 1;
   };
 
+  // ---------- Function to validate blocks for time ----------
   const validateBlocksForTime = (startBlock, numOfBlocks) => {
     const totalBlocks = startBlock + numOfBlocks - 1;
     if (totalBlocks > 96) {
@@ -125,13 +166,46 @@ function DeviceScheduleManager() {
     }
   }, [numBlocks, startTime, defaultAvcValue]);
 
+  // ---------- Function to fetch devices ----------
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await axios.get(`${apiKey}device/list/`);
-        setDevices(response.data);
+        setIsLoading(true);
+        const userData = JSON.parse(localStorage.getItem("user"));
+
+        if (!userData) {
+          throw new Error("User data not found. Please login again.");
+        }
+
+        let response;
+        if (userData.user_Type === "Admin") {
+          response = await axios.get(`${apiKey}terminal/list`);
+          setDevices(
+            response.data.map((device) => ({
+              deviceid: device.terminalId,
+              devicename: device.terminalName,
+            }))
+          );
+        } else {
+          response = await axios.get(
+            `${apiKey}terminal/list/${userData.customerID}`
+          );
+          setDevices(
+            response.data.terminals.map((device) => ({
+              deviceid: device.terminalId,
+              devicename: device.terminalName,
+            }))
+          );
+        }
       } catch (error) {
         console.error("Error fetching devices:", error);
+        setAlert({
+          open: true,
+          message: error.message || "Error fetching devices",
+          severity: "error",
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchDevices();
@@ -187,6 +261,7 @@ function DeviceScheduleManager() {
     setNumBlocks(value);
   };
 
+  // ---------- Function to handle default AVC value change ----------
   const handleDefaultAvcChange = (event) => {
     const value = parseInt(event.target.value);
     if (value < 0) {
@@ -206,6 +281,7 @@ function DeviceScheduleManager() {
     });
   };
 
+  // ---------- Function to save request ----------
   const handleSave = async () => {
     if (!selectedDevice || !startTime) {
       setAlert({
@@ -224,12 +300,21 @@ function DeviceScheduleManager() {
 
       const userData = JSON.parse(localStorage.getItem("user"));
 
-      if (!userData || !userData.customerID || !userData.email) {
+      if (!userData || !userData.email) {
         throw new Error("User data not found. Please login again.");
       }
 
+      const notificationCustomerId =
+        userData.user_Type === "Admin"
+          ? userData.customerID
+          : userData.parentId;
+
+      if (!notificationCustomerId) {
+        throw new Error("Customer ID not found");
+      }
+
       const notificationData = {
-        message: `Schedule updated for device: ${deviceName}`,
+        message: `AVC Revision Requested for Device: ${deviceName}`,
         severity: "success",
         deviceId: selectedDevice,
         deviceName: deviceName,
@@ -239,41 +324,25 @@ function DeviceScheduleManager() {
           blockno: row.blockno,
           avc: row.avc,
         })),
-        customerID: userData.customerID,
-        email: userData.email,
+        userName: userData.name,
+        userId: userData.userId,
       };
 
       const notificationResponse = await axios.post(
-        `${apiKey}notification`,
+        `${apiKey}createnotification`,
         notificationData
       );
-
+      updateGridData(0, null);
+      setSelectedDevice("");
+      setNumBlocks(0);
+      setDefaultAvcValue(0);
       if (!notificationResponse.data.success) {
         throw new Error("Failed to save schedule");
       }
 
-      /* Commented out email notification logic
-                  const emailText = `
-                        Device: ${deviceName}
-                        Start Time: ${startTime.format('HH:mm')}
-                        Number of Blocks: ${numBlocks}
-                        Block Details:
-                        ${rows.map(row => `Block ${row.blockno}: AVC = ${row.avc}`).join('\n')}
-                  `;
-      
-                  const emailResponse = await axios.post(`${apiKey}avcnotification`, {
-                        subject: `AVC Schedule Update - ${deviceName}`,
-                        text: emailText
-                  });
-      
-                  if (emailResponse.status !== 200) {
-                        throw new Error('Failed to send email notification');
-                  }
-                  */
-
       setAlert({
         open: true,
-        message: "Schedule saved successfully",
+        message: `Schedule saved successfully for ${deviceName}`,
         severity: "success",
       });
     } catch (error) {
@@ -299,11 +368,47 @@ function DeviceScheduleManager() {
   const handleCancel = () => {
     updateGridData(0, null);
     setSelectedDevice("");
-    setSelectedDate(null);
-    setStartTime(null);
     setNumBlocks(0);
     setDefaultAvcValue(0);
   };
+
+  const renderDeviceSelect = () => (
+    <FormControl sx={{ width: 200 }}>
+      <InputLabel sx={{ color: theme.palette.primary.main }}>
+        Select Device
+      </InputLabel>
+      <Select
+        value={selectedDevice}
+        label="Select Device"
+        onChange={(e) => setSelectedDevice(e.target.value)}
+        size="small"
+        disabled={isLoading}
+        sx={{
+          "& .MuiOutlinedInput-notchedOutline": {
+            borderColor: alpha(theme.palette.primary.main, 0.2),
+          },
+          "&:hover .MuiOutlinedInput-notchedOutline": {
+            borderColor: theme.palette.primary.main,
+          },
+        }}
+      >
+        {isLoading ? (
+          <MenuItem disabled>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <CircularProgress size={20} />
+              <Typography>Loading devices...</Typography>
+            </Stack>
+          </MenuItem>
+        ) : (
+          devices.map((device) => (
+            <MenuItem key={device.deviceid} value={device.deviceid}>
+              {device.devicename}
+            </MenuItem>
+          ))
+        )}
+      </Select>
+    </FormControl>
+  );
 
   return (
     <ThemeProvider theme={theme}>
@@ -379,32 +484,7 @@ function DeviceScheduleManager() {
                 borderRadius: 1,
               }}
             >
-              <FormControl sx={{ width: 200 }}>
-                <InputLabel sx={{ color: theme.palette.primary.main }}>
-                  Select Device
-                </InputLabel>
-                <Select
-                  value={selectedDevice}
-                  label="Select Device"
-                  onChange={(e) => setSelectedDevice(e.target.value)}
-                  size="small"
-                  sx={{
-                    "& .MuiOutlinedInput-notchedOutline": {
-                      borderColor: alpha(theme.palette.primary.main, 0.2),
-                    },
-                    "&:hover .MuiOutlinedInput-notchedOutline": {
-                      borderColor: theme.palette.primary.main,
-                    },
-                  }}
-                >
-                  {devices.map((device) => (
-                    <MenuItem key={device.deviceid} value={device.deviceid}>
-                      {device.devicename}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
+              {renderDeviceSelect()}
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <TimePicker
                   label="Start Time"
@@ -425,7 +505,6 @@ function DeviceScheduleManager() {
                   }}
                 />
               </LocalizationProvider>
-
               <TextField
                 label="Number of Blocks"
                 type="number"
@@ -437,7 +516,6 @@ function DeviceScheduleManager() {
                 }}
                 sx={{ width: 150 }}
               />
-
               <TextField
                 label="Default AVC Value"
                 type="number"
@@ -551,9 +629,9 @@ function DeviceScheduleManager() {
 
         <Snackbar
           open={alert.open}
-          autoHideDuration={6000}
+          autoHideDuration={2000}
           onClose={() => setAlert({ ...alert, open: false })}
-          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >
           <Alert
             onClose={() => setAlert({ ...alert, open: false })}

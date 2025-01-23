@@ -27,6 +27,8 @@ import TerminalDetailPage from "./Components/View/TerminalView/TerminalDetailPag
 import DataTable from "./Components/View/TerminalView/HistoricalData/DataTable";
 import SldcDashboard from "./Components/Dashboard/SldcDashboard";
 import NotificationDashboard from "./Components/Notifications/NotificationDashboard";
+import DeviceScheduleManager from "./Components/DeviceScheduleManager";
+
 const Main = () => {
   const HeaderLayout = () => {
     const isLoginPage = useRoutes([{ path: "/", element: <Login /> }]);
@@ -120,6 +122,10 @@ const Main = () => {
         {
           path: "/schedule",
           element: <Schedule />,
+        },
+        {
+          path: "/avc-revision",
+          element: <DeviceScheduleManager />,
         },
         {
           path: "/reports",

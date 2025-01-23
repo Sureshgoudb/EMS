@@ -13,10 +13,7 @@ import {
   useTheme,
   alpha,
 } from "@mui/material";
-import {
-  DataGrid,
-  GridToolbar,
-} from "@mui/x-data-grid";
+import { DataGrid, GridToolbar } from "@mui/x-data-grid";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SettingsIcon from "@mui/icons-material/Settings";
 import VisibilityIcon from "@mui/icons-material/Visibility";
@@ -44,44 +41,45 @@ const NotificationDashboard = ({ open, onClose }) => {
   const [openSettings, setOpenSettings] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
 
+  // --------------- ( Function to Get User Info from Local Storage ) -------------
   const getUserInfo = () => {
     const userInfo = localStorage.getItem("user");
-    return userInfo ? JSON.stringify(JSON.parse(userInfo)) : null;
+    return userInfo ? JSON.parse(userInfo) : null;
   };
 
-  const api = axios.create({
-    baseURL: apiKey,
-    headers: {
-      "Content-Type": "application/json",
-      user: getUserInfo(),
-    },
-  });
-
+  // --------------- ( Function to Fetch Notifications from API ) -------------
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      const response = await api.get("notifications");
+      const response = await axios.get(`${apiKey}notifications`, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
       if (response.data.success) {
         setNotifications(response.data.data);
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);
       if (error.response?.status === 400) {
-        console.error("User information missing or invalid");
+        console.error("User  information missing or invalid");
       }
     } finally {
       setLoading(false);
     }
   };
 
+  // --------------- ( useEffect to Fetch Notifications on Component Mount ) -------------
   useEffect(() => {
-    if (getUserInfo()) {
+    const user = getUserInfo();
+    if (user && user.user_Type === "Admin") {
       fetchNotifications();
       const interval = setInterval(fetchNotifications, 15000);
       return () => clearInterval(interval);
     }
   }, []);
 
+  // --------------- ( Function to Mark Notification as Shown/Unshown ) -------------
   const handleMarkAsShown = async (id, currentStatus, notificationStatus) => {
     if (notificationStatus === "approved") {
       return;
@@ -92,7 +90,15 @@ const NotificationDashboard = ({ open, onClose }) => {
         ? `notification/${id}/mark-unshown`
         : `notification/${id}/mark-shown`;
 
-      const response = await api.patch(endpoint);
+      const response = await axios.patch(
+        `${apiKey}${endpoint}`,
+        {},
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (response.data.success) {
         setNotifications((prev) =>
@@ -107,9 +113,10 @@ const NotificationDashboard = ({ open, onClose }) => {
       console.error("Error updating notification status:", error);
     }
   };
+
   const handleViewBlocks = (notification) => {
     if (notification.status === "approved") {
-      return; 
+      return;
     }
     setSelectedNotification(notification);
     setOpenModal(true);
@@ -158,8 +165,8 @@ const NotificationDashboard = ({ open, onClose }) => {
       ),
     },
     {
-      field: "deviceName",
-      headerName: "Device Name",
+      field: "userName",
+      headerName: "Created By",
       width: 220,
       renderCell: (params) => (
         <Tooltip title={params.value}>
@@ -235,7 +242,6 @@ const NotificationDashboard = ({ open, onClose }) => {
         </Tooltip>
       ),
     },
-
     {
       field: "status",
       headerName: "Status",
@@ -356,7 +362,7 @@ const NotificationDashboard = ({ open, onClose }) => {
       ),
     },
   ];
-  
+
   const getRowClassName = (params) => {
     if (params.row.status === "approved") {
       return "approved-row";
