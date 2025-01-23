@@ -26,7 +26,7 @@ import TerminalView from "./Components/View/TerminalView/TerminalView";
 import TerminalDetailPage from "./Components/View/TerminalView/TerminalDetailPage";
 import DataTable from "./Components/View/TerminalView/HistoricalData/DataTable";
 import SldcDashboard from "./Components/Dashboard/SldcDashboard";
-
+import NotificationDashboard from "./Components/Notifications/NotificationDashboard";
 const Main = () => {
   const HeaderLayout = () => {
     const isLoginPage = useRoutes([{ path: "/", element: <Login /> }]);
@@ -92,6 +92,10 @@ const Main = () => {
         {
           path: "/notifications",
           element: <Notifications />,
+        },
+        {
+          path: "/notification-management",
+          element: <NotificationDashboard />,
         },
         {
           path: "/customers",

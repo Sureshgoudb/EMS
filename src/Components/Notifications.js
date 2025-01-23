@@ -2,9 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useSelector } from "react-redux";
 import { DataGrid, GridToolbar } from "@mui/x-data-grid";
-import SearchIcon from "@mui/icons-material/Search";
 import {
-  InputBase,
   Chip,
   Grid,
   Select,
@@ -24,7 +22,7 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
-  Typography,
+  Typography, Slide
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -38,9 +36,9 @@ import ListItemText from "@mui/material/ListItemText";
 import * as math from "mathjs";
 import { validator } from "../Helpers/validator";
 import CardLayout from "../common/CardLayout";
-import CenterDialog from "../common/CenterDialog";
 import useDialogActions from "../common/useDialogActions";
 import CardTitleBar from "../common/CardTitleBar";
+import NotificationDashboard from './Notifications/NotificationDashboard';
 
 const BootstrapDialog = styled(Dialog)(({ theme }) => ({
   "& .MuiDialogContent-root": {
@@ -57,36 +55,36 @@ const columns = [
     field: "notificationname",
     headerName: "Name",
     width: 250,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
   {
     field: "notificationtype",
     headerName: "Type",
     width: 100,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
   {
     field: "message",
     headerName: "Message",
     width: 350,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
   {
     field: "conditionfield",
     headerName: "Condition",
     width: 150,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
   {
     field: "conditionstatus",
     headerName: "Last Triggered",
     width: 150,
-    editable: false,flex:1
+    editable: false, flex: 1
   },
   {
     field: "active",
     headerName: "Status",
-    width: 250,flex:1,
+    width: 250, flex: 1,
     editable: false,
     renderCell: (params) => {
       return (
@@ -152,10 +150,10 @@ function getStatusChipProps(params) {
 function Notifications() {
   const [fixedparams, setFixedParams] = useState(
     {
-      fields:[
-        {name : "DC",value:0},
-        {name : "SG",value:0},
-        {name : "BlockNo",value:0}
+      fields: [
+        { name: "DC", value: 0 },
+        { name: "SG", value: 0 },
+        { name: "BlockNo", value: 0 }
       ]
     });
   const { open, openDialog, closeDialog } = useDialogActions();
@@ -171,6 +169,8 @@ function Notifications() {
   const [variable, setVariable] = useState([]);
   const [withoutVariable, setwithoutVariable] = useState([]);
   const [isAdd, setIsAdd] = useState(false);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
+
   const [params, setParams] = useState({
     id: 1,
     variableid: "",
@@ -191,34 +191,30 @@ function Notifications() {
 
   const getNotifications = async () => {
     let url;
-    if(user !=null){
-    if(user.parentId != null || user.parentId  != undefined)
-    {
+    if (user != null) {
+      if (user.parentId != null || user.parentId != undefined) {
         url = apiKey + "notification/list/" + customerID
-    }
-    else
-    {
-      url = apiKey + "notification/list/"
-    }
-  }
-  else{
-    let localData = JSON.parse(localStorage.getItem("user"));
-    if(localData.parentId != null || localData.parentId  != undefined)
-      {
-          url = apiKey + "notification/list/" + localData.customerID
       }
-      else
-      {
+      else {
         url = apiKey + "notification/list/"
       }
-  }
+    }
+    else {
+      let localData = JSON.parse(localStorage.getItem("user"));
+      if (localData.parentId != null || localData.parentId != undefined) {
+        url = apiKey + "notification/list/" + localData.customerID
+      }
+      else {
+        url = apiKey + "notification/list/"
+      }
+    }
     await axios
       .get(url)
       .then((response) => {
         console.log(response.data);
         setNotifications(response.data);
       })
-      .catch((error) => {});
+      .catch((error) => { });
   };
 
   useEffect(() => {
@@ -227,27 +223,23 @@ function Notifications() {
 
   const getDeviceList = async (add) => {
     let url;
-    if(user !=null){
-    if(user.parentId != null || user.parentId  != undefined)
-    {
+    if (user != null) {
+      if (user.parentId != null || user.parentId != undefined) {
         url = apiKey + "device/list/" + user.parentId
-    }
-    else
-    {
-      url = apiKey + "device/list/"
-    }
-  }
-  else{
-    let localData = JSON.parse(localStorage.getItem("user"));
-    if(localData.parentId != null || localData.parentId  != undefined)
-      {
-          url = apiKey + "device/list/" + localData.parentId
       }
-      else
-      {
+      else {
         url = apiKey + "device/list/"
       }
-  }
+    }
+    else {
+      let localData = JSON.parse(localStorage.getItem("user"));
+      if (localData.parentId != null || localData.parentId != undefined) {
+        url = apiKey + "device/list/" + localData.parentId
+      }
+      else {
+        url = apiKey + "device/list/"
+      }
+    }
     await axios
       .get(url)
       .then(async (response) => {
@@ -255,7 +247,7 @@ function Notifications() {
         if (add) setaddNotification(true);
         else seteditNotification(true);
       })
-      .catch((error) => {});
+      .catch((error) => { });
   };
 
   const handleCellClick = (params, event) => {
@@ -308,7 +300,7 @@ function Notifications() {
     } else {
       expValue = expression + "" + event.target.textContent;
     }
-    
+
     setExpression(expValue);
     let modifiedexp = expValue;
     params.fields.forEach((element) => {
@@ -327,14 +319,14 @@ function Notifications() {
   };
   const conditioncheck = (e) => {
     setErrorMsg("");
-     setExpression(e.target.value);
-     let modifiedexp = e.target.value;
-     params.fields.forEach((element) => {
-       if (modifiedexp.includes(element.name)) {
-         modifiedexp = modifiedexp.replaceAll(element.name, 1);
-       }
-     });
-        try {
+    setExpression(e.target.value);
+    let modifiedexp = e.target.value;
+    params.fields.forEach((element) => {
+      if (modifiedexp.includes(element.name)) {
+        modifiedexp = modifiedexp.replaceAll(element.name, 1);
+      }
+    });
+    try {
       math.parse(modifiedexp);
       setErrorMsg("Valid Expression");
     } catch (error) {
@@ -352,7 +344,7 @@ function Notifications() {
   });
 
   useEffect(() => {
-    if(isAdd)
+    if (isAdd)
       setInitState({
         notificationname: "",
         message: "",
@@ -372,42 +364,42 @@ function Notifications() {
 
   const handleaddFormSubmit = async (e) => {
     if ((e != null || e != undefined) && errorMsg === "Valid Expression") {
-      if(e.target.form.notificationname.value !== "" && e.target.form.type.value !== "" && e.target.form.expressionfield.value !== "" && e.target.form.device.value !== "" && e.target.form.message.value !== ""){
-      
-      let createNotification = {
-        notificationname: e.target.form.notificationname.value,
-        notificationtype: e.target.form.type.value,
-        conditionfield: e.target.form.expressionfield.value,
-        deviceid: e.target.form.device.value,
-        message: e.target.form.message.value,
-        customerid: customerID,
-        active: true,
-      };
-      const addNotification = async () => {
-        await axios
-          .post(apiKey + "notification/create/", createNotification)
-          .then((response) => {
-            setNotifications((prevState) => [
-              ...prevState,
-              {
-                id: notifications.length + 1,
-                notificationname: response.data.notificationname,
-                notificationtype: response.data.notificationtype,
-                conditionfield: response.data.conditionfield,
-                deviceid: response.data.deviceid,
-                message: response.data.message,
-                customerid: response.data.customerid,
-                active: response.data.active,
-              },
-            ]);
-            setaddNotification(false);
-            closeDialog();
-          })
-          .catch((error) => {});
-      };
-      addNotification();
+      if (e.target.form.notificationname.value !== "" && e.target.form.type.value !== "" && e.target.form.expressionfield.value !== "" && e.target.form.device.value !== "" && e.target.form.message.value !== "") {
+
+        let createNotification = {
+          notificationname: e.target.form.notificationname.value,
+          notificationtype: e.target.form.type.value,
+          conditionfield: e.target.form.expressionfield.value,
+          deviceid: e.target.form.device.value,
+          message: e.target.form.message.value,
+          customerid: customerID,
+          active: true,
+        };
+        const addNotification = async () => {
+          await axios
+            .post(apiKey + "notification/create/", createNotification)
+            .then((response) => {
+              setNotifications((prevState) => [
+                ...prevState,
+                {
+                  id: notifications.length + 1,
+                  notificationname: response.data.notificationname,
+                  notificationtype: response.data.notificationtype,
+                  conditionfield: response.data.conditionfield,
+                  deviceid: response.data.deviceid,
+                  message: response.data.message,
+                  customerid: response.data.customerid,
+                  active: response.data.active,
+                },
+              ]);
+              setaddNotification(false);
+              closeDialog();
+            })
+            .catch((error) => { });
+        };
+        addNotification();
+      }
     }
-  }
   };
 
   const {
@@ -427,47 +419,47 @@ function Notifications() {
   const handleEditFormSubmit = async (e) => {
     const isValidated = Object.values(errors).every((value) => value === "");
     if ((e != null || e != undefined) && isValidated && errorMsg === "Valid Expression") {
-      if(e.target.form.notificationname.value !== "" && e.target.form.type.value !== "" && e.target.form.expressionfield.value !== "" && e.target.form.device.value !== "" && e.target.form.message.value !== ""){
-      let updateNotificationData = {
-        notificationname: e.target.form.notificationname.value,
-        notificationtype: e.target.form.type.value,
-        conditionfield: e.target.form.expressionfield.value,
-        deviceid: e.target.form.device.value,
-        message: e.target.form.message.value,
-        customerid: customerID,
-        active: e.target.form.active.checked,
-      };
-      const updateNotification = async () => {
-        await axios
-          .put(
-            apiKey +
+      if (e.target.form.notificationname.value !== "" && e.target.form.type.value !== "" && e.target.form.expressionfield.value !== "" && e.target.form.device.value !== "" && e.target.form.message.value !== "") {
+        let updateNotificationData = {
+          notificationname: e.target.form.notificationname.value,
+          notificationtype: e.target.form.type.value,
+          conditionfield: e.target.form.expressionfield.value,
+          deviceid: e.target.form.device.value,
+          message: e.target.form.message.value,
+          customerid: customerID,
+          active: e.target.form.active.checked,
+        };
+        const updateNotification = async () => {
+          await axios
+            .put(
+              apiKey +
               "notification/update/" +
               selectedNotification.notificationid,
-            updateNotificationData
-          )
-          .then((response) => {
-                        // 1. Find the todo with the provided id
-                        const currentTodoIndex = notifications.findIndex((notification) => notification.notificationid === selectedNotification.notificationid);
-                        // 2. Mark the todo as complete
-                        const updatedTodo = Object.assign({}, notifications[currentTodoIndex]);
-                        updatedTodo.notificationname = e.target.form.notificationname.value;
-                        updatedTodo.notificationtype = e.target.form.type.value;
-                        updatedTodo.conditionfield = e.target.form.expressionfield.value;
-                        updatedTodo.deviceid = e.target.form.device.value;
-                        updatedTodo.message = e.target.form.message.value;
-                        updatedTodo.customerid = customerID;
-                        updatedTodo.active = e.target.form.active.checked;
-                        // 3. Update the todo list with the updated todo
-                        const newTodos = notifications.slice();
-                        newTodos[currentTodoIndex] = updatedTodo;
-                        setNotifications(newTodos);
-            seteditNotification(false);
-          })
-          .catch((error) => {});
-      };
-      updateNotification();
+              updateNotificationData
+            )
+            .then((response) => {
+              // 1. Find the todo with the provided id
+              const currentTodoIndex = notifications.findIndex((notification) => notification.notificationid === selectedNotification.notificationid);
+              // 2. Mark the todo as complete
+              const updatedTodo = Object.assign({}, notifications[currentTodoIndex]);
+              updatedTodo.notificationname = e.target.form.notificationname.value;
+              updatedTodo.notificationtype = e.target.form.type.value;
+              updatedTodo.conditionfield = e.target.form.expressionfield.value;
+              updatedTodo.deviceid = e.target.form.device.value;
+              updatedTodo.message = e.target.form.message.value;
+              updatedTodo.customerid = customerID;
+              updatedTodo.active = e.target.form.active.checked;
+              // 3. Update the todo list with the updated todo
+              const newTodos = notifications.slice();
+              newTodos[currentTodoIndex] = updatedTodo;
+              setNotifications(newTodos);
+              seteditNotification(false);
+            })
+            .catch((error) => { });
+        };
+        updateNotification();
+      }
     }
-  }
   };
   const handleDelete = (e) => {
     if (selectedNotification != null || selectedNotification != undefined) {
@@ -481,7 +473,7 @@ function Notifications() {
             );
             setNotifications(newNotifications);
           })
-          .catch((error) => {});
+          .catch((error) => { });
       };
       deleteNotificationData();
     }
@@ -496,7 +488,7 @@ function Notifications() {
 
     const variableResponse = await axios.get(
       apiKey + "variable/list/" + e.target.value
-    ).then(response =>{
+    ).then(response => {
       let variableUnIncludeArr = response.data.filter(str => !str.formula.includes("variable_"));
       setwithoutVariable(variableUnIncludeArr);
       setVariable(response.data);
@@ -504,16 +496,15 @@ function Notifications() {
 
   };
 
-  const getParamsForDevice = async(url) =>
-  {
+  const getParamsForDevice = async (url) => {
     await axios
       .get(url)
       .then(async (response) => {
-        if(response.data.length > 0){
-        setParams(response.data[0]);
+        if (response.data.length > 0) {
+          setParams(response.data[0]);
         }
       })
-      .catch((error) => {});
+      .catch((error) => { });
   }
 
   const userTypeList = [
@@ -538,7 +529,7 @@ function Notifications() {
   ];
   const label = { inputProps: { "aria-label": "Active User" } };
 
-  
+
   let isValidForm =
     Object.values(errors).filter((error) => typeof error !== "undefined")
       .length === 0;
@@ -547,20 +538,24 @@ function Notifications() {
     setSelectedValue(event.target.value);
   };
 
+
   return (
     <div>
       <CardTitleBar title={"Notifications"} />
       <CardLayout
         title={`${notifications.length} Notifications`}
         action={
-          <Fab
-            onClick={() => {handleaddNotification(); setIsAdd(true);}}
-            aria-label="add"
-            className="add_from_section"
-            size="medium"
-          >
-            <AddIcon className="add_from_Icon" />
-          </Fab>
+          <Box sx={{ gap: 2 }}>
+
+            <Fab
+              onClick={() => { handleaddNotification(); setIsAdd(true); }}
+              aria-label="add"
+              className="add_from_section"
+              size="medium"
+            >
+              <AddIcon className="add_from_Icon" />
+            </Fab>
+          </Box>
         }
       >
         <DataGrid
@@ -587,6 +582,8 @@ function Notifications() {
           sx={{ "&, [class^=MuiDataGrid-root ]": { border: "none" } }}
         />
       </CardLayout>
+
+
       <BootstrapDialog
         aria-labelledby="customized-dialog-title"
         open={editNotification}
@@ -599,7 +596,7 @@ function Notifications() {
         </DialogTitle>
         <IconButton
           aria-label="close"
-          onClick={() => {handleEditClose(); resetErrors();}}
+          onClick={() => { handleEditClose(); resetErrors(); }}
           sx={{
             position: "absolute",
             right: 8,
@@ -631,7 +628,7 @@ function Notifications() {
                     onBlur={handleBlur}
                     defaultValue={selectedNotification.notificationname}
                   />
- <TextField
+                  <TextField
                     autoFocus
                     required
                     margin="dense"
@@ -649,7 +646,7 @@ function Notifications() {
                     onBlur={handleBlur}
                   />
                   <TextField
-                     margin="dense"
+                    margin="dense"
                     fullWidth
                     multiline
                     maxRows={8}
@@ -664,11 +661,11 @@ function Notifications() {
                         <span>{errorMsg}</span>
                       </>
                     }
-                    onChange={(e) => {conditioncheck(e); handleChange(e);}}
+                    onChange={(e) => { conditioncheck(e); handleChange(e); }}
                     defaultValue={selectedNotification.conditionfield}
                   />
-                   {/* <Typography>{errorMsg}</Typography> */}
-                   <Typography>Select the Device Variable</Typography>
+                  {/* <Typography>{errorMsg}</Typography> */}
+                  <Typography>Select the Device Variable</Typography>
                   <Paper style={{ maxHeight: 200, overflow: "auto" }}>
                     <List sx={{ mx: 2, p: 2 }}>
                       {withoutVariable?.map((field) => (
@@ -678,7 +675,7 @@ function Notifications() {
                             alignItems="flex-start"
                             sx={{ bgcolor: "#fff", m: 1, cursor: "pointer" }}
                           >
-                            <ListItemText primary={"variable_" +field.variablename} />
+                            <ListItemText primary={"variable_" + field.variablename} />
                           </ListItem>
                         </Paper>
                       ))}
@@ -728,8 +725,8 @@ function Notifications() {
                     fullWidth
                     onChange={handleDeviceClick}
                     defaultValue={selectedNotification.deviceid}
-                    // error={errors.device ? true : false}
-                    // helperText="Select a Device"
+                  // error={errors.device ? true : false}
+                  // helperText="Select a Device"
                   >
                     {devices.map((option) => (
                       <MenuItem
@@ -779,7 +776,7 @@ function Notifications() {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button className="action-cancel-btn" onClick={() => {handleEditClose(); resetErrors();}}>
+            <Button className="action-cancel-btn" onClick={() => { handleEditClose(); resetErrors(); }}>
               Cancel
             </Button>
             <Button
@@ -837,7 +834,7 @@ function Notifications() {
         </DialogTitle>
         <IconButton
           aria-label="close"
-          onClick={()=> {closeDialog(); resetErrors();}}
+          onClick={() => { closeDialog(); resetErrors(); }}
           sx={{
             position: "absolute",
             right: 8,
@@ -848,113 +845,113 @@ function Notifications() {
           <CloseIcon />
         </IconButton>
         <form autoComplete="off" onSubmit={(e) => e.preventDefault()}>
-        <DialogContent dividers>
+          <DialogContent dividers>
             <Box sx={{ flexGrow: 1 }}>
-        <Grid container spacing={2}>   
-            <Grid item xs={6}>
-              <TextField
-                required
-                margin="dense"
-                id="notificationname"
-                name="notificationname"
-                label="NotificationName"
-                defaultValue=""
-                type="text"
-                fullWidth
-                variant="standard"
-                onChange={handleChange}
-                error={errors.notificationname ? true : false}
-                helperText={errors.notificationname}
-                onBlur={handleBlur}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                required
-                margin="dense"
-                id="message"
-                name="message"
-                label="Message"
-                defaultValue=""
-                type="text"
-                fullWidth
-                variant="standard"
-                onChange={handleChange}
-                error={errors.message ? true : false}
-                helperText={errors.message}
-                onBlur={handleBlur}
-              />
-            </Grid>
-      
-            <Grid item xs={6}>
-              <FormControl fullWidth error={errors.type ? true : false}>
-                <InputLabel id="demo-simple-select-label">
-                  Notification Type
-                </InputLabel>
-                <Select
-                  labelId="demo-simple-select-label"
-                  id="tupe"
-                  name="type"
-                  label="Notification Type"
-                  onChange={handleChange}
-                >
-                  {notificationTypeList.map((option) => (
-                    <MenuItem
-                      key={option.label}
-                      value={option.value}
-                      sx={{ font: 12 }}
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <TextField
+                    required
+                    margin="dense"
+                    id="notificationname"
+                    name="notificationname"
+                    label="NotificationName"
+                    defaultValue=""
+                    type="text"
+                    fullWidth
+                    variant="standard"
+                    onChange={handleChange}
+                    error={errors.notificationname ? true : false}
+                    helperText={errors.notificationname}
+                    onBlur={handleBlur}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    required
+                    margin="dense"
+                    id="message"
+                    name="message"
+                    label="Message"
+                    defaultValue=""
+                    type="text"
+                    fullWidth
+                    variant="standard"
+                    onChange={handleChange}
+                    error={errors.message ? true : false}
+                    helperText={errors.message}
+                    onBlur={handleBlur}
+                  />
+                </Grid>
+
+                <Grid item xs={6}>
+                  <FormControl fullWidth error={errors.type ? true : false}>
+                    <InputLabel id="demo-simple-select-label">
+                      Notification Type
+                    </InputLabel>
+                    <Select
+                      labelId="demo-simple-select-label"
+                      id="tupe"
+                      name="type"
+                      label="Notification Type"
+                      onChange={handleChange}
                     >
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-                <FormHelperText>{errors.type}</FormHelperText>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6}>
-              <FormControl fullWidth error={errors.device ? true : false}>
-                <InputLabel id="demo-simple-select-label">Device</InputLabel>
-                <Select
-                  labelId="demo-simple-select-label"
-                  id="device"
-                  name="device"
-                  label="Device"
-                  onChange={(e) => {handleDeviceClick(e); handleChange(e);}}
-                >
-                  {devices.map((option) => (
-                    <MenuItem
-                      key={option.devicename}
-                      value={option.deviceid}
-                      sx={{ font: 12 }}
+                      {notificationTypeList.map((option) => (
+                        <MenuItem
+                          key={option.label}
+                          value={option.value}
+                          sx={{ font: 12 }}
+                        >
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <FormHelperText>{errors.type}</FormHelperText>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControl fullWidth error={errors.device ? true : false}>
+                    <InputLabel id="demo-simple-select-label">Device</InputLabel>
+                    <Select
+                      labelId="demo-simple-select-label"
+                      id="device"
+                      name="device"
+                      label="Device"
+                      onChange={(e) => { handleDeviceClick(e); handleChange(e); }}
                     >
-                      {option.devicename}
-                    </MenuItem>
-                  ))}
-                </Select>
-                <FormHelperText>{errors.device}</FormHelperText>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} md={6}>
-              <TextField
-                fullWidth
-                multiline
-                maxRows={5}
-                minRows={5}
-                id="expressionfield"
-                name="expressionfield"
-                label="Notification Condition."
-                value={expression}
-                error={!!(errors.expressionfield || errorMsg === "Invalid Expression")}
-                helperText={
-                  <>
-                    <span>{errors.expressionfield}</span><br />
-                    <span>{errorMsg}</span>
-                  </>
-                }
-                onChange={(e) => {conditioncheck(e); handleChange(e);}}
-              />
-            {/* <Typography>{errorMsg}</Typography> */}
-            <Typography>Select the Device Variable</Typography>
+                      {devices.map((option) => (
+                        <MenuItem
+                          key={option.devicename}
+                          value={option.deviceid}
+                          sx={{ font: 12 }}
+                        >
+                          {option.devicename}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <FormHelperText>{errors.device}</FormHelperText>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} md={6}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    maxRows={5}
+                    minRows={5}
+                    id="expressionfield"
+                    name="expressionfield"
+                    label="Notification Condition."
+                    value={expression}
+                    error={!!(errors.expressionfield || errorMsg === "Invalid Expression")}
+                    helperText={
+                      <>
+                        <span>{errors.expressionfield}</span><br />
+                        <span>{errorMsg}</span>
+                      </>
+                    }
+                    onChange={(e) => { conditioncheck(e); handleChange(e); }}
+                  />
+                  {/* <Typography>{errorMsg}</Typography> */}
+                  <Typography>Select the Device Variable</Typography>
                   <Paper style={{ maxHeight: 200, overflow: "auto" }}>
                     <List sx={{ mx: 2, p: 2 }}>
                       {withoutVariable?.map((field) => (
@@ -964,33 +961,33 @@ function Notifications() {
                             alignItems="flex-start"
                             sx={{ bgcolor: "#fff", m: 1, cursor: "pointer" }}
                           >
-                            <ListItemText primary={"variable_" +field.variablename} />
+                            <ListItemText primary={"variable_" + field.variablename} />
                           </ListItem>
                         </Paper>
                       ))}
                     </List>
                   </Paper>
-            </Grid>
-            <Grid item xs={6} md={6}>
-            <Typography>Select the parameter</Typography>
-              <Paper
-                style={{ maxHeight: 200, overflow: "auto", marginTop: "1px", minHeight: 200}}
-              >
-                <List sx={{ mx: 2, p: 2 }}>
-                  {params.fields.map((field) => (
-                    <Paper elevation={4}> 
-                      <ListItem
-                        onClick={handleFieldClick}
-                        alignItems="flex-start"
-                        sx={{ bgcolor: "#fff", m: 0.5, cursor: "pointer" }}
-                      >
-                        <ListItemText primary={field.name} />
-                      </ListItem>
-                    </Paper>
-                  ))}
-                </List>
-              </Paper>
-              <Typography>Select the DC/SG parameter</Typography>
+                </Grid>
+                <Grid item xs={6} md={6}>
+                  <Typography>Select the parameter</Typography>
+                  <Paper
+                    style={{ maxHeight: 200, overflow: "auto", marginTop: "1px", minHeight: 200 }}
+                  >
+                    <List sx={{ mx: 2, p: 2 }}>
+                      {params.fields.map((field) => (
+                        <Paper elevation={4}>
+                          <ListItem
+                            onClick={handleFieldClick}
+                            alignItems="flex-start"
+                            sx={{ bgcolor: "#fff", m: 0.5, cursor: "pointer" }}
+                          >
+                            <ListItemText primary={field.name} />
+                          </ListItem>
+                        </Paper>
+                      ))}
+                    </List>
+                  </Paper>
+                  <Typography>Select the DC/SG parameter</Typography>
                   <Paper style={{ maxHeight: 150, overflow: "auto" }}>
                     <List sx={{ mx: 2, p: 2 }}>
                       {fixedparams?.fields?.map((field) => (
@@ -1006,12 +1003,12 @@ function Notifications() {
                       ))}
                     </List>
                   </Paper>
-            </Grid>
-          </Grid>
-          </Box>
+                </Grid>
+              </Grid>
+            </Box>
           </DialogContent>
           <DialogActions sx={{ justifyContent: "center" }}>
-            <Button className="action-cancel-btn" onClick={() => {closeDialog(); resetErrors();}}>
+            <Button className="action-cancel-btn" onClick={() => { closeDialog(); resetErrors(); }}>
               Cancel
             </Button>
             <Button
@@ -1024,7 +1021,8 @@ function Notifications() {
             </Button>
           </DialogActions>
         </form>
-        </BootstrapDialog>
+      </BootstrapDialog>
+
     </div>
   );
 }

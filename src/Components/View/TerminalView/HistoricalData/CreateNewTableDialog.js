@@ -63,18 +63,25 @@ const TableColumnCreate = ({
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(
-        isAdmin
-          ? `${apiKey}terminals/${profile}`
-          : `${apiKey}terminals/${profile}/${userInfo.customerID}`
-      );
-      setTerminals(Array.isArray(response.data) ? response.data : []);
+      const url = isAdmin
+        ? `${apiKey}terminals/${profile}`
+        : `${apiKey}terminals/${profile}/${userInfo.customerID}`;
+      const response = await axios.get(url);
+  
+      const data = response.data;
+  
+      const terminalsData = Array.isArray(data)
+        ? data 
+        : data.terminals || [];
+  
+      setTerminals(terminalsData);
     } catch (error) {
       setError("Failed to fetch terminals");
     } finally {
       setLoading(false);
     }
   };
+  
 
   const fetchVariables = async (profile, terminal) => {
     setLoading(true);

@@ -13,6 +13,7 @@ import {
 import { styled } from "@mui/material/styles";
 import { Refresh } from "@mui/icons-material";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import NotificationManager from '../Notifications/NotificationManager';
 
 const ALLOWED_SCRIPTS = [
   "AvC MW",
@@ -446,7 +447,7 @@ const TableGrid = () => {
           }
           return "";
         }}
-      />
+      />  <NotificationManager />
     </StyledCard>
   );
 };
