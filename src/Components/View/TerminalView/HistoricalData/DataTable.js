@@ -32,6 +32,7 @@ import {
   Snackbar,
   Stack,
 } from "@mui/material";
+import { ArrowUpward, ArrowDownward } from "@mui/icons-material";
 import { ArrowBack, Save, Close } from "@mui/icons-material";
 import ExportButtons from "../ExportButtons";
 import Clock from "react-live-clock";
@@ -153,6 +154,9 @@ const DataTable = () => {
   const navigate = useNavigate();
   const [tableInfo, setTableInfo] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState("");
+  const [isDataAvailable, setIsDataAvailable] = useState(true);
+  const [sortDirection, setSortDirection] = useState("desc"); // Add this for timestamp sorting
+
   const [profiles] = useState([
     { value: "trend", label: "Trend" },
     { value: "block", label: "Block" },
@@ -180,76 +184,6 @@ const DataTable = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
-  useEffect(() => {
-    if (selectedTerminal) {
-      fetchScripts(selectedTerminal);
-    }
-  }, [selectedTerminal]);
-
-  useEffect(() => {
-    if (selectedTerminal && selectedProfile) {
-      fetchScripts(selectedTerminal);
-    }
-  }, [selectedTerminal, selectedProfile]);
-
-  useEffect(() => {
-    if (tableInfo) {
-      fetchScriptData();
-    }
-  }, [tableInfo]);
-
-  // ---------- Function to set default dates based on profile ----------
-  const setDefaultDates = (profile) => {
-    let newFromDate;
-    const newToDate = dayjs().endOf("day");
-
-    switch (profile) {
-      case "trend":
-      case "block":
-        newFromDate = dayjs().startOf("day");
-        break;
-      case "daily":
-        newFromDate = dayjs().startOf("month");
-        break;
-      default:
-        newFromDate = dayjs().startOf("day");
-    }
-
-    setFromDate(newFromDate);
-    setToDate(newToDate);
-  };
-
-  useEffect(() => {
-    if (selectedProfile) {
-      setDefaultDates(selectedProfile);
-      if (selectedTerminal && selectedScripts.length > 0) {
-        fetchScriptData();
-      }
-    }
-  }, [selectedProfile, selectedTerminal, selectedScripts]);
-
-  useEffect(() => {
-    if (selectedTerminal && selectedScripts.length > 0 && selectedProfile) {
-      fetchScriptData();
-    }
-  }, [selectedTerminal, selectedScripts, selectedProfile, fromDate, toDate]);
-
-  useEffect(() => {
-    if (selectedTerminal && selectedScript) {
-      const newColumn = {
-        id: selectedScript,
-        label: selectedTerminal + "_" + selectedScript,
-      };
-      setColumns((prevColumns) => {
-        if (!prevColumns.find((col) => col.id === selectedScript)) {
-          return [...prevColumns, newColumn];
-        }
-        return prevColumns;
-      });
-      fetchScriptData();
-    }
-  }, [selectedScript]);
-
   // ---------- Fetch scripts ----------
   const fetchScripts = async (terminalId) => {
     try {
@@ -261,12 +195,6 @@ const DataTable = () => {
       console.error("Error fetching scripts:", error);
     }
   };
-
-  useEffect(() => {
-    if (selectedTerminal && selectedScripts.length > 0) {
-      fetchScriptData();
-    }
-  }, [selectedTerminal, selectedScripts]);
 
   // ---------- Save table ----------
   const handleSaveTable = () => {
@@ -329,28 +257,32 @@ const DataTable = () => {
     }
   };
 
+  const handleSortTimestamp = () => {
+    const newDirection = sortDirection === "desc" ? "asc" : "desc";
+    setSortDirection(newDirection);
+
+    const sorted = [...filteredRows].sort((a, b) => {
+      const dateA = new Date(a.timestamp);
+      const dateB = new Date(b.timestamp);
+      return newDirection === "desc" ? dateB - dateA : dateA - dateB;
+    });
+
+    setSortedRows(sorted);
+    setVisibleRows(sorted.slice(0, 50));
+  };
+
   useEffect(() => {
     if (tableInfo && selectedTerminal && selectedProfile) {
       fetchScripts(selectedTerminal);
-      selectedScripts.forEach((script) => fetchScriptData(script));
+      const today = dayjs();
+      setFromDate(today.startOf("day"));
+      setToDate(today.endOf("day"));
+
+      selectedScripts.forEach((script) => {
+        fetchScriptData(script);
+      });
     }
   }, [tableInfo, selectedTerminal, selectedProfile]);
-
-  useEffect(() => {
-    if (tableInfo) {
-      setSelectedTerminal(tableInfo.terminal);
-      setSelectedScripts(
-        tableInfo.columns.filter((col) => col !== "timestamp")
-      );
-      setColumns([
-        { id: "timestamp", label: "Timestamp" },
-        ...tableInfo.columns
-          .filter((col) => col !== "timestamp")
-          .map((col) => ({ id: col, label: col })),
-      ]);
-      fetchScriptData();
-    }
-  }, [tableInfo]);
 
   const handleGraphIconClick = (script) => {
     setSelectedGraphScripts([script]);
@@ -425,16 +357,7 @@ const DataTable = () => {
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return "";
-    const date = new Date(timestamp);
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
-      2,
-      "0"
-    )}-${String(date.getUTCDate()).padStart(2, "0")} ${String(
-      date.getUTCHours()
-    ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(
-      2,
-      "0"
-    )}:${String(date.getUTCSeconds()).padStart(2, "0")}`;
+    return dayjs(timestamp).format("YYYY-MM-DD HH:mm:ss");
   };
 
   // ---------- Function to calculate the difference between two values ----------
@@ -595,33 +518,6 @@ const DataTable = () => {
     });
   };
 
-  useEffect(() => {
-    const newColumns = [
-      { id: "timestamp", label: "Timestamp" },
-      ...selectedScripts.map((script) => ({ id: script, label: script })),
-    ];
-    setColumns(newColumns);
-
-    selectedScripts.forEach((script) => {
-      if (!columns.some((col) => col.id === script)) {
-        fetchScriptData(script);
-      }
-    });
-
-    setRows((prevRows) =>
-      prevRows.map((row) => {
-        const newRow = { timestamp: row.timestamp };
-
-        selectedScripts.forEach((script) => {
-          if (row.hasOwnProperty(script)) {
-            newRow[script] = row[script];
-          }
-        });
-        return newRow;
-      })
-    );
-  }, [selectedScripts]);
-
   const fetchScriptData = async (script) => {
     if (!selectedTerminal || !selectedProfile) return;
 
@@ -638,12 +534,16 @@ const DataTable = () => {
     }
 
     try {
+      // Convert dates to ISO string format ensuring timezone is preserved
+      const fromDateISO = fromDate.startOf("minute").toISOString();
+      const toDateISO = toDate.endOf("minute").toISOString();
+
       const response = await axios.get(
         `${apiKey}terminal/${selectedTerminal}/script/${script}/history/${selectedProfile}`,
         {
           params: {
-            fromDate: fromDate.toISOString(),
-            toDate: toDate.toISOString(),
+            fromDate: fromDateISO,
+            toDate: toDateISO,
           },
         }
       );
@@ -652,7 +552,19 @@ const DataTable = () => {
       response.data.forEach((item) => {
         if (item[script]) {
           const { timestamp, value } = item[script];
-          if (timestamp && !isNaN(value.$numberDecimal)) {
+
+          // Create dates using the exact timestamp string to preserve timezone
+          const itemDate = dayjs(timestamp);
+          const startDate = fromDate.startOf("minute");
+          const endDate = toDate.endOf("minute");
+
+          // Include data only if it falls within the selected range
+          if (
+            itemDate.isAfter(startDate) ||
+            (itemDate.isSame(startDate) &&
+              (itemDate.isBefore(endDate) || itemDate.isSame(endDate)) &&
+              !isNaN(value.$numberDecimal))
+          ) {
             processedData[timestamp] = {
               timestamp,
               [script]: parseFloat(value.$numberDecimal),
@@ -670,26 +582,19 @@ const DataTable = () => {
       }));
     } catch (error) {
       console.error(`Error fetching data for script ${script}:`, error);
+      showNotification(`Error fetching data for ${script}`, "error");
     }
   };
-
-  const loadData = useCallback(async () => {
-    if (!selectedTerminal || !selectedProfile || selectedScripts.length === 0)
-      return;
-
-    setLoading(true);
-
-    const fetchPromises = selectedScripts.map((script) =>
-      fetchScriptData(script)
-    );
-    await Promise.all(fetchPromises);
-
-    setLoading(false);
-  }, [selectedTerminal, selectedProfile, selectedScripts, fromDate, toDate]);
-
+  // Add effect to refetch data when dates change
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    // Clear the request cache when dates change
+    requestCache.current.clear();
+
+    // Refetch data for all selected scripts with new date range
+    selectedScripts.forEach((script) => {
+      fetchScriptData(script);
+    });
+  }, [fromDate, toDate]);
 
   useEffect(() => {
     const mergedData = {};
@@ -706,6 +611,9 @@ const DataTable = () => {
       (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
     );
 
+    // Check if we have any data
+    setIsDataAvailable(sortedNewRows.length > 0);
+
     setRows(sortedNewRows);
     setFilteredRows(sortedNewRows);
     setSortedRows(sortedNewRows);
@@ -713,20 +621,93 @@ const DataTable = () => {
     setHasMore(sortedNewRows.length > 50);
   }, [scriptData]);
 
-  useEffect(() => {
-    const fetchAllScriptData = async () => {
-      setLoading(true);
-      const fetchPromises = selectedScripts.map((script) =>
-        fetchScriptData(script)
-      );
-      await Promise.all(fetchPromises);
-      setLoading(false);
-    };
+  // Create a component for the no data message
+  const renderTimestampHeader = () => (
+    <Box
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      sx={{ cursor: "pointer" }}
+      onClick={handleSortTimestamp}
+    >
+      <Typography variant="subtitle2" sx={{ mr: 1 }}>
+        Timestamp
+      </Typography>
+      {sortDirection === "desc" ? (
+        <ArrowDownward fontSize="small" />
+      ) : (
+        <ArrowUpward fontSize="small" />
+      )}
+    </Box>
+  );
 
-    if (selectedTerminal && selectedProfile && selectedScripts.length > 0) {
-      fetchAllScriptData();
-    }
-  }, [selectedScripts, selectedTerminal, selectedProfile, fromDate, toDate]);
+  // Update the NoDataMessage component
+  const NoDataMessage = () => (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "400px",
+        backgroundColor: "#fff",
+        borderRadius: "8px",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+        p: 4,
+      }}
+    >
+      <Box
+        component="img"
+        src="/api/placeholder/200/200"
+        alt="No data"
+        sx={{
+          width: 200,
+          height: 200,
+          opacity: 0.5,
+          mb: 3,
+        }}
+      />
+      <Typography
+        variant="h5"
+        sx={{
+          color: "#455a64",
+          fontWeight: 600,
+          mb: 2,
+          textAlign: "center",
+        }}
+      >
+        No Data Available
+      </Typography>
+      <Typography
+        variant="body1"
+        sx={{
+          color: "#78909c",
+          textAlign: "center",
+          maxWidth: "500px",
+        }}
+      >
+        There is no data available for the selected date range:
+        <br />
+        {fromDate.format("MMMM D, YYYY h:mm A")} to{" "}
+        {toDate.format("MMMM D, YYYY h:mm A")}
+      </Typography>
+      <Button
+        variant="contained"
+        sx={{ mt: 3 }}
+        onClick={() => {
+          const today = dayjs();
+          setFromDate(today.startOf("day"));
+          setToDate(today.endOf("day"));
+          selectedScripts.forEach((script) => {
+            fetchScriptData(script);
+          });
+          showNotification("Reset to today's date range", "info");
+        }}
+      >
+        Reset to Today
+      </Button>
+    </Box>
+  );
 
   useEffect(() => {
     const mergedData = Object.values(scriptData).reduce((acc, scriptRows) => {
@@ -749,17 +730,6 @@ const DataTable = () => {
     setVisibleRows(sortedNewRows.slice(0, 50));
     setHasMore(sortedNewRows.length > 50);
   }, [scriptData]);
-
-  useEffect(() => {
-    const fetchAllScriptData = async () => {
-      const fetchPromises = selectedScripts.map((script) =>
-        fetchScriptData(script)
-      );
-      await Promise.all(fetchPromises);
-    };
-
-    fetchAllScriptData();
-  }, [selectedScripts, selectedTerminal, selectedProfile, fromDate, toDate]);
 
   useEffect(() => {
     const mergedData = Object.values(scriptData).reduce((acc, scriptRows) => {
@@ -792,7 +762,6 @@ const DataTable = () => {
 
     selectedScripts.forEach((script) => {
       if (!scriptData[script]) {
-        fetchScriptData(script);
       }
     });
   }, [selectedScripts]);
@@ -1064,28 +1033,157 @@ const DataTable = () => {
               </Select>
             </StyledFormControl>
 
-            <StyledFormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel sx={{ color: "#424242" }}>Select Variable</InputLabel>
+            <StyledFormControl fullWidth sx={{ mb: 3, position: "relative" }}>
+              <InputLabel
+                sx={{
+                  fontSize: "0.95rem",
+                  fontWeight: 500,
+                  color: "#2c3e50",
+                  transform: "translate(14px, -8px) scale(0.75)",
+                  "&.Mui-focused": {
+                    color: "#3498db",
+                  },
+                }}
+              >
+                Select Variable
+              </InputLabel>
               <Select
                 multiple
                 value={selectedScripts}
                 onChange={handleScriptChange}
-                renderValue={(selected) => selected.join(", ")}
-                label="Select Variables"
+                renderValue={(selected) => (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 0.8,
+                      maxHeight: "120px",
+                      overflowY: "auto",
+                      "&::-webkit-scrollbar": {
+                        width: "6px",
+                      },
+                      "&::-webkit-scrollbar-thumb": {
+                        backgroundColor: "#bdc3c7",
+                        borderRadius: "10px",
+                      },
+                    }}
+                  >
+                    {selected.map((value) => (
+                      <Box
+                        key={value}
+                        component="span"
+                        sx={{
+                          m: 0.5,
+                          padding: "4px 10px",
+                          borderRadius: "20px",
+                          backgroundColor: "#3498db",
+                          color: "white",
+                          fontSize: "0.85rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          boxShadow: "0 2px 5px rgba(52, 152, 219, 0.2)",
+                          transition: "all 0.2s ease",
+                          "&:hover": {
+                            backgroundColor: "#2980b9",
+                            transform: "translateY(-1px)",
+                            boxShadow: "0 3px 8px rgba(52, 152, 219, 0.3)",
+                          },
+                        }}
+                      >
+                        {value}
+                      </Box>
+                    ))}
+                  </Box>
+                )}
                 sx={{
-                  backgroundColor: "#ffffff",
-                  borderRadius: "8px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+                  mt: 1,
+                  "& .MuiSelect-select": {
+                    padding: "12px 16px",
+                    backgroundColor: "#f8fafc",
+                    border: "2px solid #e2e8f0",
+                    borderRadius: "12px !important",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      borderColor: "#3498db",
+                      backgroundColor: "#fff",
+                    },
+                    "&.Mui-focused": {
+                      borderColor: "#3498db",
+                      boxShadow: "0 0 0 2px rgba(52, 152, 219, 0.2)",
+                    },
+                  },
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    border: "none",
+                  },
+                }}
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      mt: 1,
+                      padding: "8px",
+                      borderRadius: "12px",
+                      backgroundColor: "#fff",
+                      boxShadow: "0 10px 25px rgba(0, 0, 0, 0.1)",
+                      "& .MuiMenuItem-root": {
+                        borderRadius: "8px",
+                        margin: "4px 0",
+                        transition: "all 0.2s ease",
+                        "&:hover": {
+                          backgroundColor: "#f1f9ff",
+                        },
+                        "&.Mui-selected": {
+                          backgroundColor: "#e1f0ff",
+                          "&:hover": {
+                            backgroundColor: "#d1e8ff",
+                          },
+                        },
+                      },
+                    },
+                  },
                 }}
               >
                 {scripts.map((script) => (
-                  <MenuItem key={script} value={script}>
-                    <Checkbox checked={selectedScripts.indexOf(script) > -1} />
-                    <ListItemText primary={script} />
+                  <MenuItem
+                    key={script}
+                    value={script}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1.5,
+                      padding: "10px 16px",
+                    }}
+                  >
+                    <Checkbox
+                      checked={selectedScripts.indexOf(script) > -1}
+                      sx={{
+                        color: "#cbd5e1",
+                        "&.Mui-checked": {
+                          color: "#3498db",
+                        },
+                        "& .MuiSvgIcon-root": {
+                          fontSize: "1.2rem",
+                        },
+                      }}
+                    />
+                    <ListItemText
+                      primary={script}
+                      sx={{
+                        "& .MuiTypography-root": {
+                          fontSize: "0.9rem",
+                          fontWeight: selectedScripts.includes(script)
+                            ? 600
+                            : 400,
+                          color: selectedScripts.includes(script)
+                            ? "#2c3e50"
+                            : "#64748b",
+                        },
+                      }}
+                    />
                   </MenuItem>
                 ))}
               </Select>
             </StyledFormControl>
+
             <Box
               sx={{
                 mt: 3,
@@ -1093,10 +1191,6 @@ const DataTable = () => {
                 backgroundColor: "#e3f2fd",
                 borderRadius: "12px",
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-                transition: "box-shadow 0.3s",
-                "&:hover": {
-                  boxShadow: "0 6px 18px rgba(0, 0, 0, 0.1)",
-                },
               }}
             >
               <Typography
@@ -1105,7 +1199,7 @@ const DataTable = () => {
                 sx={{
                   fontWeight: "bold",
                   color: "#1565c0",
-                  letterSpacing: "0.3px",
+                  mb: 2,
                 }}
               >
                 Filter Data
@@ -1113,39 +1207,40 @@ const DataTable = () => {
               <DateTimePicker
                 label="From Date"
                 value={fromDate}
-                onChange={(newValue) => setFromDate(newValue)}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    fullWidth
-                    margin="normal"
-                    sx={{
-                      backgroundColor: "#ffffff",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 10px rgba(0, 0, 0, 0.05)",
-                    }}
-                  />
-                )}
-                ampm={false}
+                onChange={(newValue) => {
+                  if (newValue && newValue.isValid()) {
+                    setFromDate(newValue);
+                    showNotification("From date updated", "info");
+                  }
+                }}
+                maxDate={toDate}
+                sx={{ width: "100%", mb: 2 }}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !fromDate?.isValid(),
+                    helperText: !fromDate?.isValid() ? "Invalid date" : "",
+                  },
+                }}
               />
               <DateTimePicker
                 label="To Date"
-                sx={{ mt: 2, mb: 2 }}
                 value={toDate}
-                onChange={(newValue) => setToDate(newValue)}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    fullWidth
-                    margin="normal"
-                    sx={{
-                      backgroundColor: "#ffffff",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 10px rgba(0, 0, 0, 0.05)",
-                    }}
-                  />
-                )}
-                ampm={false}
+                onChange={(newValue) => {
+                  if (newValue && newValue.isValid()) {
+                    setToDate(newValue);
+                    showNotification("To date updated", "info");
+                  }
+                }}
+                minDate={fromDate}
+                sx={{ width: "100%" }}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !toDate?.isValid(),
+                    helperText: !toDate?.isValid() ? "Invalid date" : "",
+                  },
+                }}
               />
             </Box>
 
@@ -1256,107 +1351,128 @@ const DataTable = () => {
         </Grid>
         <Grid item xs={12} md={9}>
           {selectedScripts && selectedScripts.length > 0 ? (
-            <TableContainer
-              component={Paper}
-              elevation={3}
-              sx={{
-                height: "70vh",
-                overflow: "auto",
-              }}
-              ref={tableRef}
-            >
-              <Table stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {columns.map((column) => (
-                      <StyledTableCell key={column.id} align="center">
-                        <Box
-                          display="flex"
-                          flexDirection="column"
-                          alignItems="center"
-                        >
-                          <Typography variant="subtitle2">
-                            {column.label}
-                          </Typography>
-                          {column.id !== "timestamp" && (
-                            <Box display="flex" alignItems="center" mt={0.5}>
-                              <BarChartIcon
-                                onClick={() => handleGraphIconClick(column.id)}
-                                sx={{
-                                  cursor: "pointer",
-                                  fontSize: "small",
-                                  mr: 1,
-                                }}
-                              />
-                              <StyledSwitch
-                                size="small"
-                                checked={showPercentage[column.id] || false}
-                                onChange={() =>
-                                  handleTogglePercentage(column.id)
-                                }
-                              />
-                              <Typography variant="caption" sx={{ ml: 0.5 }}>
-                                {showPercentage[column.id] ? "%" : "Val"}
-                              </Typography>
-                            </Box>
-                          )}
-                        </Box>
-                      </StyledTableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {visibleRows.map((row, index) => (
-                    <StyledTableRow key={index}>
+            isDataAvailable ? (
+              <TableContainer
+                component={Paper}
+                elevation={3}
+                sx={{
+                  height: "70vh",
+                  overflow: "auto",
+                }}
+                ref={tableRef}
+              >
+                <Table stickyHeader>
+                  <TableHead>
+                    <TableRow>
                       {columns.map((column) => (
-                        <TableCell key={column.id} align="center">
+                        <StyledTableCell key={column.id} align="center">
                           <Box
                             display="flex"
                             flexDirection="column"
                             alignItems="center"
                           >
-                            <Typography variant="body2">
-                              {column.id === "timestamp"
-                                ? formatTimestamp(row.timestamp)
-                                : row[column.id] !== undefined &&
-                                  row[column.id] !== null
-                                ? Number(row[column.id]).toFixed(2)
-                                : "NA"}
-                            </Typography>
-                            {column.id !== "timestamp" &&
-                              index < sortedRows.length - 1 && (
-                                <Typography
-                                  variant="caption"
-                                  color="textSecondary"
-                                >
-                                  {formatDifference(
-                                    calculateDifference(
-                                      row[column.id],
-                                      sortedRows[index + 1][column.id]
-                                    ),
-                                    showPercentage[column.id]
-                                  )}
+                            {column.id === "timestamp" ? (
+                              renderTimestampHeader()
+                            ) : (
+                              <>
+                                <Typography variant="subtitle2">
+                                  {column.label}
                                 </Typography>
-                              )}
+                                {column.id !== "timestamp" && (
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    mt={0.5}
+                                  >
+                                    <BarChartIcon
+                                      onClick={() =>
+                                        handleGraphIconClick(column.id)
+                                      }
+                                      sx={{
+                                        cursor: "pointer",
+                                        fontSize: "small",
+                                        mr: 1,
+                                      }}
+                                    />
+                                    <StyledSwitch
+                                      size="small"
+                                      checked={
+                                        showPercentage[column.id] || false
+                                      }
+                                      onChange={() =>
+                                        handleTogglePercentage(column.id)
+                                      }
+                                    />
+                                    <Typography
+                                      variant="caption"
+                                      sx={{ ml: 0.5 }}
+                                    >
+                                      {showPercentage[column.id] ? "%" : "Val"}
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </>
+                            )}
                           </Box>
-                        </TableCell>
+                        </StyledTableCell>
                       ))}
-                    </StyledTableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {loadingMore && (
-                <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
-                  <CircularProgress />
-                </Box>
-              )}
-            </TableContainer>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {visibleRows.map((row, index) => (
+                      <StyledTableRow key={index}>
+                        {columns.map((column) => (
+                          <TableCell key={column.id} align="center">
+                            <Box
+                              display="flex"
+                              flexDirection="column"
+                              alignItems="center"
+                            >
+                              <Typography variant="body2">
+                                {column.id === "timestamp"
+                                  ? formatTimestamp(row.timestamp)
+                                  : row[column.id] !== undefined &&
+                                    row[column.id] !== null
+                                  ? Number(row[column.id]).toFixed(2)
+                                  : "NA"}
+                              </Typography>
+                              {column.id !== "timestamp" &&
+                                index < sortedRows.length - 1 && (
+                                  <Typography
+                                    variant="caption"
+                                    color="textSecondary"
+                                  >
+                                    {formatDifference(
+                                      calculateDifference(
+                                        row[column.id],
+                                        sortedRows[index + 1][column.id]
+                                      ),
+                                      showPercentage[column.id]
+                                    )}
+                                  </Typography>
+                                )}
+                            </Box>
+                          </TableCell>
+                        ))}
+                      </StyledTableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {loadingMore && (
+                  <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
+                    <CircularProgress />
+                  </Box>
+                )}
+              </TableContainer>
+            ) : (
+              <NoDataMessage />
+            )
           ) : (
             <Typography variant="body1" align="center" sx={{ mt: 2 }}>
               No variables selected. Please select a variable to view data.
             </Typography>
           )}
-          {!loading && (
+          {!loading && isDataAvailable && (
             <Box
               mt={4}
               p={3}

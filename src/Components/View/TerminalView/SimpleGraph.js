@@ -41,7 +41,7 @@ import {
   DialogActions,
 } from "@mui/material";
 import { ChromePicker } from "react-color";
-
+import dayjs from "dayjs";
 import {
   Timer as TimerIcon,
   Analytics as ProfileIcon,
@@ -60,17 +60,8 @@ const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "";
-  const date = new Date(timestamp);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(date.getUTCDate()).padStart(2, "0")} ${String(
-    date.getUTCHours()
-  ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(
-    date.getUTCSeconds()
-  ).padStart(2, "0")}`;
+  return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss');
 };
-
 const SimpleGraph = ({ widgetData, showXAxis = true, isExpanded = false }) => {
   const [error, setError] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState("trend");

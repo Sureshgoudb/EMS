@@ -201,15 +201,11 @@ function DeviceScheduleManager() {
 
   const handleStartTimeChange = (newValue) => {
     if (!newValue) return;
-
     const now = dayjs();
     const selectedTime = dayjs(newValue);
+    const bufferTime = now.subtract(2, "minute");
 
-    // selected time is in the future and on 15-minute intervals
-    const roundedMinutes = Math.ceil(now.minute() / 15) * 15;
-    const minAllowedTime = now.minute(roundedMinutes);
-
-    if (selectedTime.isBefore(minAllowedTime)) {
+    if (selectedTime.isBefore(bufferTime)) {
       setAlert({
         open: true,
         message: "Please select a future time",
@@ -487,14 +483,18 @@ function DeviceScheduleManager() {
                   ampm={false}
                   views={["hours", "minutes", "seconds"]}
                   minutesStep={15}
-                  secondsStep={15}
+                  shouldDisableTime={(timeValue, view) => {
+                    if (!timeValue) return false;
+                    const now = dayjs();
+                    const bufferTime = now.subtract(2, "minute");
+                    return timeValue.isBefore(bufferTime);
+                  }}
                   slots={{
                     textField: (props) => (
                       <TextField
                         {...props}
                         size="small"
                         sx={{
-                          width: 250,
                           "& .MuiInputBase-root": {
                             borderRadius: 2,
                             "&:hover": {
@@ -509,6 +509,16 @@ function DeviceScheduleManager() {
                               color: theme.palette.primary.dark,
                             },
                           },
+                          "& .Mui-error": {
+                            color: theme.palette.primary.main,
+                          },
+                          "& .Mui-error .MuiOutlinedInput-notchedOutline": {
+                            borderColor: alpha(theme.palette.primary.main, 0.2),
+                          },
+                          "&:hover .Mui-error .MuiOutlinedInput-notchedOutline":
+                            {
+                              borderColor: theme.palette.primary.main,
+                            },
                         }}
                       />
                     ),
@@ -529,10 +539,10 @@ function DeviceScheduleManager() {
                         },
                       },
                     },
+                    textField: {
+                      error: false,
+                    },
                   }}
-                  minTime={dayjs().minute(
-                    Math.ceil(dayjs().minute() / 15) * 15
-                  )}
                 />
               </LocalizationProvider>
               <TextField

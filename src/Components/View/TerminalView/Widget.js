@@ -15,8 +15,6 @@ import {
   Settings,
   OpenInFull,
   Fullscreen,
-  ZoomIn,
-  ZoomOut,
   FileDownload,
   Close,
   FullscreenExit,
@@ -28,20 +26,13 @@ import MultiAxisGraph from "./MultiAxisGraph";
 import html2canvas from "html2canvas";
 import jsPdf from "jspdf";
 import ConfirmationDialog from "./ConfirmationDialog";
+import dayjs from "dayjs";
 
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "";
-  const date = new Date(timestamp);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(date.getUTCDate()).padStart(2, "0")} ${String(
-    date.getUTCHours()
-  ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(
-    date.getUTCSeconds()
-  ).padStart(2, "0")}`;
+  return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss');
 };
 
 const Widget = ({

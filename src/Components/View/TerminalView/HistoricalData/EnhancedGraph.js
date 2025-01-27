@@ -15,6 +15,7 @@ import {
   useTheme,
   Paper,
   Typography,
+  alpha,
 } from "@mui/material";
 import {
   AreaChart,
@@ -37,18 +38,60 @@ import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import dayjs from "dayjs";
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "";
-  const date = new Date(timestamp);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(date.getUTCDate()).padStart(2, "0")} ${String(
-    date.getUTCHours()
-  ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(
-    date.getUTCSeconds()
-  ).padStart(2, "0")}`;
+  return dayjs(timestamp).format("YYYY-MM-DD HH:mm:ss");
+};
+
+const CustomTooltip = ({ active, payload, label }) => {
+  const theme = useTheme();
+
+  if (active && payload && payload.length) {
+    return (
+      <Box
+        sx={{
+          bgcolor: alpha(theme.palette.background.paper, 0.95),
+          p: 2,
+          borderRadius: 2,
+          boxShadow: theme.shadows[4],
+          border: `1px solid ${theme.palette.divider}`,
+          backdropFilter: "blur(4px)",
+        }}
+      >
+        <Typography
+          variant="subtitle2"
+          sx={{ mb: 1, color: theme.palette.text.primary }}
+        >
+          {formatTimestamp(label)}
+        </Typography>
+        {payload.map((entry, index) => (
+          <Box
+            key={index}
+            sx={{ display: "flex", alignItems: "center", mb: 0.5 }}
+          >
+            <Box
+              sx={{
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                bgcolor: entry.color,
+                mr: 1,
+              }}
+            />
+            <Typography
+              variant="body2"
+              sx={{ color: theme.palette.text.secondary }}
+            >
+              {`${entry.name}: ${entry.value}`}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    );
+  }
+  return null;
 };
 
 const EnhancedGraph = ({
@@ -71,27 +114,6 @@ const EnhancedGraph = ({
   const [chartType, setChartType] = useState("area");
   const chartContainerRef = useRef(null);
   const containerRef = useRef(null);
-
-  const handleChartTypeChange = (event) => {
-    setChartType(event.target.value);
-  };
-
-  const getColor = (index) => {
-    const colors = [
-      "#2196F3",
-      "#FF5722",
-      "#4CAF50",
-      "#9C27B0",
-      "#FF9800",
-      "#E91E63",
-      "#00BCD4",
-      "#3F51B5",
-      "#F44336",
-      "#009688",
-    ];
-    return colors[index % colors.length];
-  };
-
   const handleWheel = useCallback((event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -132,14 +154,6 @@ const EnhancedGraph = ({
     });
   }, []);
 
-  const handleResetZoom = () => {
-    setZoomRange({
-      start: 0,
-      end: 100,
-      minPoints: 5,
-    });
-  };
-
   const handleZoomButton = (zoomIn) => {
     setZoomRange((prevRange) => {
       const currentRangeSize = prevRange.end - prevRange.start;
@@ -169,16 +183,6 @@ const EnhancedGraph = ({
     });
   };
 
-  const toggleFullScreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen();
-      setIsFullScreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullScreen(false);
-    }
-  };
-
   const getZoomedData = useCallback(() => {
     const startIndex = Math.floor(
       (reversedGraphData.length * zoomRange.start) / 100
@@ -199,6 +203,40 @@ const EnhancedGraph = ({
     }
   }, [handleWheel]);
 
+  const handleResetZoom = () => {
+    setZoomRange({
+      start: 0,
+      end: 100,
+      minPoints: 5,
+    });
+  };
+
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen();
+      setIsFullScreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullScreen(false);
+    }
+  };
+
+  const getColor = (index) => {
+    const colors = [
+      theme.palette.primary.main,
+      theme.palette.secondary.main,
+      theme.palette.error.main,
+      theme.palette.warning.main,
+      theme.palette.success.main,
+      theme.palette.info.main,
+      "#9C27B0",
+      "#FF9800",
+      "#00BCD4",
+      "#795548",
+    ];
+    return colors[index % colors.length];
+  };
+
   const renderChart = () => {
     const ChartComponent =
       chartType === "area"
@@ -208,7 +246,6 @@ const EnhancedGraph = ({
         : BarChart;
     const DataComponent =
       chartType === "area" ? Area : chartType === "line" ? Line : Bar;
-
     const zoomedData = getZoomedData();
 
     return (
@@ -218,8 +255,7 @@ const EnhancedGraph = ({
       >
         <CartesianGrid
           strokeDasharray="3 3"
-          stroke={theme.palette.divider}
-          opacity={0.5}
+          stroke={alpha(theme.palette.divider, 0.3)}
         />
         <XAxis
           dataKey="timestamp"
@@ -235,16 +271,7 @@ const EnhancedGraph = ({
           tick={{ fontSize: 12 }}
           width={60}
         />
-        <RechartsTooltip
-          contentStyle={{
-            backgroundColor: theme.palette.background.paper,
-            borderRadius: 8,
-            border: `1px solid ${theme.palette.divider}`,
-            boxShadow: theme.shadows[3],
-            padding: "10px",
-          }}
-          cursor={{ stroke: theme.palette.primary.main, strokeWidth: 1 }}
-        />
+        <RechartsTooltip content={<CustomTooltip />} />
         <Legend
           verticalAlign="top"
           height={36}
@@ -253,28 +280,58 @@ const EnhancedGraph = ({
             fontSize: "14px",
           }}
         />
-        {selectedGraphScripts.map((script, index) => (
-          <DataComponent
-            key={script}
-            type="monotone"
-            dataKey={script}
-            name={script}
-            stroke={getColor(index)}
-            fill={chartType === "line" ? "none" : getColor(index)}
-            strokeWidth={2}
-            fillOpacity={chartType === "area" ? 0.4 : 0.8}
-            dot={chartType === "line" ? { r: 0.1 } : false}
-            activeDot={
-              chartType !== "bar"
-                ? {
-                    r: 6,
-                    stroke: theme.palette.background.paper,
-                    strokeWidth: 0.1,
-                  }
-                : false
-            }
-          />
-        ))}
+        {selectedGraphScripts.map((script, index) => {
+          const color = getColor(index);
+          if (chartType === "area") {
+            return (
+              <Area
+                key={script}
+                type="monotone"
+                dataKey={script}
+                name={script}
+                stroke={color}
+                fill={color}
+                fillOpacity={0.3}
+                strokeWidth={1.5}
+                dot={false}
+                activeDot={{
+                  r: 4,
+                  stroke: theme.palette.background.paper,
+                  strokeWidth: 2,
+                  fill: color,
+                }}
+              />
+            );
+          } else if (chartType === "line") {
+            return (
+              <Line
+                key={script}
+                type="monotone"
+                dataKey={script}
+                name={script}
+                stroke={color}
+                strokeWidth={1.5}
+                dot={false}
+                activeDot={{
+                  r: 4,
+                  stroke: theme.palette.background.paper,
+                  strokeWidth: 2,
+                  fill: color,
+                }}
+              />
+            );
+          } else {
+            return (
+              <Bar
+                key={script}
+                dataKey={script}
+                name={script}
+                fill={color}
+                fillOpacity={0.8}
+              />
+            );
+          }
+        })}
       </ChartComponent>
     );
   };
@@ -289,80 +346,86 @@ const EnhancedGraph = ({
         sx: {
           borderRadius: 2,
           bgcolor: theme.palette.background.paper,
+          backgroundImage: `linear-gradient(to bottom right, ${alpha(
+            theme.palette.primary.main,
+            0.05
+          )}, ${alpha(theme.palette.secondary.main, 0.05)})`,
         },
       }}
     >
       <DialogTitle
         sx={{
-          background: theme.palette.primary.main,
+          background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
           color: "white",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           p: 2,
+
+          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
-        <Typography variant="h6" component="div" sx={{ fontWeight: "bold" }}>
+        <Typography
+          variant="h6"
+          component="div"
+          sx={{
+            fontWeight: "bold",
+            textShadow: "0px 2px 4px rgba(0,0,0,0.2)",
+          }}
+        >
           {selectedTerminal}
         </Typography>
-        <Box>
-          <IconButton
-            onClick={() => handleZoomButton(true)}
-            sx={{ color: "white", mr: 1 }}
-            size="small"
-          >
-            <Tooltip title="Zoom In" arrow>
-              <ZoomInIcon />
-            </Tooltip>
-          </IconButton>
-          <IconButton
-            onClick={() => handleZoomButton(false)}
-            sx={{ color: "white", mr: 1 }}
-            size="small"
-          >
-            <Tooltip title="Zoom Out" arrow>
-              <ZoomOutIcon />
-            </Tooltip>
-          </IconButton>
-          <IconButton
-            onClick={handleResetZoom}
-            sx={{ color: "white", mr: 1 }}
-            size="small"
-          >
-            <Tooltip title="Reset Zoom" arrow>
-              <RestartAltIcon />
-            </Tooltip>
-          </IconButton>
-          <IconButton
-            onClick={graphexportToPdf}
-            sx={{ color: "white", mr: 1 }}
-            size="small"
-          >
-            <Tooltip title="Export to PDF" arrow>
-              <PictureAsPdfIcon />
-            </Tooltip>
-          </IconButton>
-          <IconButton
-            onClick={toggleFullScreen}
-            sx={{ color: "white", mr: 1 }}
-            size="small"
-          >
-            <Tooltip
-              title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"}
-              arrow
+        <Box sx={{ display: "flex", gap: 1 }}>
+          {[
+            {
+              icon: <ZoomInIcon />,
+              tooltip: "Zoom In",
+              onClick: () => handleZoomButton(true),
+            },
+            {
+              icon: <ZoomOutIcon />,
+              tooltip: "Zoom Out",
+              onClick: () => handleZoomButton(false),
+            },
+            {
+              icon: <RestartAltIcon />,
+              tooltip: "Reset Zoom",
+              onClick: handleResetZoom,
+            },
+            {
+              icon: <PictureAsPdfIcon />,
+              tooltip: "Export to PDF",
+              onClick: graphexportToPdf,
+            },
+            {
+              icon: isFullScreen ? <FullscreenExitIcon /> : <FullscreenIcon />,
+              tooltip: isFullScreen ? "Exit Fullscreen" : "Fullscreen",
+              onClick: toggleFullScreen,
+            },
+            {
+              icon: <CloseIcon />,
+              tooltip: "Close",
+              onClick: handleCloseGraph,
+            },
+          ].map((button, index) => (
+            <IconButton
+              key={index}
+              onClick={button.onClick}
+              sx={{
+                color: "white",
+                "&:hover": {
+                  bgcolor: alpha("#fff", 0.1),
+                  transform: "scale(1.1)",
+                },
+                transition: "all 0.2s ease-in-out",
+              }}
+              size="small"
             >
-              {isFullScreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-            </Tooltip>
-          </IconButton>
-          <IconButton
-            onClick={handleCloseGraph}
-            sx={{ color: "white" }}
-            size="small"
-          >
-            <Tooltip title="Close" arrow>
-              <CloseIcon />
-            </Tooltip>
-          </IconButton>
+              <Tooltip title={button.tooltip} arrow>
+                {button.icon}
+              </Tooltip>
+            </IconButton>
+          ))}
         </Box>
       </DialogTitle>
 
@@ -381,9 +444,10 @@ const EnhancedGraph = ({
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: 3,
+            mt: 2,
           }}
         >
-          <FormControl sx={{ minWidth: 200, flex: 1, mt: 2 }} size="small">
+          <FormControl sx={{ minWidth: 200, flex: 1 }} size="small">
             <InputLabel id="script-select-label">Select Variables</InputLabel>
             <Select
               labelId="script-select-label"
@@ -394,6 +458,12 @@ const EnhancedGraph = ({
               renderValue={(selected) => selected.join(", ")}
               sx={{
                 "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: alpha(theme.palette.primary.main, 0.5),
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: theme.palette.primary.main,
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
                   borderColor: theme.palette.primary.main,
                 },
               }}
@@ -411,15 +481,21 @@ const EnhancedGraph = ({
             </Select>
           </FormControl>
 
-          <FormControl sx={{ minWidth: 100, mt: 2 }} size="small">
+          <FormControl sx={{ minWidth: 120 }} size="small">
             <InputLabel id="chart-type-label">Chart Type</InputLabel>
             <Select
               labelId="chart-type-label"
               label="Chart Type"
               value={chartType}
-              onChange={handleChartTypeChange}
+              onChange={(e) => setChartType(e.target.value)}
               sx={{
                 "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: alpha(theme.palette.primary.main, 0.5),
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: theme.palette.primary.main,
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
                   borderColor: theme.palette.primary.main,
                 },
               }}
@@ -433,7 +509,7 @@ const EnhancedGraph = ({
 
         <Paper
           ref={containerRef}
-          elevation={3}
+          elevation={4}
           sx={{
             height: isFullScreen ? "100vh" : 500,
             borderRadius: 2,
@@ -441,20 +517,8 @@ const EnhancedGraph = ({
             overflow: "hidden",
             position: "relative",
             cursor: "zoom-in",
-            "&:before": {
-              content: '""',
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-              opacity: 0.1,
-              zIndex: 0,
-            },
-            "&:hover": {
-              cursor: "zoom-in",
-            },
+            bgcolor: alpha(theme.palette.background.paper, 0.8),
+            backdropFilter: "blur(8px)",
           }}
         >
           <Box
@@ -464,6 +528,7 @@ const EnhancedGraph = ({
               height: "100%",
               position: "relative",
               zIndex: 1,
+              p: 2,
             }}
           >
             <ResponsiveContainer width="100%" height="100%">

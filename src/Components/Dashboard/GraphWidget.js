@@ -43,20 +43,15 @@ import {
 } from 'recharts';
 import { SketchPicker } from 'react-color';
 import axios from 'axios';
+import dayjs from 'dayjs';
+
 const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
-const formatTimestamp = (timestamp) => {
-  if (!timestamp) return "";
-  const date = new Date(timestamp);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(date.getUTCDate()).padStart(2, "0")} ${String(
-    date.getUTCHours()
-  ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(
-    date.getUTCSeconds()
-  ).padStart(2, "0")}`;
-};
+ const formatTimestamp = (timestamp) => {
+    if (!timestamp) return "";
+    return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss');
+  };
+
 
 
 const GraphWidget = ({ widget }) => {

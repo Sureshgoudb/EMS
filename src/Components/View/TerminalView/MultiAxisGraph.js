@@ -40,6 +40,7 @@ import {
   TextField,
   DialogActions,
 } from "@mui/material";
+import dayjs from "dayjs";
 import { ChromePicker } from "react-color";
 
 import {
@@ -60,15 +61,7 @@ const apiKey = process.env.REACT_APP_API_LOCAL_URL;
 
 const formatTimestamp = (timestamp) => {
   if (!timestamp) return "";
-  const date = new Date(timestamp);
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(date.getUTCDate()).padStart(2, "0")} ${String(
-    date.getUTCHours()
-  ).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}:${String(
-    date.getUTCSeconds()
-  ).padStart(2, "0")}`;
+  return dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss');
 };
 
 const MultiAxisGraph = ({
