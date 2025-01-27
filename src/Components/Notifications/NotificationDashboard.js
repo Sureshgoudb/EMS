@@ -39,7 +39,6 @@ const NotificationDashboard = ({ open, onClose }) => {
   const [openModal, setOpenModal] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [openSettings, setOpenSettings] = useState(false);
-  const [anchorEl, setAnchorEl] = useState(null);
 
   // --------------- ( Function to Get User Info from Local Storage ) -------------
   const getUserInfo = () => {
@@ -151,22 +150,43 @@ const NotificationDashboard = ({ open, onClose }) => {
     return colors[status] || theme.palette.grey[500];
   };
 
+  const getNotificationNumber = (fullNumber) => {
+    return fullNumber ? fullNumber.split("_").pop() : "N/A";
+  };
+
+  const getLatestNotificationByDevice = (notifications) => {
+    const deviceMap = new Map();
+
+    notifications.forEach((notification) => {
+      const existingNotification = deviceMap.get(notification.deviceName);
+      if (
+        !existingNotification ||
+        new Date(notification.createdAt) >
+          new Date(existingNotification.createdAt)
+      ) {
+        deviceMap.set(notification.deviceName, notification);
+      }
+    });
+
+    return deviceMap;
+  };
+
   const columns = [
     {
-      field: "deviceId",
-      headerName: "Device ID",
-      width: 220,
+      field: "dateTime",
+      headerName: "Date & Time",
+      width: 180,
+      valueGetter: (params) => params.row.createdAt,
       renderCell: (params) => (
-        <Tooltip title={params.value}>
-          <Typography noWrap sx={{ fontSize: "0.875rem" }}>
-            {params.value}
-          </Typography>
-        </Tooltip>
+        <Typography noWrap sx={{ fontSize: "0.875rem" }}>
+          {dayjs(params.value).format("DD/MM/YYYY HH:mm:ss")}
+        </Typography>
       ),
     },
+
     {
       field: "userName",
-      headerName: "Created By",
+      headerName: "Customer Name",
       width: 220,
       renderCell: (params) => (
         <Tooltip title={params.value}>
@@ -179,66 +199,109 @@ const NotificationDashboard = ({ open, onClose }) => {
     {
       field: "message",
       headerName: "Message",
-      width: 300,
+      width: 400,
       flex: 1,
-      renderCell: (params) => (
-        <Tooltip
-          title={
-            params.row.status === "approved"
-              ? "This notification has been approved and cannot be modified"
-              : ""
-          }
-        >
-          <Box
-            sx={{
-              cursor:
-                params.row.blocks?.length > 0 &&
-                params.row.status !== "approved"
-                  ? "pointer"
-                  : "default",
-              display: "flex",
-              alignItems: "center",
-              width: "100%",
-              "&:hover": {
-                color:
-                  params.row.blocks?.length > 0 &&
-                  params.row.status !== "approved"
-                    ? theme.palette.primary.main
-                    : "inherit",
-                textDecoration:
-                  params.row.blocks?.length > 0 &&
-                  params.row.status !== "approved"
-                    ? "underline"
-                    : "none",
-              },
-            }}
+      
+      renderCell: (params) => {
+        const latestNotificationsMap =
+          getLatestNotificationByDevice(notifications);
+        const isLatestForDevice =
+          latestNotificationsMap.get(params.row.deviceName)?._id ===
+          params.row._id;
+
+        return (
+          <Tooltip
+            title={
+              params.row.status === "approved"
+                ? "This notification has been approved and cannot be modified"
+                : ""
+            }
           >
-            <Typography
+            <Box
               sx={{
-                fontSize: "0.875rem",
-                color: "inherit",
-                fontWeight: params.row.isShown ? 400 : 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                backgroundColor: alpha(theme.palette.primary.light, 0.1),
+                padding: "8px",
+                borderRadius: "8px",
+                width: "100%",
               }}
             >
-              {params.value}
-            </Typography>
-            {params.row.blocks?.length > 0 &&
-              params.row.status !== "approved" && (
-                <Typography
-                  variant="caption"
-                  sx={{
-                    ml: 1,
-                    color: theme.palette.primary.main,
-                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                    padding: "2px 6px",
-                    borderRadius: "4px",
-                    fontSize: "0.75rem",
+              <Typography
+                sx={{
+                  fontSize: "0.875rem",
+                  color: "inherit",
+                  fontWeight: params.row.isShown ? 400 : 500,
+                  whiteSpace: "normal",
+                  wordBreak: "break-word",
+                }}
+              >
+                {`AVC Revision Request Initiated for Device: `}
+                <span
+                  style={{ fontWeight: 400, color: theme.palette.info.dark }}
+                >
+                  {params.row.deviceName || "N/A"}
+                </span>
+                {` | Rev-No: `}
+                <span
+                  style={{
+                    fontWeight: "bold",
+                    color: theme.palette.success.main,
+                    fontStyle: "italic",
                   }}
                 >
-                  View Blocks
-                </Typography>
-              )}
-          </Box>
+                  {getNotificationNumber(params.row.notificationNumber)}
+                </span>
+                {isLatestForDevice && params.row.status === "new" && (
+                  <Chip
+                    label="LATEST"
+                    size="small"
+                    sx={{
+                      ml: 1,
+                      height: "20px",
+                      backgroundColor: theme.palette.error.main,
+                      color: theme.palette.common.white,
+                      fontWeight: "bold",
+                      fontSize: "0.7rem",
+                    }}
+                  />
+                )}
+              </Typography>
+              {params.row.blocks?.length > 0 &&
+                params.row.status !== "approved" && (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      ml: 1,
+                      color: theme.palette.primary.main,
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      fontSize: "0.75rem",
+                    }}
+                  >
+                    View Blocks
+                  </Typography>
+                )}
+            </Box>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      field: "createdAt",
+      headerName: "Created At",
+      width: 180,
+      type: "dateTime",
+      valueGetter: (params) => new Date(params.row.createdAt),
+      renderCell: (params) => (
+        <Tooltip title={dayjs(params.value).format("YYYY-MM-DD HH:mm:ss")}>
+          <Typography
+            sx={{ fontSize: "0.875rem", color: theme.palette.text.secondary }}
+          >
+            {dayjs(params.value).fromNow()}
+          </Typography>
         </Tooltip>
       ),
     },
@@ -276,33 +339,7 @@ const NotificationDashboard = ({ open, onClose }) => {
               Until {dayjs(params.row.snoozeUntil).format("HH:mm")}
             </Typography>
           )}
-          {params.row.status !== "approved" && (
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedNotification(params.row);
-                setAnchorEl(e.currentTarget);
-              }}
-            ></IconButton>
-          )}
         </Box>
-      ),
-    },
-    {
-      field: "createdAt",
-      headerName: "Created At",
-      width: 180,
-      type: "dateTime",
-      valueGetter: (params) => new Date(params.row.createdAt),
-      renderCell: (params) => (
-        <Tooltip title={dayjs(params.value).format("YYYY-MM-DD HH:mm:ss")}>
-          <Typography
-            sx={{ fontSize: "0.875rem", color: theme.palette.text.secondary }}
-          >
-            {dayjs(params.value).fromNow()}
-          </Typography>
-        </Tooltip>
       ),
     },
     {
@@ -368,6 +405,32 @@ const NotificationDashboard = ({ open, onClose }) => {
       return "approved-row";
     }
     return "";
+  };
+
+  const removeFromLocalStorage = (notificationId) => {
+    try {
+      const STORAGE_KEY = "snoozed_notifications";
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        delete parsed[notificationId];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      }
+    } catch (error) {
+      console.error("Error removing notification from localStorage:", error);
+    }
+  };
+
+  // ------------- the StatusChange handler function ------------
+  const handleStatusChange = (updatedNotification) => {
+    if (updatedNotification.status === "approved") {
+      removeFromLocalStorage(updatedNotification._id);
+    }
+    setNotifications((prev) =>
+      prev.map((notif) =>
+        notif._id === updatedNotification._id ? updatedNotification : notif
+      )
+    );
   };
 
   return (
@@ -495,9 +558,7 @@ const NotificationDashboard = ({ open, onClose }) => {
         open={openModal}
         onClose={handleCloseModal}
         notification={selectedNotification}
-        onStatusChange={(updatedNotification) => {
-          console.log(updatedNotification);
-        }}
+        onStatusChange={handleStatusChange}
       />
 
       <Dialog

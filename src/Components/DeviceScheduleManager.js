@@ -18,7 +18,7 @@ import {
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { LocalizationProvider } from "@mui/x-date-pickers";
-import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import { MobileTimePicker } from "@mui/x-date-pickers/MobileTimePicker";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import axios from "axios";
@@ -40,28 +40,16 @@ const theme = createTheme({
   },
 });
 
-// ---------- Funtion to get time from block number ----------
+// ---------- Function to get time from block number ----------
 const getTimeFromBlock = (blockNo) => {
-  const minutes = (blockNo - 1) * 15;
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
+  const totalMinutes = (blockNo - 1) * 15;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const seconds = 0;
 
-  let period = "AM";
-  let displayHours = hours;
-
-  if (hours >= 12) {
-    period = "PM";
-    if (hours > 12) {
-      displayHours = hours - 12;
-    }
-  }
-  if (hours === 0) {
-    displayHours = 12;
-  }
-
-  return `${displayHours}:${remainingMinutes
+  return `${hours.toString().padStart(2, "0")}:${minutes
     .toString()
-    .padStart(2, "0")} ${period}`;
+    .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 };
 
 const columns = [
@@ -217,18 +205,23 @@ function DeviceScheduleManager() {
     const now = dayjs();
     const selectedTime = dayjs(newValue);
 
-    if (selectedTime.isBefore(now)) {
+    // selected time is in the future and on 15-minute intervals
+    const roundedMinutes = Math.ceil(now.minute() / 15) * 15;
+    const minAllowedTime = now.minute(roundedMinutes);
+
+    if (selectedTime.isBefore(minAllowedTime)) {
       setAlert({
         open: true,
-        message: "Cannot select past time. Please select a future time.",
+        message: "Please select a future time",
         severity: "error",
       });
       return;
     }
 
-    const minutes = newValue.minute();
-    const roundedMinutes = Math.round(minutes / 15) * 15;
-    const roundedTime = newValue.minute(roundedMinutes).second(0);
+    const roundedTime = newValue
+      .minute(Math.round(newValue.minute() / 15) * 15)
+      .second(0);
+
     setStartTime(roundedTime);
   };
 
@@ -332,19 +325,21 @@ function DeviceScheduleManager() {
         `${apiKey}createnotification`,
         notificationData
       );
-      updateGridData(0, null);
-      setSelectedDevice("");
-      setNumBlocks(0);
-      setDefaultAvcValue(0);
+
       if (!notificationResponse.data.success) {
         throw new Error("Failed to save schedule");
       }
 
       setAlert({
         open: true,
-        message: `Schedule saved successfully for ${deviceName}`,
+        message: `Schedule saved successfully for ${deviceName} (Notification #${notificationResponse.data.data.notificationNumber})`,
         severity: "success",
       });
+
+      updateGridData(0, null);
+      setSelectedDevice("");
+      setNumBlocks(1);
+      setDefaultAvcValue(0);
     } catch (error) {
       console.error("Error in handleSave:", error);
 
@@ -364,7 +359,6 @@ function DeviceScheduleManager() {
       setIsSubmitting(false);
     }
   };
-
   const handleCancel = () => {
     updateGridData(0, null);
     setSelectedDevice("");
@@ -486,23 +480,59 @@ function DeviceScheduleManager() {
             >
               {renderDeviceSelect()}
               <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <TimePicker
+                <MobileTimePicker
                   label="Start Time"
                   value={startTime}
                   onChange={handleStartTimeChange}
+                  ampm={false}
+                  views={["hours", "minutes", "seconds"]}
                   minutesStep={15}
-                  shouldDisableTime={(timeValue, clockType) => {
-                    if (clockType === "minutes") {
-                      return timeValue % 15 !== 0;
-                    }
-                    return false;
+                  secondsStep={15}
+                  slots={{
+                    textField: (props) => (
+                      <TextField
+                        {...props}
+                        size="small"
+                        sx={{
+                          width: 250,
+                          "& .MuiInputBase-root": {
+                            borderRadius: 2,
+                            "&:hover": {
+                              "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: theme.palette.primary.main,
+                              },
+                            },
+                          },
+                          "& .MuiInputLabel-root": {
+                            color: theme.palette.primary.main,
+                            "&.Mui-focused": {
+                              color: theme.palette.primary.dark,
+                            },
+                          },
+                        }}
+                      />
+                    ),
+                    openPickerIcon: AccessTimeIcon,
                   }}
                   slotProps={{
-                    textField: {
-                      size: "small",
-                      sx: { width: 200 },
+                    actionBar: {
+                      actions: ["accept", "cancel"],
+                    },
+                    openPickerIcon: {
+                      sx: {
+                        color: theme.palette.primary.main,
+                        "&:hover": {
+                          backgroundColor: alpha(
+                            theme.palette.primary.main,
+                            0.1
+                          ),
+                        },
+                      },
                     },
                   }}
+                  minTime={dayjs().minute(
+                    Math.ceil(dayjs().minute() / 15) * 15
+                  )}
                 />
               </LocalizationProvider>
               <TextField

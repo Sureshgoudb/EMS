@@ -9,10 +9,13 @@ import {
   Menu,
   MenuItem,
   useTheme,
+  Chip,
+  Grow,
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import CloseIcon from "@mui/icons-material/Close";
 import SnoozeIcon from "@mui/icons-material/Snooze";
+import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import BlocksModal from "./BlocksModal";
 import axios from "axios";
 
@@ -168,7 +171,6 @@ const ToastNotification = () => {
       });
       saveSnoozedNotifications(newMap);
       setSnoozedNotifications(newMap);
-
       handleNotificationRemoval(selectedNotification._id);
     } catch (error) {
       console.error("Error snoozing notification:", error);
@@ -247,153 +249,180 @@ const ToastNotification = () => {
       <Box
         sx={{
           position: "fixed",
-          top: 26,
-          right: 16,
+          top: 75,
+          right: 2,
           display: "flex",
-          flexDirection: "column",
-          gap: 2,
-          zIndex: 1300,
+          flexDirection: "column-reverse",
+          gap: 3,
+          maxHeight: "calc(100vh - 52px)",
         }}
       >
         {notifications.map((notification, index) => (
-          <Box
-            key={notification._id}
-            sx={{
-              opacity: 1,
-              transition: "opacity 0.3s ease",
-            }}
-          >
-            <Typography
-              variant="caption"
+          <Grow key={notification._id} in={true} timeout={300}>
+            <Box
               sx={{
-                color: "text.secondary",
-                display: "block",
-                textAlign: "right",
-                mb: 1,
-                fontWeight: 500,
+                opacity: 1,
+                transition: "opacity 0.3s ease",
+                minWidth: 400,
+                maxWidth: 500,
               }}
             >
-              {`Notification ${index + 1} of ${notifications.length}`}
-            </Typography>
-            <Snackbar
-              open={true}
-              anchorOrigin={{ vertical: "top", horizontal: "right" }}
-              sx={{
-                position: "relative",
-                transform: "none",
-                maxWidth: 400,
-                backgroundColor: theme.palette.background.paper,
-                boxShadow: theme.shadows[6],
-              }}
-            >
-              <Alert
-                severity={notification.severity || "info"}
-                action={
-                  <Box sx={{ display: "flex", alignItems: "center" }}>
-                    {notification.blocks?.length > 0 &&
-                      notification.status !== "approved" && (
+              <Snackbar
+                open={true}
+                anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                sx={{
+                  position: "relative",
+                  transform: "none",
+                }}
+              >
+                <Alert
+                  severity={notification.severity || "info"}
+                  icon={<NotificationsActiveIcon sx={{ fontSize: "1.2rem" }} />}
+                  action={
+                    <Box
+                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                    >
+                      {notification.blocks?.length > 0 &&
+                        notification.status !== "approved" && (
+                          <Button
+                            size="small"
+                            onClick={() => handleViewBlocks(notification)}
+                            sx={{
+                              minWidth: "auto",
+                              py: 0.5,
+                              px: 1,
+                              color: "inherit",
+                              "&:hover": {
+                                backgroundColor: theme.palette.grey[800],
+                              },
+                            }}
+                          >
+                            <VisibilityIcon sx={{ fontSize: "1.1rem" }} />
+                          </Button>
+                        )}
+                      {notification.status !== "approved" && (
                         <Button
                           size="small"
-                          onClick={() => handleViewBlocks(notification)}
+                          onClick={(e) => handleSnoozeClick(e, notification)}
                           sx={{
                             minWidth: "auto",
-                            mr: 1,
+                            py: 0.5,
+                            px: 1,
                             color: "inherit",
                             "&:hover": {
                               backgroundColor: theme.palette.grey[800],
                             },
                           }}
-                          startIcon={<VisibilityIcon />}
                         >
-                          View
+                          <SnoozeIcon sx={{ fontSize: "1.1rem" }} />
                         </Button>
                       )}
-                    {notification.status !== "approved" && (
-                      <Button
+                      <IconButton
                         size="small"
-                        onClick={(e) => handleSnoozeClick(e, notification)}
+                        aria-label="close"
+                        color="inherit"
+                        onClick={() => handleClose(notification)}
+                        sx={{ p: 0.5 }}
+                      >
+                        <CloseIcon sx={{ fontSize: "1.1rem" }} />
+                      </IconButton>
+                    </Box>
+                  }
+                  sx={{
+                    width: "100%",
+                    backgroundColor: theme.palette.grey[900],
+                    color: theme.palette.getContrastText(
+                      theme.palette.grey[900]
+                    ),
+                    py: 0.5,
+                    px: 1,
+                    ".MuiAlert-message": {
+                      width: "100%",
+                      color: "inherit",
+                      py: 0.5,
+                    },
+                    ".MuiAlert-icon": {
+                      py: 0.5,
+                      mr: 1,
+                    },
+                  }}
+                >
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontSize: "0.9rem",
+                        fontWeight: 600,
+                        color: "inherit",
+                        mb: 0.5,
+                      }}
+                    >
+                      {notification.title}
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        backgroundColor: theme.palette.grey[800],
+                        p: 1,
+                        borderRadius: 1,
+                        minHeight: "32px",
+                      }}
+                    >
+                      <Typography
                         sx={{
-                          minWidth: "auto",
-                          mr: 1,
+                          fontSize: "0.8rem",
                           color: "inherit",
-                          "&:hover": {
-                            backgroundColor: theme.palette.grey[800],
+                          flex: 1,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {notification.message}
+                      </Typography>
+                      <Chip
+                        label={notification.notificationNumber}
+                        color="primary"
+                        size="small"
+                        sx={{
+                          fontWeight: 600,
+                          backgroundColor: theme.palette.primary.dark,
+                          height: "20px",
+                          "& .MuiChip-label": {
+                            px: 1,
+                            fontSize: "0.7rem",
                           },
                         }}
-                        startIcon={<SnoozeIcon />}
-                      >
-                        Snooze
-                      </Button>
-                    )}
-                    <IconButton
-                      size="small"
-                      aria-label="close"
-                      color="inherit"
-                      onClick={() => handleClose(notification)}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
+                      />
+                    </Box>
                   </Box>
-                }
-                sx={{
-                  width: "100%",
-                  backgroundColor: theme.palette.grey[900],
-                  color: theme.palette.getContrastText(theme.palette.grey[900]),
-                  ".MuiAlert-message": {
-                    width: "100%",
-                    color: "inherit",
-                  },
-                }}
-              >
-                <Box>
-                  <Typography
-                    sx={{
-                      fontSize: "0.95rem",
-                      fontWeight: 500,
-                      color: "inherit",
-                    }}
-                  >
-                    {notification.title}
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontSize: "0.8rem",
-                      color: "inherit",
-                    }}
-                  >
-                    {notification.message}
-                  </Typography>
-                </Box>
-              </Alert>
-            </Snackbar>
-          </Box>
+                </Alert>
+              </Snackbar>
+            </Box>
+          </Grow>
         ))}
-        <Menu
-          anchorEl={snoozeAnchorEl}
-          open={Boolean(snoozeAnchorEl)}
-          onClose={handleSnoozeClose}
-        >
-          {snoozeOptions.map((option) => (
-            <MenuItem
-              key={option.value}
-              onClick={() => handleSnoozeSelect(option.value)}
-            >
-              {option.label}
-            </MenuItem>
-          ))}
-        </Menu>
-
-        <Snackbar
-          open={!!error}
-          autoHideDuration={6000}
-          onClose={() => setError(null)}
-          sx={{
-            backgroundColor: theme.palette.error.dark,
-          }}
-        >
-          <Alert severity="error">{error}</Alert>
-        </Snackbar>
       </Box>
+      <Menu
+        anchorEl={snoozeAnchorEl}
+        open={Boolean(snoozeAnchorEl)}
+        onClose={handleSnoozeClose}
+      >
+        {snoozeOptions.map((option) => (
+          <MenuItem
+            key={option.value}
+            onClick={() => handleSnoozeSelect(option.value)}
+          >
+            {option.label}
+          </MenuItem>
+        ))}
+      </Menu>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+      >
+        <Alert severity="error">{error}</Alert>
+      </Snackbar>
 
       <BlocksModal
         open={blocksModalOpen}

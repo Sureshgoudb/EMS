@@ -39,27 +39,16 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
 
   // --------------- ( Function to Get Time from Block Number ) -------------
   const getTimeFromBlock = (blockNo) => {
-    const minutes = (blockNo - 1) * 15;
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
+    const totalMinutes = (blockNo - 1) * 15;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const seconds = 0; 
 
-    let period = "AM";
-    let displayHours = hours;
-
-    if (hours >= 12) {
-      period = "PM";
-      if (hours > 12) {
-        displayHours = hours - 12;
-      }
-    }
-    if (hours === 0) {
-      displayHours = 12;
-    }
-
-    return `${displayHours}:${remainingMinutes
+    return `${hours.toString().padStart(2, "0")}:${minutes
       .toString()
-      .padStart(2, "0")} ${period}`;
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
+
   // --------------- ( Return null if no notification ) -------------
   if (!notification) return null;
 
@@ -350,7 +339,8 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
         <DialogActions
           sx={{
             p: 2.5,
-            gap: 1,
+            gap: 1.5,
+            justifyContent: "flex-end",
           }}
         >
           <Button
@@ -359,14 +349,25 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
             startIcon={<CheckCircle />}
             disabled={notification.status === "approved"}
             sx={{
-              px: 3,
-              py: 1,
-              borderRadius: 2,
-              textTransform: "none",
-              fontWeight: 600,
-              backgroundColor: "#43A047",
+              background:
+                notification.status === "approved"
+                  ? "linear-gradient(90deg, #b0bec5, #cfd8dc)"
+                  : "linear-gradient(90deg, #00c853, #1b5e20)",
+              color: "#ffffff",
+              textTransform: "uppercase",
+              boxShadow:
+                notification.status === "approved"
+                  ? "none"
+                  : "0px 4px 8px rgba(0, 200, 83, 0.3)",
               "&:hover": {
-                backgroundColor: "#388E3C",
+                background:
+                  notification.status === "approved"
+                    ? "linear-gradient(90deg, #b0bec5, #cfd8dc)"
+                    : "linear-gradient(90deg, #00e676, #00c853)",
+                boxShadow:
+                  notification.status === "approved"
+                    ? "none"
+                    : "0px 6px 12px rgba(0, 230, 118, 0.4)",
               },
             }}
           >
@@ -376,14 +377,12 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
             onClick={onClose}
             variant="outlined"
             sx={{
-              px: 3,
-              py: 1,
-              borderRadius: 2,
-              textTransform: "none",
-              fontWeight: 600,
-              borderColor: "#D32F2F",
+              color: "#d32f2f",
+              borderColor: "#d32f2f",
+              textTransform: "uppercase",
               "&:hover": {
-                borderColor: "#D32F2F",
+                background: "rgba(211, 47, 47, 0.1)",
+                borderColor: "#c62828",
               },
             }}
           >

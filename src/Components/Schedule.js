@@ -1,16 +1,10 @@
 import React, { useEffect, useState } from "react";
 import LinearProgress from '@mui/material/LinearProgress';
 import { useSelector } from "react-redux";
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import CircularProgress from '@mui/material/CircularProgress';
-import Box from '@mui/material/Box';
-import SettingsIcon from '@mui/icons-material/Settings';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
-import DeviceScheduleManager from "./DeviceScheduleManager";
 import Backdrop from '@mui/material/Backdrop';
 import axios from "axios";
 import {
@@ -86,7 +80,6 @@ function Schedule() {
   const [adddcsgs, setadddcsgs] = useState(false);
   const [selectedOption, setSelectedOption] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
-  const [openSettings, setOpenSettings] = useState(false);
 
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
   const user = useSelector((store) => store.user);
@@ -301,14 +294,6 @@ function Schedule() {
       .length === 0;
   const { open, openDialog, closeDialog } = useDialogActions();
 
-  const handleSettingsOpen = () => {
-    setOpenSettings(true);
-  };
-
-  const handleSettingsClose = () => {
-    setOpenSettings(false);
-  };
-
   return (
     <div>
       <CardTitleBar title={"Schedule"} />
@@ -316,21 +301,6 @@ function Schedule() {
         title="AVC-SG"
         action={
           <div >
-            <Tooltip title="Schedule Settings">
-              <IconButton
-                onClick={handleSettingsOpen}
-                size="small"
-                sx={{
-                  color: 'rgba(0, 0, 0, 0.54)',
-                  mr: 1,
-                  '&:hover': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                  }
-                }}
-              >
-                <SettingsIcon />
-              </IconButton>
-            </Tooltip>
             <Fab
               onClick={openDialog}
               aria-label="add"
@@ -341,13 +311,7 @@ function Schedule() {
             </Fab>
           </div>
         }
-      >    <CenterDialog
-        open={openSettings}
-        onClose={handleSettingsClose}
-        title="Schedule Settings"
-      >
-          <DeviceScheduleManager onClose={handleSettingsClose} />
-        </CenterDialog>
+      >    
 
         <form>
           <Grid container spacing={2} mb={1}>
