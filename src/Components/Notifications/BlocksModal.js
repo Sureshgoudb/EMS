@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -19,6 +19,7 @@ import {
   useTheme,
   alpha,
   Chip,
+  CircularProgress,
 } from "@mui/material";
 import {
   Analytics,
@@ -32,17 +33,26 @@ import {
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import axios from "axios";
+import ApprovalForm from "./ApprovalForm";
 
 const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
   const theme = useTheme();
   const apiKey = process.env.REACT_APP_API_LOCAL_URL;
+  const [isLoading, setIsLoading] = useState(false);
+  const [approvalMessage, setApprovalMessage] = useState("");
+  const [approvalDetails, setApprovalDetails] = useState({
+    type: "offline",
+    operatorName: "",
+    approvalDateTime: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+    isValid: false,
+  });
 
   // --------------- ( Function to Get Time from Block Number ) -------------
   const getTimeFromBlock = (blockNo) => {
     const totalMinutes = (blockNo - 1) * 15;
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    const seconds = 0; 
+    const seconds = 0;
 
     return `${hours.toString().padStart(2, "0")}:${minutes
       .toString()
@@ -55,27 +65,56 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
   // --------------- ( Function to Handle Status Change ) -------------
   const handleStatusChange = async (newStatus) => {
     try {
+      setIsLoading(true);
+      setApprovalMessage("Processing approval...");
+
       const userInfo = JSON.parse(localStorage.getItem("user"));
-      if (!userInfo || userInfo.user_Type !== "Admin") return;
+      if (!userInfo || userInfo.user_Type !== "Admin") {
+        setApprovalMessage("Unauthorized access");
+        return;
+      }
 
       const response = await axios.patch(
         `${apiKey}notification/${notification._id}/status`,
-        { status: newStatus }
+        {
+          status: newStatus,
+          approvalDetails: {
+            type: approvalDetails.type,
+            operatorName: approvalDetails.operatorName,
+            approvalDateTime: approvalDetails.approvalDateTime,
+            customerName: notification.userName,
+          },
+        }
       );
 
       if (response.data.success) {
+        setApprovalMessage("Successfully approved!");
         const updatedNotification = {
           ...notification,
           status: newStatus,
+          approvalDetails: {
+            type: approvalDetails.type,
+            operatorName: approvalDetails.operatorName,
+            approvalDateTime: approvalDetails.approvalDateTime,
+            customerName: notification.userName,
+          },
         };
         onStatusChange(updatedNotification);
-        onClose();
+        setTimeout(() => {
+          onClose();
+        }, 1500);
       }
     } catch (error) {
       console.error("Error updating notification status:", error);
+      setApprovalMessage("Error during approval");
+    } finally {
+      setTimeout(() => {
+        setIsLoading(false);
+        setApprovalMessage("");
+      }, 1500);
     }
   };
-
+  
   // --------------- ( Stats Cards Data ) -------------
   const statsCards = [
     {
@@ -142,6 +181,8 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
     };
     return colors[status] || "#1976D2";
   };
+  const isButtonDisabled =
+    notification.status === "approved" || !approvalDetails.isValid || isLoading;
 
   return (
     <>
@@ -334,6 +375,10 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
               </Table>
             </TableContainer>
           </Paper>
+          <ApprovalForm
+            onApprovalDetailsChange={setApprovalDetails}
+            customerName={notification.userName}
+          />
         </DialogContent>
 
         <DialogActions
@@ -343,39 +388,68 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
             justifyContent: "flex-end",
           }}
         >
-          <Button
-            onClick={() => handleStatusChange("approved")}
-            variant="contained"
-            startIcon={<CheckCircle />}
-            disabled={notification.status === "approved"}
-            sx={{
-              background:
-                notification.status === "approved"
-                  ? "linear-gradient(90deg, #b0bec5, #cfd8dc)"
+          <Box sx={{ position: "relative" }}>
+            <Button
+              onClick={() => handleStatusChange("approved")}
+              variant="contained"
+              disabled={isButtonDisabled}
+              sx={{
+                minWidth: "150px",
+                background: isLoading
+                  ? "linear-gradient(90deg, #64b5f6, #2196f3)"
+                  : isButtonDisabled
+                  ? theme.palette.action.disabledBackground
                   : "linear-gradient(90deg, #00c853, #1b5e20)",
-              color: "#ffffff",
-              textTransform: "uppercase",
-              boxShadow:
-                notification.status === "approved"
+                color: isButtonDisabled
+                  ? theme.palette.action.disabled
+                  : "#ffffff",
+                textTransform: "uppercase",
+                boxShadow: isButtonDisabled
                   ? "none"
+                  : isLoading
+                  ? "0px 4px 8px rgba(33, 150, 243, 0.3)"
                   : "0px 4px 8px rgba(0, 200, 83, 0.3)",
-              "&:hover": {
-                background:
-                  notification.status === "approved"
-                    ? "linear-gradient(90deg, #b0bec5, #cfd8dc)"
+                "&:hover": {
+                  background: isButtonDisabled
+                    ? theme.palette.action.disabledBackground
+                    : isLoading
+                    ? "linear-gradient(90deg, #64b5f6, #2196f3)"
                     : "linear-gradient(90deg, #00e676, #00c853)",
-                boxShadow:
-                  notification.status === "approved"
+                  boxShadow: isButtonDisabled
                     ? "none"
                     : "0px 6px 12px rgba(0, 230, 118, 0.4)",
-              },
-            }}
-          >
-            Approve
-          </Button>
+                },
+                "&.Mui-disabled": {
+                  background: theme.palette.action.disabledBackground,
+                  color: theme.palette.action.disabled,
+                  boxShadow: "none",
+                },
+              }}
+            >
+              {isLoading ? (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <CircularProgress
+                    size={20}
+                    sx={{
+                      color: isButtonDisabled
+                        ? theme.palette.action.disabled
+                        : "#fff",
+                    }}
+                  />
+                  <Typography variant="button">{approvalMessage}</Typography>
+                </Box>
+              ) : (
+                <>
+                  <CheckCircle sx={{ mr: 1 }} />
+                  Approve
+                </>
+              )}
+            </Button>
+          </Box>
           <Button
             onClick={onClose}
             variant="outlined"
+            disabled={isLoading}
             sx={{
               color: "#d32f2f",
               borderColor: "#d32f2f",
@@ -383,6 +457,10 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
               "&:hover": {
                 background: "rgba(211, 47, 47, 0.1)",
                 borderColor: "#c62828",
+              },
+              "&.Mui-disabled": {
+                borderColor: theme.palette.action.disabled,
+                color: theme.palette.action.disabled,
               },
             }}
           >

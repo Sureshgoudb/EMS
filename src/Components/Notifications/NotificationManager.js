@@ -244,6 +244,23 @@ const ToastNotification = () => {
     setSelectedNotification(null);
   };
 
+  const getLatestNotificationByDevice = (notifications) => {
+    const deviceMap = new Map();
+
+    notifications.forEach((notification) => {
+      const existingNotification = deviceMap.get(notification.deviceName);
+      if (
+        !existingNotification ||
+        new Date(notification.createdAt) >
+          new Date(existingNotification.createdAt)
+      ) {
+        deviceMap.set(notification.deviceName, notification);
+      }
+    });
+
+    return deviceMap;
+  };
+
   return (
     <>
       <Box
@@ -257,36 +274,59 @@ const ToastNotification = () => {
           maxHeight: "calc(100vh - 52px)",
         }}
       >
-        {notifications.map((notification, index) => (
-          <Grow key={notification._id} in={true} timeout={300}>
-            <Box
-              sx={{
-                opacity: 1,
-                transition: "opacity 0.3s ease",
-                minWidth: 400,
-                maxWidth: 500,
-              }}
-            >
-              <Snackbar
-                open={true}
-                anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        {notifications.map((notification, index) => {
+          const latestNotificationsMap = getLatestNotificationByDevice(notifications);
+          const isLatestForDevice =
+            latestNotificationsMap.get(notification.deviceName)?._id ===
+            notification._id;
+
+          return (
+            <Grow key={notification._id} in={true} timeout={300}>
+              <Box
                 sx={{
-                  position: "relative",
-                  transform: "none",
+                  opacity: 1,
+                  transition: "opacity 0.3s ease",
+                  minWidth: 400,
+                  maxWidth: 500,
                 }}
               >
-                <Alert
-                  severity={notification.severity || "info"}
-                  icon={<NotificationsActiveIcon sx={{ fontSize: "1.2rem" }} />}
-                  action={
-                    <Box
-                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                    >
-                      {notification.blocks?.length > 0 &&
-                        notification.status !== "approved" && (
+                <Snackbar
+                  open={true}
+                  anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                  sx={{
+                    position: "relative",
+                    transform: "none",
+                  }}
+                >
+                  <Alert
+                    severity={notification.severity || "info"}
+                    icon={<NotificationsActiveIcon sx={{ fontSize: "1.2rem" }} />}
+                    action={
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      >
+                        {notification.blocks?.length > 0 &&
+                          notification.status !== "approved" && (
+                            <Button
+                              size="small"
+                              onClick={() => handleViewBlocks(notification)}
+                              sx={{
+                                minWidth: "auto",
+                                py: 0.5,
+                                px: 1,
+                                color: "inherit",
+                                "&:hover": {
+                                  backgroundColor: theme.palette.grey[800],
+                                },
+                              }}
+                            >
+                              <VisibilityIcon sx={{ fontSize: "1.1rem" }} />
+                            </Button>
+                          )}
+                        {notification.status !== "approved" && (
                           <Button
                             size="small"
-                            onClick={() => handleViewBlocks(notification)}
+                            onClick={(e) => handleSnoozeClick(e, notification)}
                             sx={{
                               minWidth: "auto",
                               py: 0.5,
@@ -297,110 +337,109 @@ const ToastNotification = () => {
                               },
                             }}
                           >
-                            <VisibilityIcon sx={{ fontSize: "1.1rem" }} />
+                            <SnoozeIcon sx={{ fontSize: "1.1rem" }} />
                           </Button>
                         )}
-                      {notification.status !== "approved" && (
-                        <Button
+                        <IconButton
                           size="small"
-                          onClick={(e) => handleSnoozeClick(e, notification)}
-                          sx={{
-                            minWidth: "auto",
-                            py: 0.5,
-                            px: 1,
-                            color: "inherit",
-                            "&:hover": {
-                              backgroundColor: theme.palette.grey[800],
-                            },
-                          }}
+                          aria-label="close"
+                          color="inherit"
+                          onClick={() => handleClose(notification)}
+                          sx={{ p: 0.5 }}
                         >
-                          <SnoozeIcon sx={{ fontSize: "1.1rem" }} />
-                        </Button>
-                      )}
-                      <IconButton
-                        size="small"
-                        aria-label="close"
-                        color="inherit"
-                        onClick={() => handleClose(notification)}
-                        sx={{ p: 0.5 }}
-                      >
-                        <CloseIcon sx={{ fontSize: "1.1rem" }} />
-                      </IconButton>
-                    </Box>
-                  }
-                  sx={{
-                    width: "100%",
-                    backgroundColor: theme.palette.grey[900],
-                    color: theme.palette.getContrastText(
-                      theme.palette.grey[900]
-                    ),
-                    py: 0.5,
-                    px: 1,
-                    ".MuiAlert-message": {
+                          <CloseIcon sx={{ fontSize: "1.1rem" }} />
+                        </IconButton>
+                      </Box>
+                    }
+                    sx={{
                       width: "100%",
-                      color: "inherit",
+                      backgroundColor: theme.palette.grey[900],
+                      color: theme.palette.getContrastText(
+                        theme.palette.grey[900]
+                      ),
                       py: 0.5,
-                    },
-                    ".MuiAlert-icon": {
-                      py: 0.5,
-                      mr: 1,
-                    },
-                  }}
-                >
-                  <Box>
-                    <Typography
-                      sx={{
-                        fontSize: "0.9rem",
-                        fontWeight: 600,
+                      px: 1,
+                      ".MuiAlert-message": {
+                        width: "100%",
                         color: "inherit",
-                        mb: 0.5,
-                      }}
-                    >
-                      {notification.title}
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        backgroundColor: theme.palette.grey[800],
-                        p: 1,
-                        borderRadius: 1,
-                        minHeight: "32px",
-                      }}
-                    >
+                        py: 0.5,
+                      },
+                      ".MuiAlert-icon": {
+                        py: 0.5,
+                        mr: 1,
+                      },
+                    }}
+                  >
+                    <Box>
                       <Typography
                         sx={{
-                          fontSize: "0.8rem",
+                          fontSize: "0.9rem",
+                          fontWeight: 600,
                           color: "inherit",
-                          flex: 1,
-                          lineHeight: 1.4,
+                          mb: 0.5,
                         }}
                       >
-                        {notification.message}
+                        {notification.title}
                       </Typography>
-                      <Chip
-                        label={notification.notificationNumber}
-                        color="primary"
-                        size="small"
+                      <Box
                         sx={{
-                          fontWeight: 600,
-                          backgroundColor: theme.palette.primary.dark,
-                          height: "20px",
-                          "& .MuiChip-label": {
-                            px: 1,
-                            fontSize: "0.7rem",
-                          },
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          backgroundColor: theme.palette.grey[800],
+                          p: 1,
+                          borderRadius: 1,
+                          minHeight: "32px",
                         }}
-                      />
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: "0.8rem",
+                            color: "inherit",
+                            flex: 1,
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {notification.message}
+                          {isLatestForDevice && notification.status === "new" && (
+                            <Chip
+                              label="LATEST"
+                              size="small"
+                              sx={{
+                                ml: 1,
+                                height: "20px",
+                                backgroundColor: theme.palette.error.main,
+                                color: theme.palette.common.white,
+                                fontWeight: "bold",
+                                fontSize: "0.7rem",
+                              }}
+                            />
+                          )}
+                        </Typography>
+                        <Chip
+                          label={notification.notificationNumber}
+                          color="primary"
+                          size="small"
+                          sx={{
+                            fontWeight: 600,
+                            backgroundColor: theme.palette.primary.dark,
+                            height: "20px",
+                            "& .MuiChip-label": {
+                              px: 1,
+                              fontSize: "0.7rem",
+                            },
+                          }}
+                        />
+                      </Box>
                     </Box>
-                  </Box>
-                </Alert>
-              </Snackbar>
-            </Box>
-          </Grow>
-        ))}
+                  </Alert>
+                </Snackbar>
+              </Box>
+            </Grow>
+          );
+        })}
       </Box>
+
       <Menu
         anchorEl={snoozeAnchorEl}
         open={Boolean(snoozeAnchorEl)}
