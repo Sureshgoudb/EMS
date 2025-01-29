@@ -114,9 +114,6 @@ const NotificationDashboard = ({ open, onClose }) => {
   };
 
   const handleViewBlocks = (notification) => {
-    if (notification.status === "approved") {
-      return;
-    }
     setSelectedNotification(notification);
     setOpenModal(true);
   };
@@ -201,7 +198,6 @@ const NotificationDashboard = ({ open, onClose }) => {
       headerName: "Message",
       width: 400,
       flex: 1,
-      
       renderCell: (params) => {
         const latestNotificationsMap =
           getLatestNotificationByDevice(notifications);
@@ -210,82 +206,98 @@ const NotificationDashboard = ({ open, onClose }) => {
           params.row._id;
 
         return (
-          <Tooltip
-            title={
-              params.row.status === "approved"
-                ? "This notification has been approved and cannot be modified"
-                : ""
-            }
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              backgroundColor: alpha(theme.palette.primary.light, 0.1),
+              padding: "8px",
+              borderRadius: "8px",
+              width: "100%",
+            }}
           >
-            <Box
+            <Typography
               sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                backgroundColor: alpha(theme.palette.primary.light, 0.1),
-                padding: "8px",
-                borderRadius: "8px",
-                width: "100%",
+                fontSize: "0.875rem",
+                color: "inherit",
+                fontWeight: params.row.isShown ? 400 : 500,
+                whiteSpace: "normal",
+                wordBreak: "break-word",
               }}
             >
-              <Typography
-                sx={{
-                  fontSize: "0.875rem",
-                  color: "inherit",
-                  fontWeight: params.row.isShown ? 400 : 500,
-                  whiteSpace: "normal",
-                  wordBreak: "break-word",
+              {`AVC Revision Request Initiated for Device: `}
+              <span style={{ fontWeight: 400, color: theme.palette.info.dark }}>
+                {params.row.deviceName || "N/A"}
+              </span>
+              {` | Rev-No: `}
+              <span
+                style={{
+                  fontWeight: "bold",
+                  color: theme.palette.success.main,
+                  fontStyle: "italic",
                 }}
               >
-                {`AVC Revision Request Initiated for Device: `}
-                <span
-                  style={{ fontWeight: 400, color: theme.palette.info.dark }}
-                >
-                  {params.row.deviceName || "N/A"}
-                </span>
-                {` | Rev-No: `}
-                <span
-                  style={{
+                {getNotificationNumber(params.row.notificationNumber)}
+              </span>
+              {isLatestForDevice && (
+                <Chip
+                  label="LATEST"
+                  size="small"
+                  sx={{
+                    ml: 1,
+                    height: "20px",
+                    backgroundColor: theme.palette.error.main,
+                    color: theme.palette.common.white,
                     fontWeight: "bold",
-                    color: theme.palette.success.main,
-                    fontStyle: "italic",
+                    fontSize: "0.7rem",
+                  }}
+                />
+              )}
+            </Typography>
+            {params.row.blocks?.length > 0 && (
+              <Tooltip
+                title={
+                  params.row.status === "approved"
+                    ? "View complete approval details and revision history"
+                    : "View pending block changes and modification requests"
+                }
+                arrow
+                placement="top"
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    ml: 1,
+                    color:
+                      params.row.status === "approved"
+                        ? theme.palette.common.white
+                        : theme.palette.warning.contrastText,
+                    backgroundColor:
+                      params.row.status === "approved"
+                        ? theme.palette.success.dark
+                        : theme.palette.warning.main,
+                    padding: "3px 8px",
+                    borderRadius: "8px",
+                    fontSize: "0.75rem",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease-in-out",
+                    fontWeight: 300,
+                    boxShadow: `0 2px 4px ${alpha(
+                      params.row.status === "approved"
+                        ? theme.palette.success.main
+                        : theme.palette.warning.main,
+                      0.25
+                    )}`,
                   }}
                 >
-                  {getNotificationNumber(params.row.notificationNumber)}
-                </span>
-                {isLatestForDevice && params.row.status === "new" && (
-                  <Chip
-                    label="LATEST"
-                    size="small"
-                    sx={{
-                      ml: 1,
-                      height: "20px",
-                      backgroundColor: theme.palette.error.main,
-                      color: theme.palette.common.white,
-                      fontWeight: "bold",
-                      fontSize: "0.7rem",
-                    }}
-                  />
-                )}
-              </Typography>
-              {params.row.blocks?.length > 0 &&
-                params.row.status !== "approved" && (
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      ml: 1,
-                      color: theme.palette.primary.main,
-                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                      padding: "2px 6px",
-                      borderRadius: "4px",
-                      fontSize: "0.75rem",
-                    }}
-                  >
-                    View Blocks
-                  </Typography>
-                )}
-            </Box>
-          </Tooltip>
+                  {params.row.status === "approved"
+                    ? "View Details"
+                    : "View Blocks"}
+                </Typography>
+              </Tooltip>
+            )}
+          </Box>
         );
       },
     },

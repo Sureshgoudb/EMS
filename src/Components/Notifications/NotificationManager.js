@@ -275,7 +275,8 @@ const ToastNotification = () => {
         }}
       >
         {notifications.map((notification, index) => {
-          const latestNotificationsMap = getLatestNotificationByDevice(notifications);
+          const latestNotificationsMap =
+            getLatestNotificationByDevice(notifications);
           const isLatestForDevice =
             latestNotificationsMap.get(notification.deviceName)?._id ===
             notification._id;
@@ -300,7 +301,9 @@ const ToastNotification = () => {
                 >
                   <Alert
                     severity={notification.severity || "info"}
-                    icon={<NotificationsActiveIcon sx={{ fontSize: "1.2rem" }} />}
+                    icon={
+                      <NotificationsActiveIcon sx={{ fontSize: "1.2rem" }} />
+                    }
                     action={
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
@@ -401,7 +404,7 @@ const ToastNotification = () => {
                           }}
                         >
                           {notification.message}
-                          {isLatestForDevice && notification.status === "new" && (
+                          {isLatestForDevice && (
                             <Chip
                               label="LATEST"
                               size="small"

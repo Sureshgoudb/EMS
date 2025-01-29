@@ -18,18 +18,26 @@ import {
   IconButton,
   useTheme,
   alpha,
+  Divider,
+  Fade,
+  Avatar,
   Chip,
   CircularProgress,
 } from "@mui/material";
+import {
+  AccessTime,
+  Person,
+  Category,
+  CheckCircle,
+  ArrowForward,
+} from "@mui/icons-material";
 import {
   Analytics,
   Close,
   ShowChart,
   DeviceHub,
   Schedule,
-  CheckCircle,
   Notifications,
-  AccessTime,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import axios from "axios";
@@ -114,7 +122,7 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
       }, 1500);
     }
   };
-  
+
   // --------------- ( Stats Cards Data ) -------------
   const statsCards = [
     {
@@ -183,6 +191,171 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
   };
   const isButtonDisabled =
     notification.status === "approved" || !approvalDetails.isValid || isLoading;
+
+  const ApprovalDetails = () => {
+    const theme = useTheme();
+
+    if (!notification?.approvalDetails) return null;
+
+    const detailItems = [
+      {
+        icon: <Person />,
+        label: "Requested By",
+        value: notification.userName,
+        color: theme.palette.primary.main,
+      },
+      {
+        icon: <CheckCircle />,
+        label: "Approved By",
+        value: notification.approvalDetails.operatorName,
+        color: theme.palette.success.main,
+      },
+      {
+        icon: <Category />,
+        label: "Approval Type",
+        value: `${notification.approvalDetails.type} Revision`,
+        color: theme.palette.info.main,
+      },
+      {
+        icon: <AccessTime />,
+        label: "Approval Date/Time",
+        value: dayjs(notification.approvalDetails.approvalDateTime).format(
+          "DD/MM/YYYY HH:mm:ss"
+        ),
+        color: theme.palette.warning.main,
+      },
+    ];
+
+    return (
+      <Fade in timeout={500}>
+        <Paper
+          elevation={3}
+          sx={{
+            mt: 3,
+            borderRadius: 3,
+            overflow: "hidden",
+            background: `linear-gradient(135deg, ${alpha(
+              theme.palette.background.paper,
+              0.95
+            )} 0%, ${alpha(theme.palette.background.paper, 0.9)} 100%)`,
+            backdropFilter: "blur(10px)",
+            border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`,
+            transition:
+              "transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out",
+          }}
+        >
+          <Box
+            sx={{
+              p: 2.5,
+              background: `linear-gradient(135deg, ${alpha(
+                theme.palette.success.main,
+                0.15
+              )} 0%, ${alpha(theme.palette.success.main, 0.05)} 100%)`,
+              borderBottom: `1px solid ${alpha(
+                theme.palette.success.main,
+                0.1
+              )}`,
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
+            <Avatar
+              sx={{
+                bgcolor: alpha(theme.palette.success.main, 0.2),
+                color: theme.palette.success.main,
+              }}
+            >
+              <CheckCircle />
+            </Avatar>
+            <Typography
+              variant="h6"
+              fontWeight="700"
+              color="success.main"
+              sx={{
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
+              Approval Details
+            </Typography>
+          </Box>
+
+          <Box sx={{ p: 3 }}>
+            <Grid container spacing={3}>
+              {detailItems.map((item, index) => (
+                <Grid item xs={12} md={6} key={index}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      bgcolor: alpha(item.color, 0.05),
+                      border: `1px solid ${alpha(item.color, 0.1)}`,
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 2,
+                      transition: "all 0.3s ease",
+                      "&:hover": {
+                        bgcolor: alpha(item.color, 0.1),
+                        transform: "translateX(8px)",
+                      },
+                    }}
+                  >
+                    <Avatar
+                      sx={{
+                        bgcolor: alpha(item.color, 0.2),
+                        color: item.color,
+                        width: 40,
+                        height: 40,
+                      }}
+                    >
+                      {item.icon}
+                    </Avatar>
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: alpha(item.color, 0.8),
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          mb: 0.5,
+                          display: "block",
+                        }}
+                      >
+                        {item.label}
+                      </Typography>
+                      <Typography
+                        variant="body1"
+                        fontWeight="500"
+                        sx={{
+                          color: theme.palette.text.primary,
+                          textTransform: "capitalize",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                        }}
+                      >
+                        {item.value}
+                        <ArrowForward
+                          sx={{
+                            fontSize: 16,
+                            color: alpha(item.color, 0.5),
+                            ml: 1,
+                          }}
+                        />
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+            <Divider sx={{ my: 3 }} />
+          </Box>
+        </Paper>
+      </Fade>
+    );
+  };
 
   return (
     <>
@@ -375,12 +548,15 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
               </Table>
             </TableContainer>
           </Paper>
-          <ApprovalForm
-            onApprovalDetailsChange={setApprovalDetails}
-            customerName={notification.userName}
-          />
+          {notification?.status === "approved" ? (
+            <ApprovalDetails />
+          ) : (
+            <ApprovalForm
+              onApprovalDetailsChange={setApprovalDetails}
+              customerName={notification?.userName}
+            />
+          )}
         </DialogContent>
-
         <DialogActions
           sx={{
             p: 2.5,
@@ -388,64 +564,66 @@ const BlocksModal = ({ open, onClose, notification, onStatusChange }) => {
             justifyContent: "flex-end",
           }}
         >
-          <Box sx={{ position: "relative" }}>
-            <Button
-              onClick={() => handleStatusChange("approved")}
-              variant="contained"
-              disabled={isButtonDisabled}
-              sx={{
-                minWidth: "150px",
-                background: isLoading
-                  ? "linear-gradient(90deg, #64b5f6, #2196f3)"
-                  : isButtonDisabled
-                  ? theme.palette.action.disabledBackground
-                  : "linear-gradient(90deg, #00c853, #1b5e20)",
-                color: isButtonDisabled
-                  ? theme.palette.action.disabled
-                  : "#ffffff",
-                textTransform: "uppercase",
-                boxShadow: isButtonDisabled
-                  ? "none"
-                  : isLoading
-                  ? "0px 4px 8px rgba(33, 150, 243, 0.3)"
-                  : "0px 4px 8px rgba(0, 200, 83, 0.3)",
-                "&:hover": {
-                  background: isButtonDisabled
-                    ? theme.palette.action.disabledBackground
-                    : isLoading
+          {notification?.status !== "approved" && (
+            <Box sx={{ position: "relative" }}>
+              <Button
+                onClick={() => handleStatusChange("approved")}
+                variant="contained"
+                disabled={isButtonDisabled}
+                sx={{
+                  minWidth: "150px",
+                  background: isLoading
                     ? "linear-gradient(90deg, #64b5f6, #2196f3)"
-                    : "linear-gradient(90deg, #00e676, #00c853)",
+                    : isButtonDisabled
+                    ? theme.palette.action.disabledBackground
+                    : "linear-gradient(90deg, #00c853, #1b5e20)",
+                  color: isButtonDisabled
+                    ? theme.palette.action.disabled
+                    : "#ffffff",
+                  textTransform: "uppercase",
                   boxShadow: isButtonDisabled
                     ? "none"
-                    : "0px 6px 12px rgba(0, 230, 118, 0.4)",
-                },
-                "&.Mui-disabled": {
-                  background: theme.palette.action.disabledBackground,
-                  color: theme.palette.action.disabled,
-                  boxShadow: "none",
-                },
-              }}
-            >
-              {isLoading ? (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <CircularProgress
-                    size={20}
-                    sx={{
-                      color: isButtonDisabled
-                        ? theme.palette.action.disabled
-                        : "#fff",
-                    }}
-                  />
-                  <Typography variant="button">{approvalMessage}</Typography>
-                </Box>
-              ) : (
-                <>
-                  <CheckCircle sx={{ mr: 1 }} />
-                  Approve
-                </>
-              )}
-            </Button>
-          </Box>
+                    : isLoading
+                    ? "0px 4px 8px rgba(33, 150, 243, 0.3)"
+                    : "0px 4px 8px rgba(0, 200, 83, 0.3)",
+                  "&:hover": {
+                    background: isButtonDisabled
+                      ? theme.palette.action.disabledBackground
+                      : isLoading
+                      ? "linear-gradient(90deg, #64b5f6, #2196f3)"
+                      : "linear-gradient(90deg, #00e676, #00c853)",
+                    boxShadow: isButtonDisabled
+                      ? "none"
+                      : "0px 6px 12px rgba(0, 230, 118, 0.4)",
+                  },
+                  "&.Mui-disabled": {
+                    background: theme.palette.action.disabledBackground,
+                    color: theme.palette.action.disabled,
+                    boxShadow: "none",
+                  },
+                }}
+              >
+                {isLoading ? (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <CircularProgress
+                      size={20}
+                      sx={{
+                        color: isButtonDisabled
+                          ? theme.palette.action.disabled
+                          : "#fff",
+                      }}
+                    />
+                    <Typography variant="button">{approvalMessage}</Typography>
+                  </Box>
+                ) : (
+                  <>
+                    <CheckCircle sx={{ mr: 1 }} />
+                    Approve
+                  </>
+                )}
+              </Button>
+            </Box>
+          )}
           <Button
             onClick={onClose}
             variant="outlined"
